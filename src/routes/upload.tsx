@@ -9,8 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, MAX_UPLOAD_BYTES } from "@/lib/fees";
-import { finalizeUpload, addByCid } from "@/lib/videos.functions";
+import { getUploadUrl, registerUpload, addByCid } from "@/lib/videos.functions";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { Upload, Loader2, FileVideo, Link2 } from "lucide-react";
 
@@ -28,10 +29,50 @@ export const Route = createFileRoute("/upload")({
   component: UploadPage,
 });
 
+/**
+ * Upload a file directly to a Pinata presigned URL using XHR so we get
+ * progress events. Returns the parsed Pinata response.
+ */
+function uploadToPinata(
+  url: string,
+  file: File,
+  onProgress: (pct: number) => void,
+): Promise<{ cid: string; size: number; id: string }> {
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    form.append("file", file, file.name);
+    form.append("network", "public");
+    form.append("pinataOptions", JSON.stringify({ cidVersion: 1 }));
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url, true);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress((e.loaded / e.total) * 100);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const json = JSON.parse(xhr.responseText) as {
+            data: { cid: string; size: number; id: string };
+          };
+          resolve(json.data);
+        } catch (err) {
+          reject(new Error("Bad response from Pinata"));
+        }
+      } else {
+        reject(new Error(`Pinata upload failed [${xhr.status}]: ${xhr.responseText}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Network error during upload"));
+    xhr.send(form);
+  });
+}
+
 function UploadPage() {
   const navigate = useNavigate();
   const { address, connect } = useWallet();
-  const finalize = useServerFn(finalizeUpload);
+  const getUrl = useServerFn(getUploadUrl);
+  const register = useServerFn(registerUpload);
   const addCid = useServerFn(addByCid);
 
   // Auto-provision an anonymous owner id so uploads are free and frictionless
@@ -49,8 +90,9 @@ function UploadPage() {
   const [cidStage, setCidStage] = useState<"idle" | "registering">("idle");
   const months = 1;
   const [stage, setStage] = useState<
-    "idle" | "paying" | "uploading" | "pinning" | "stamping"
+    "idle" | "signing" | "uploading" | "registering"
   >("idle");
+  const [progress, setProgress] = useState(0);
 
   const tooBig = !!file && file.size > MAX_UPLOAD_BYTES;
 
@@ -63,41 +105,40 @@ function UploadPage() {
     }
 
     try {
-      // Encode file to base64
-      setStage("uploading");
-      const buffer = await file.arrayBuffer();
-      let binary = "";
-      const bytes = new Uint8Array(buffer);
-      const chunk = 0x8000;
-      for (let i = 0; i < bytes.length; i += chunk) {
-        binary += String.fromCharCode.apply(
-          null,
-          Array.from(bytes.subarray(i, i + chunk)),
-        );
-      }
-      const base64 = btoa(binary);
+      // 1. Ask our server for a presigned Pinata URL
+      setStage("signing");
+      setProgress(0);
+      const { url } = await getUrl({
+        data: { filename: file.name, sizeBytes: file.size },
+      });
 
-      // 3. Pin + timestamp
-      setStage("pinning");
-      const result = await finalize({
+      // 2. Upload the file directly to Pinata with progress
+      setStage("uploading");
+      const pinResult = await uploadToPinata(url, file, (pct) =>
+        setProgress(pct),
+      );
+
+      // 3. Register metadata + mock chain stamp
+      setStage("registering");
+      const result = await register({
         data: {
           wallet: address,
+          cid: pinResult.cid,
           title,
           description,
-          months,
-          fileBase64: base64,
-          filename: file.name,
+          sizeBytes: pinResult.size || file.size,
           mimeType: file.type || "video/mp4",
+          months,
         },
       });
 
-      setStage("stamping");
       toast.success("Pinned to IPFS");
       navigate({ to: "/v/$cid", params: { cid: result.cid } });
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Upload failed");
       setStage("idle");
+      setProgress(0);
     }
   }
 
@@ -223,6 +264,15 @@ function UploadPage() {
               </div>
             )}
 
+            {stage === "uploading" && (
+              <div className="space-y-2">
+                <Progress value={progress} />
+                <div className="font-mono text-xs text-muted-foreground text-right">
+                  {progress.toFixed(0)}% · uploading directly to IPFS
+                </div>
+              </div>
+            )}
+
             <Button
               type="submit"
               size="lg"
@@ -238,9 +288,9 @@ function UploadPage() {
               {stage !== "idle" && (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {stage === "uploading" && "Encoding…"}
-                  {stage === "pinning" && "Pinning to IPFS…"}
-                  {stage === "stamping" && "Finalizing…"}
+                  {stage === "signing" && "Requesting upload URL…"}
+                  {stage === "uploading" && `Uploading ${progress.toFixed(0)}%…`}
+                  {stage === "registering" && "Finalizing…"}
                 </>
               )}
             </Button>

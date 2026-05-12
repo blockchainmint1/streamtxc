@@ -1,7 +1,8 @@
 // Pinata IPFS pinning client (server-only). Uses JWT auth.
 // https://docs.pinata.cloud/api-reference/endpoint/upload-a-file
 
-const PINATA_BASE = "https://uploads.pinata.cloud/v3";
+const PINATA_UPLOADS = "https://uploads.pinata.cloud/v3";
+const PINATA_API = "https://api.pinata.cloud/v3";
 
 export interface PinResult {
   cid: string;
@@ -22,7 +23,7 @@ export async function pinFileToIPFS(
   // Request CIDv1 (bafy…) instead of legacy CIDv0 (Qm…)
   form.append("pinataOptions", JSON.stringify({ cidVersion: 1 }));
 
-  const res = await fetch(`${PINATA_BASE}/files`, {
+  const res = await fetch(`${PINATA_UPLOADS}/files`, {
     method: "POST",
     headers: { Authorization: `Bearer ${jwt}` },
     body: form,
@@ -41,6 +42,66 @@ export async function pinFileToIPFS(
     size: json.data.size,
     pinataId: json.data.id,
   };
+}
+
+/**
+ * Request a presigned URL the browser can POST a file to directly.
+ * Avoids streaming large files through our Worker.
+ */
+export async function createPresignedUploadUrl(opts: {
+  filename: string;
+  expiresSeconds?: number;
+}): Promise<{ url: string; expires: number }> {
+  const jwt = process.env.PINATA_JWT;
+  if (!jwt) throw new Error("PINATA_JWT is not configured");
+
+  const expires = opts.expiresSeconds ?? 60 * 60; // 1 hour
+  const res = await fetch(`${PINATA_UPLOADS}/files/sign`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      network: "public",
+      expires,
+      filename: opts.filename,
+      date: Math.floor(Date.now() / 1000),
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Pinata sign failed [${res.status}]: ${text}`);
+  }
+
+  const json = (await res.json()) as { data: string };
+  return { url: json.data, expires };
+}
+
+/**
+ * Pin an already-existing CID into our Pinata account so playback is reliable.
+ * Returns the queue entry id; pinning happens asynchronously on Pinata's side.
+ */
+export async function pinByCid(cid: string, name?: string): Promise<void> {
+  const jwt = process.env.PINATA_JWT;
+  if (!jwt) throw new Error("PINATA_JWT is not configured");
+
+  const res = await fetch(`${PINATA_API}/files/public/pin_by_cid`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ cid, name: name ?? cid }),
+  });
+
+  // 200/202 both acceptable; ignore "already pinned" style errors.
+  if (!res.ok && res.status !== 409) {
+    const text = await res.text().catch(() => "");
+    // Don't throw — pin_by_cid is best-effort. Just log.
+    console.warn(`pin_by_cid soft-fail [${res.status}]: ${text}`);
+  }
 }
 
 export function gatewayUrl(cid: string): string {
