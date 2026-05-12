@@ -143,7 +143,7 @@ export function Comments({ cid }: { cid: string }) {
         higher; anyone can <span className="text-primary">boost</span> a
         comment to push it back up. Split:{" "}
         <span className="text-foreground">90% creator</span> /{" "}
-        <span className="text-foreground">5% hosting</span> /{" "}
+        <span className="text-foreground">5% commenter</span> /{" "}
         <span className="text-foreground">5% platform</span>.
       </p>
 
