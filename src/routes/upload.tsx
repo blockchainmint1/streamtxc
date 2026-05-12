@@ -476,9 +476,57 @@ function UploadPage() {
             </div>
 
             {file && !tooBig && (
-              <div className="border border-border bg-card rounded-sm p-4 font-mono text-sm flex justify-between">
-                <span className="text-muted-foreground">cost</span>
-                <span className="text-primary font-bold">FREE (beta)</span>
+              <div className="border border-border bg-card rounded-sm p-4 space-y-3 font-mono text-sm">
+                <div className="flex justify-between items-start gap-4">
+                  <span className="text-muted-foreground shrink-0">cid</span>
+                  <span className="text-foreground text-xs break-all text-right">
+                    {localCid ?? (
+                      <span className="text-muted-foreground inline-flex items-center gap-1.5">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        hashing…
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">on ipfs?</span>
+                  {cidProbe === "checking" || cidProbe === "idle" ? (
+                    <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      checking…
+                    </span>
+                  ) : cidProbe === "on-ipfs" ? (
+                    <span className="text-primary inline-flex items-center gap-1.5 text-xs">
+                      <CheckCircle2 className="h-3 w-3" />
+                      already pinned — no upload needed
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">no — will upload</span>
+                  )}
+                </div>
+                <div className="flex justify-between items-center border-t border-border pt-3">
+                  <span className="text-muted-foreground">cost · 1 month</span>
+                  {quote ? (
+                    <span className="text-right">
+                      <span className="text-primary font-bold">
+                        {formatTxc(quote.txcAmount)}
+                      </span>
+                      <span className="block text-[10px] text-muted-foreground">
+                        ≈ ${quote.usdAmount.toFixed(4)} @ ${quote.txcUsd.toFixed(4)}/TXC
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      pricing…
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  $0.01 / MB / month, paid in TXC. After publishing you'll get a
+                  per-video TXC address — send the amount above within 24h or
+                  the file is unpinned.
+                </p>
               </div>
             )}
 
@@ -498,10 +546,17 @@ function UploadPage() {
               className="w-full font-mono"
             >
               {stage === "idle" && (
-                <>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload to IPFS
-                </>
+                cidProbe === "on-ipfs" ? (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Publish your video
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload to IPFS & publish
+                  </>
+                )
               )}
               {stage !== "idle" && (
                 <>
