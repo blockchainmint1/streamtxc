@@ -9,10 +9,11 @@ import { listRecentVideos } from "@/lib/videos.functions";
 import { formatBytes, shortenHash } from "@/lib/fees";
 import { ArrowUpRight, Upload, Database, Coins, Eye, Play } from "lucide-react";
 
-type SortKey = "newest" | "expensive" | "comments" | "leaving-soon";
+type SortKey = "newest" | "most-viewed" | "expensive" | "comments" | "leaving-soon";
 const PAGE = 9;
 const SORTS: { key: SortKey; label: string }[] = [
   { key: "newest", label: "newest" },
+  { key: "most-viewed", label: "most viewed" },
   { key: "expensive", label: "most expensive" },
   { key: "comments", label: "most comments" },
   { key: "leaving-soon", label: "leaving soon" },
