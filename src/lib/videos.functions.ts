@@ -109,6 +109,7 @@ export const registerUpload = createServerFn({ method: "POST" })
         sizeBytes: z.number().int().positive().max(MAX_UPLOAD_BYTES),
         mimeType: z.string().min(1).max(100),
         months: z.number().int().min(1).max(12).default(1),
+        thumbnailCid: cidStringSchema.optional(),
       })
       .parse(input),
   )
@@ -135,6 +136,7 @@ export const registerUpload = createServerFn({ method: "POST" })
       uploaderWallet: data.wallet,
       title: data.title,
       description: data.description ?? "",
+      thumbnailCid: data.thumbnailCid ?? null,
     });
 
     const expires = new Date();
@@ -156,6 +158,7 @@ export const registerUpload = createServerFn({ method: "POST" })
       derivation_index: videoWallet.derivationIndex,
       payment_required_txc: fee,
       metadata_cid: meta?.metaCid ?? null,
+      thumbnail_cid: data.thumbnailCid ?? null,
     });
     if (vErr) {
       // Race condition: someone registered the same CID between our check
