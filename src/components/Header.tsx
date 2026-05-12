@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Play } from "lucide-react";
+import { Play, Coins, ExternalLink } from "lucide-react";
 
 export function Header() {
   return (
@@ -32,6 +32,16 @@ export function Header() {
           >
             manage
           </Link>
+          <a
+            href="https://swap.texitcoin.org"
+            target="_blank"
+            rel="noreferrer"
+            className="ml-1 inline-flex items-center gap-1.5 rounded-sm border border-primary/40 bg-primary/10 px-3 py-1.5 text-primary transition-colors hover:bg-primary hover:text-primary-foreground"
+          >
+            <Coins className="h-3.5 w-3.5" />
+            get TXC
+            <ExternalLink className="h-3 w-3 opacity-70" />
+          </a>
         </nav>
       </div>
     </header>
