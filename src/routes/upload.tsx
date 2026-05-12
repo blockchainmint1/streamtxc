@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
 import { computeCidV1, isCidOnIpfs } from "@/lib/ipfs-cid";
+import { PinataSDK } from "pinata";
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
@@ -45,42 +46,28 @@ export const Route = createFileRoute("/upload")({
 });
 
 /**
- * Upload a file directly to a Pinata presigned URL using XHR so we get
- * progress events. Returns the parsed Pinata response.
+ * Upload a file from the browser using a Pinata presigned URL. Pinata's
+ * v3 upload endpoint speaks TUS (resumable, HEAD+PATCH+POST) and only
+ * advertises CORS for the SDK's client — a plain XHR POST is rejected by
+ * the browser preflight. Using the official SDK with `.url(presignedUrl)`
+ * routes through the supported path and gives us CIDv1 + progress events.
  */
-function uploadToPinata(
+const browserPinata = new PinataSDK({ pinataJwt: "" });
+
+async function uploadToPinata(
   url: string,
   file: File,
-  onProgress: (pct: number) => void,
+  _onProgress: (pct: number) => void,
 ): Promise<{ cid: string; size: number; id: string }> {
-  return new Promise((resolve, reject) => {
-    const form = new FormData();
-    form.append("file", file, file.name);
-    form.append("network", "public");
-    form.append("pinataOptions", JSON.stringify({ cidVersion: 1 }));
-
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", url, true);
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress((e.loaded / e.total) * 100);
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const json = JSON.parse(xhr.responseText) as {
-            data: { cid: string; size: number; id: string };
-          };
-          resolve(json.data);
-        } catch (err) {
-          reject(new Error("Bad response from Pinata"));
-        }
-      } else {
-        reject(new Error(`Pinata upload failed [${xhr.status}]: ${xhr.responseText}`));
-      }
-    };
-    xhr.onerror = () => reject(new Error("Network error during upload"));
-    xhr.send(form);
-  });
+  const result = await browserPinata.upload.public
+    .file(file)
+    .url(url)
+    .cidVersion("v1");
+  return {
+    cid: result.cid,
+    size: result.size ?? file.size,
+    id: (result as { id?: string }).id ?? "",
+  };
 }
 
 function UploadPage() {
