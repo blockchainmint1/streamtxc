@@ -14,7 +14,142 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      creator_credits: {
+        Row: {
+          credits: number
+          updated_at: string
+          wallet: string
+        }
+        Insert: {
+          credits?: number
+          updated_at?: string
+          wallet: string
+        }
+        Update: {
+          credits?: number
+          updated_at?: string
+          wallet?: string
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          created_at: string
+          id: string
+          mock_tx_hash: string
+          months_prepaid: number
+          txc_amount: number
+          video_cid: string
+          wallet: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mock_tx_hash: string
+          months_prepaid: number
+          txc_amount: number
+          video_cid: string
+          wallet: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mock_tx_hash?: string
+          months_prepaid?: number
+          txc_amount?: number
+          video_cid?: string
+          wallet?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_video_cid_fkey"
+            columns: ["video_cid"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["cid"]
+          },
+        ]
+      }
+      videos: {
+        Row: {
+          cid: string
+          created_at: string
+          description: string | null
+          duration_s: number | null
+          expires_at: string
+          mime_type: string | null
+          mock_block_number: number | null
+          mock_tx_hash: string | null
+          months_prepaid: number
+          owner_wallet: string
+          size_bytes: number
+          status: string
+          title: string
+          view_count: number
+        }
+        Insert: {
+          cid: string
+          created_at?: string
+          description?: string | null
+          duration_s?: number | null
+          expires_at?: string
+          mime_type?: string | null
+          mock_block_number?: number | null
+          mock_tx_hash?: string | null
+          months_prepaid?: number
+          owner_wallet: string
+          size_bytes: number
+          status?: string
+          title: string
+          view_count?: number
+        }
+        Update: {
+          cid?: string
+          created_at?: string
+          description?: string | null
+          duration_s?: number | null
+          expires_at?: string
+          mime_type?: string | null
+          mock_block_number?: number | null
+          mock_tx_hash?: string | null
+          months_prepaid?: number
+          owner_wallet?: string
+          size_bytes?: number
+          status?: string
+          title?: string
+          view_count?: number
+        }
+        Relationships: []
+      }
+      view_events: {
+        Row: {
+          id: number
+          ip_hash: string
+          ts: string
+          video_cid: string
+        }
+        Insert: {
+          id?: number
+          ip_hash: string
+          ts?: string
+          video_cid: string
+        }
+        Update: {
+          id?: number
+          ip_hash?: string
+          ts?: string
+          video_cid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "view_events_video_cid_fkey"
+            columns: ["video_cid"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["cid"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
