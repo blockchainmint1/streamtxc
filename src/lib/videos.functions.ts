@@ -835,3 +835,103 @@ export async function recordView(cid: string, ipHash: string) {
 
   return true;
 }
+
+// --- Thumbnail pinning + metadata editing --------------------------------
+
+/**
+ * Pin a small image (typically a JPEG frame the browser captured from the
+ * uploaded video) to IPFS and return the CID. The browser sends the bytes
+ * as base64 to keep the server fn payload simple — these are ~50–150 KB.
+ */
+export const pinThumbnail = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        // base64-encoded image bytes (no data: prefix)
+        imageBase64: z.string().min(1).max(2_000_000),
+        mimeType: z
+          .string()
+          .regex(/^image\/(jpeg|png|webp)$/, "Only JPEG/PNG/WebP")
+          .default("image/jpeg"),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const bytes = Uint8Array.from(atob(data.imageBase64), (c) =>
+      c.charCodeAt(0),
+    );
+    if (bytes.byteLength > 1_500_000) {
+      throw new Error("Thumbnail too large (max 1.5 MB)");
+    }
+    const ext = data.mimeType.split("/")[1] || "jpg";
+    const blob = new Blob([bytes as BlobPart], { type: data.mimeType });
+    const pin = await pinFileToIPFS(blob, `thumb.${ext}`);
+    return { cid: pin.cid, size: pin.size };
+  });
+
+/**
+ * Owner-only edit of title / description / thumbnail. Re-pins a fresh
+ * metadata JSON to IPFS and stamps a new "T" event on TXC, so the chain
+ * keeps a full version history (every edit is its own confirmed tx). The
+ * `videos` row is updated to point at the latest metadata_cid for fast
+ * read paths.
+ */
+export const editVideoMetadata = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        wallet: walletSchema,
+        cid: z.string().min(1).max(200),
+        title: z.string().min(1).max(200),
+        description: z.string().max(2000).optional().default(""),
+        thumbnailCid: cidStringSchema.nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: video, error } = await supabaseAdmin
+      .from("videos")
+      .select("cid, owner_wallet, video_wallet, thumbnail_cid")
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!video) throw new Error("Video not found");
+    if (video.owner_wallet.toLowerCase() !== data.wallet.toLowerCase()) {
+      throw new Error("Only the owner can edit this video");
+    }
+    if (!video.video_wallet) {
+      throw new Error("Video has no on-chain wallet — re-stamp first");
+    }
+
+    // null in input means "keep existing", explicit string means "replace",
+    // empty string means "remove" (we coerce to null upstream if needed).
+    const nextThumb =
+      data.thumbnailCid === undefined ? video.thumbnail_cid : data.thumbnailCid;
+
+    const meta = await recordMetadataAnchor({
+      videoCid: video.cid,
+      videoWallet: video.video_wallet,
+      uploaderWallet: video.owner_wallet,
+      title: data.title,
+      description: data.description ?? "",
+      thumbnailCid: nextThumb,
+    });
+
+    const { error: uErr } = await supabaseAdmin
+      .from("videos")
+      .update({
+        title: data.title,
+        description: data.description || null,
+        thumbnail_cid: nextThumb,
+        metadata_cid: meta?.metaCid ?? null,
+      })
+      .eq("cid", video.cid);
+    if (uErr) throw new Error(`Failed to update video: ${uErr.message}`);
+
+    return {
+      cid: video.cid,
+      metaCid: meta?.metaCid ?? null,
+      txid: meta?.stamp.real ? meta.stamp.txid : null,
+      stamped: !!meta?.stamp.real,
+    };
+  });
