@@ -4,6 +4,7 @@
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { stampEvent, type TxcEventType, type StampResult } from "./txc.server";
+import { createHash } from "crypto";
 
 export interface RecordChainEventInput {
   cid: string;
@@ -18,13 +19,30 @@ export interface RecordChainEventInput {
 export async function recordChainEvent(
   input: RecordChainEventInput,
 ): Promise<StampResult> {
-  const stamp = await stampEvent({
-    cid: input.cid,
-    wallet: input.uploaderWallet,
-    eventType: input.eventType,
-    toAddress: input.videoWallet,
-    extra: input.extra,
-  });
+  let stamp: StampResult;
+  try {
+    stamp = await stampEvent({
+      cid: input.cid,
+      wallet: input.uploaderWallet,
+      eventType: input.eventType,
+      toAddress: input.videoWallet,
+      extra: input.extra,
+    });
+  } catch (err) {
+    // Chain broadcast failed (RPC down, insufficient funds, dust, etc.) —
+    // don't take the whole upload down with it. Generate a placeholder
+    // txid, log loudly, and return so the video still saves. Operator can
+    // re-stamp later from the chain_events row.
+    console.error("recordChainEvent: stamp broadcast failed", err);
+    const fakeTxid = createHash("sha256")
+      .update(`pending:${input.cid}:${input.eventType}:${Date.now()}`)
+      .digest("hex");
+    stamp = {
+      txid: fakeTxid,
+      payload: `${input.eventType}|${input.cid}|${input.videoWallet}`,
+      real: false,
+    };
+  }
 
   const { error } = await supabaseAdmin.from("chain_events").insert({
     video_cid: input.cid,
@@ -34,7 +52,7 @@ export async function recordChainEvent(
     op_return_payload: stamp.payload,
     from_wallet: input.fromWallet ?? null,
     to_wallet: input.videoWallet,
-    status: "mempool",
+    status: stamp.real ? "mempool" : "stamp_failed",
     metadata: (input.metadata ?? null) as never,
   });
   if (error) {
