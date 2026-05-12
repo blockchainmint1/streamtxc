@@ -632,6 +632,129 @@ export const listMyVideos = createServerFn({ method: "POST" })
     return videos ?? [];
   });
 
+// --- Bulk extend (sendmany helper) ----------------------------------------
+
+/**
+ * Build a copy-pasteable `sendmany` command that extends every video the
+ * connected wallet owns by N months. Returns per-video amounts plus the full
+ * CLI string. Nothing is broadcast — the user pastes this into their wallet.
+ */
+export const buildBulkExtendQuote = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        wallet: walletSchema,
+        months: z.number().int().min(1).max(12).default(1),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: rows, error } = await supabaseAdmin
+      .from("videos")
+      .select("cid, title, video_wallet, size_bytes, expires_at")
+      .eq("owner_wallet", data.wallet)
+      .not("video_wallet", "is", null)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+
+    const price = await getTxcUsdPrice();
+    const items = (rows ?? []).map((v) => {
+      const usd = quoteUsd(v.size_bytes, data.months);
+      const txcRaw = usdToTxc(usd, price.usd);
+      // Round to 8 decimal places (TXC max precision).
+      const txcAmount = Math.round(txcRaw * 1e8) / 1e8;
+      return {
+        cid: v.cid,
+        title: v.title,
+        depositAddress: v.video_wallet as string,
+        usdAmount: usd,
+        txcAmount,
+      };
+    });
+
+    // Collapse duplicate addresses (sendmany requires unique keys).
+    const sumByAddr = new Map<string, number>();
+    for (const it of items) {
+      sumByAddr.set(
+        it.depositAddress,
+        Math.round(((sumByAddr.get(it.depositAddress) ?? 0) + it.txcAmount) * 1e8) / 1e8,
+      );
+    }
+    const obj: Record<string, number> = {};
+    for (const [addr, amt] of sumByAddr.entries()) obj[addr] = amt;
+
+    const totalTxc = Math.round(items.reduce((s, x) => s + x.txcAmount, 0) * 1e8) / 1e8;
+    const totalUsd = items.reduce((s, x) => s + x.usdAmount, 0);
+    const sendmanyJson = JSON.stringify(obj);
+    const sendmanyCli = `texitcoin-cli sendmany "" '${sendmanyJson}'`;
+
+    return {
+      months: data.months,
+      txcUsd: price.usd,
+      priceSource: price.source,
+      totalTxc,
+      totalUsd,
+      items,
+      sendmanyJson,
+      sendmanyCli,
+    };
+  });
+
+/**
+ * Trust-based "I paid the sendmany" confirmation. Bumps expires_at on every
+ * video the user owns by N months and inserts a payments row per video so the
+ * audit log matches. Does NOT verify the on-chain TX — pair with the watcher
+ * later when extension semantics land there.
+ */
+export const markBulkExtended = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        wallet: walletSchema,
+        months: z.number().int().min(1).max(12).default(1),
+        txHash: z.string().trim().max(200).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: rows, error } = await supabaseAdmin
+      .from("videos")
+      .select("cid, video_wallet, size_bytes, expires_at, months_prepaid")
+      .eq("owner_wallet", data.wallet)
+      .not("video_wallet", "is", null);
+    if (error) throw new Error(error.message);
+
+    const price = await getTxcUsdPrice();
+    const updated: string[] = [];
+    for (const v of rows ?? []) {
+      const usd = quoteUsd(v.size_bytes, data.months);
+      const txcAmount = Math.round(usdToTxc(usd, price.usd) * 1e8) / 1e8;
+      const base = new Date(
+        Math.max(new Date(v.expires_at).getTime(), Date.now()),
+      );
+      base.setDate(base.getDate() + data.months * 30);
+
+      const { error: uErr } = await supabaseAdmin
+        .from("videos")
+        .update({
+          expires_at: base.toISOString(),
+          months_prepaid: (v.months_prepaid ?? 0) + data.months,
+        })
+        .eq("cid", v.cid);
+      if (uErr) continue;
+
+      await supabaseAdmin.from("payments").insert({
+        video_cid: v.cid,
+        wallet: data.wallet,
+        txc_amount: txcAmount,
+        months_prepaid: data.months,
+        mock_tx_hash: data.txHash || `bulk-extend-${Date.now()}`,
+      });
+      updated.push(v.cid);
+    }
+    return { extended: updated.length, cids: updated };
+  });
+
 // --- Content reports / takedowns -----------------------------------------
 
 const REPORT_REASONS = [
