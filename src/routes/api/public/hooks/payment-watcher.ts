@@ -16,7 +16,12 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { getAddressReceived, stampCommentCid, getPlatformAddress } from "@/lib/txc.server";
+import {
+  getAddressReceived,
+  stampCommentCid,
+  getPlatformAddress,
+  stampEvent,
+} from "@/lib/txc.server";
 import { recordChainEvent } from "@/lib/chain-events.server";
 import { unpinByCid, pinJsonToIPFS } from "@/lib/pinata.server";
 import { PAYMENT_GRACE_HOURS } from "@/lib/fees";
@@ -154,6 +159,51 @@ async function handler() {
   });
 }
 
+async function retryFailedPaymentStampForPaidVideo(v: {
+  cid: string;
+  owner_wallet: string;
+  video_wallet: string;
+}) {
+  const { data: failedP } = await supabaseAdmin
+    .from("chain_events")
+    .select("id")
+    .eq("video_cid", v.cid)
+    .eq("event_type", "P")
+    .eq("status", "stamp_failed")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!failedP) return null;
+
+  const stamp = await stampEvent({
+    cid: v.cid,
+    wallet: v.owner_wallet,
+    eventType: "P",
+    toAddress: v.video_wallet,
+  });
+
+  if (!stamp.real) {
+    throw new Error("payment proof retry stayed in stub mode");
+  }
+
+  await supabaseAdmin
+    .from("chain_events")
+    .update({
+      tx_hash: stamp.txid,
+      op_return_payload: stamp.payload,
+      status: "mempool",
+    })
+    .eq("id", failedP.id);
+
+  await supabaseAdmin
+    .from("videos")
+    .update({ payment_tx_hash: stamp.txid })
+    .eq("cid", v.cid);
+
+  return stamp.txid;
+}
+
 async function processVideos() {
   const { data: pending, error } = await supabaseAdmin
     .from("videos")
@@ -186,6 +236,25 @@ async function processVideos() {
 
     // Already-paid video: only update expires_at if more TXC arrived (top-ups extend life).
     if (v.paid_at) {
+      try {
+        const retriedTxid = await retryFailedPaymentStampForPaidVideo({
+          cid: v.cid,
+          owner_wallet: v.owner_wallet,
+          video_wallet: v.video_wallet,
+        });
+        if (retriedTxid) {
+          results.push({ cid: v.cid, action: "payment_restamped", txid: retriedTxid });
+          continue;
+        }
+      } catch (err) {
+        results.push({
+          cid: v.cid,
+          action: "payment_restamp_failed",
+          error: String(err),
+        });
+        continue;
+      }
+
       const prevReceived = Number(v.payment_received_txc ?? 0);
       if (received > prevReceived + 0.00000001) {
         await supabaseAdmin
