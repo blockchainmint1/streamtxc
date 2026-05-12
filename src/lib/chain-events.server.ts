@@ -12,7 +12,21 @@ import {
   type StampResult,
 } from "./txc.server";
 import { pinJsonToIPFS } from "./pinata.server";
-import { createHash } from "crypto";
+
+// Non-crypto stub-id helper. Used only when no real RPC is configured
+// (local dev / tests). Must NOT pull in node:crypto — this file ends up
+// in the client bundle via the createServerFn import graph.
+function stubHex(seed: string): string {
+  let h = 0;
+  const data = `${seed}:${Date.now()}:${Math.random()}`;
+  for (let i = 0; i < data.length; i++) h = ((h << 5) - h + data.charCodeAt(i)) | 0;
+  let out = "";
+  for (let i = 0; i < 8; i++) {
+    h = (h * 1103515245 + 12345) | 0;
+    out += ((h >>> 0).toString(16)).padStart(8, "0");
+  }
+  return out;
+}
 
 export interface RecordChainEventInput {
   cid: string;
@@ -42,9 +56,7 @@ export async function recordChainEvent(
     // txid, log loudly, and return so the video still saves. Operator can
     // re-stamp later from the chain_events row.
     console.error("recordChainEvent: stamp broadcast failed", err);
-    const fakeTxid = createHash("sha256")
-      .update(`pending:${input.cid}:${input.eventType}:${Date.now()}`)
-      .digest("hex");
+    const fakeTxid = stubHex(`pending:${input.cid}:${input.eventType}:${Date.now()}`);
     stamp = {
       txid: fakeTxid,
       payload: `${input.eventType}|${input.cid}|${input.videoWallet}`,
@@ -124,9 +136,7 @@ export async function recordMetadataAnchor(input: {
     });
   } catch (err) {
     console.error("recordMetadataAnchor: stamp broadcast failed", err);
-    const fakeTxid = createHash("sha256")
-      .update(`pending:${input.videoCid}:T:${Date.now()}`)
-      .digest("hex");
+    const fakeTxid = stubHex(`pending:${input.videoCid}:T:${Date.now()}`);
     stamp = { txid: fakeTxid, payload, real: false };
   }
 
@@ -167,9 +177,7 @@ export async function recordOwnershipAnchor(input: {
     });
   } catch (err) {
     console.error("recordOwnershipAnchor: stamp broadcast failed", err);
-    const fakeTxid = createHash("sha256")
-      .update(`pending:${input.videoCid}:O:${Date.now()}`)
-      .digest("hex");
+    const fakeTxid = stubHex(`pending:${input.videoCid}:O:${Date.now()}`);
     stamp = { txid: fakeTxid, payload, real: false };
   }
 

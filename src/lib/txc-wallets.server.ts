@@ -18,7 +18,6 @@
 // mempool.texitcoin.org/address/<addr> shows the video's complete public
 // history.
 
-import { createHash } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getNewLabeledAddress } from "./txc.server";
 
@@ -35,11 +34,8 @@ function rpcConfigured(): boolean {
  * receives real funds — purely a placeholder string in the DB row.
  */
 function stubAddress(index: number): string {
-  const h = createHash("sha256")
-    .update(`txc-video-wallet-stub:${index}`)
-    .digest("hex")
-    .slice(0, 32);
-  return `txc1qstub${index}${h}`.slice(0, 50);
+  // Dev-only placeholder; never receives real funds.
+  return `txc1qstub${index.toString(16).padStart(8, "0")}`;
 }
 
 export interface VideoWalletAssignment {

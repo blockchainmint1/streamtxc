@@ -28,7 +28,21 @@
 // mempool polling UI) works end-to-end. The adapter is the ONLY place that
 // needs to change when real RPC creds land.
 
-import { createHash } from "crypto";
+
+// Non-crypto stub-id helper. Used only when no real RPC is configured
+// (local dev / tests). Must NOT pull in node:crypto — this file ends up
+// in the client bundle via the createServerFn import graph.
+function stubHex(seed: string): string {
+  let h = 0;
+  const data = `${seed}:${Date.now()}:${Math.random()}`;
+  for (let i = 0; i < data.length; i++) h = ((h << 5) - h + data.charCodeAt(i)) | 0;
+  let out = "";
+  for (let i = 0; i < 8; i++) {
+    h = (h * 1103515245 + 12345) | 0;
+    out += ((h >>> 0).toString(16)).padStart(8, "0");
+  }
+  return out;
+}
 
 export const TXC_PROTO_TAG = "TXCV1";
 
@@ -73,9 +87,7 @@ export function buildOpReturnPayload(
   const direct = parts.join("|");
   if (Buffer.byteLength(direct, "utf8") <= 80) return direct;
   // Fallback: hash everything into a single 32-byte commitment.
-  const h = createHash("sha256")
-    .update(`${cid}|${wallet}|${extra ?? ""}`)
-    .digest("hex");
+  const h = stubHex(`${cid}|${wallet}|${extra ?? ""}`);
   return `${tag}|h:${h}`;
 }
 
@@ -240,9 +252,7 @@ export async function stampRawPayload(opts: {
   }
 
   if (!rpcConfigured()) {
-    const txid = createHash("sha256")
-      .update(`stub:${payload}:${Date.now()}:${Math.random()}`)
-      .digest("hex");
+    const txid = stubHex(`stub:${payload}:${Date.now()}:${Math.random()}`);
     return { txid, payload, real: false };
   }
 
@@ -283,9 +293,7 @@ export async function stampEvent(opts: {
 
   if (!rpcConfigured()) {
     // Stub mode — deterministic 64-hex "txid" so the UI flow works.
-    const txid = createHash("sha256")
-      .update(`stub:${payload}:${Date.now()}:${Math.random()}`)
-      .digest("hex");
+    const txid = stubHex(`stub:${payload}:${Date.now()}:${Math.random()}`);
     return { txid, payload, real: false };
   }
 
@@ -371,7 +379,7 @@ export async function getTxStatus(
   if (!rpcConfigured() && createdAt) {
     const ageMs = Date.now() - new Date(createdAt).getTime();
     if (ageMs > 60_000) {
-      const blockHash = createHash("sha256").update(`block:${txid}`).digest("hex");
+      const blockHash = stubHex(`block:${txid}`);
       const blockHeight = Math.floor(Date.now() / 600_000); // 10-min "blocks"
       return { confirmed: true, blockHeight, blockHash };
     }
@@ -419,9 +427,7 @@ export async function sendToAddress(
   const amount = +amountTxc.toFixed(8);
   if (amount <= 0) throw new Error("sendToAddress: amount must be > 0");
   if (!rpcConfigured()) {
-    const txid = createHash("sha256")
-      .update(`stub:pay:${address}:${amount}:${Date.now()}:${Math.random()}`)
-      .digest("hex");
+    const txid = stubHex(`stub:pay:${address}:${amount}:${Date.now()}:${Math.random()}`);
     return { txid, payload: `pay:${amount}`, real: false };
   }
   const txid = await rpc<string>("sendtoaddress", [address, amount]);
