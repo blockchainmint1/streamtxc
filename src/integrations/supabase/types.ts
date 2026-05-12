@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      chain_events: {
+        Row: {
+          block_hash: string | null
+          block_number: number | null
+          created_at: string
+          event_type: string
+          from_wallet: string | null
+          id: string
+          metadata: Json | null
+          op_return_payload: string
+          status: string
+          to_wallet: string | null
+          tx_hash: string
+          video_cid: string
+          video_wallet: string | null
+        }
+        Insert: {
+          block_hash?: string | null
+          block_number?: number | null
+          created_at?: string
+          event_type: string
+          from_wallet?: string | null
+          id?: string
+          metadata?: Json | null
+          op_return_payload: string
+          status?: string
+          to_wallet?: string | null
+          tx_hash: string
+          video_cid: string
+          video_wallet?: string | null
+        }
+        Update: {
+          block_hash?: string | null
+          block_number?: number | null
+          created_at?: string
+          event_type?: string
+          from_wallet?: string | null
+          id?: string
+          metadata?: Json | null
+          op_return_payload?: string
+          status?: string
+          to_wallet?: string | null
+          tx_hash?: string
+          video_cid?: string
+          video_wallet?: string | null
+        }
+        Relationships: []
+      }
       creator_credits: {
         Row: {
           credits: number
@@ -76,6 +124,7 @@ export type Database = {
           block_number: number | null
           cid: string
           created_at: string
+          derivation_index: number | null
           description: string | null
           duration_s: number | null
           expires_at: string
@@ -87,6 +136,7 @@ export type Database = {
           status: string
           title: string
           tx_hash: string | null
+          video_wallet: string | null
           view_count: number
         }
         Insert: {
@@ -94,6 +144,7 @@ export type Database = {
           block_number?: number | null
           cid: string
           created_at?: string
+          derivation_index?: number | null
           description?: string | null
           duration_s?: number | null
           expires_at?: string
@@ -105,6 +156,7 @@ export type Database = {
           status?: string
           title: string
           tx_hash?: string | null
+          video_wallet?: string | null
           view_count?: number
         }
         Update: {
@@ -112,6 +164,7 @@ export type Database = {
           block_number?: number | null
           cid?: string
           created_at?: string
+          derivation_index?: number | null
           description?: string | null
           duration_s?: number | null
           expires_at?: string
@@ -123,6 +176,7 @@ export type Database = {
           status?: string
           title?: string
           tx_hash?: string | null
+          video_wallet?: string | null
           view_count?: number
         }
         Relationships: []
@@ -161,7 +215,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      next_video_wallet_index: { Args: never; Returns: number }
     }
     Enums: {
       [_ in never]: never

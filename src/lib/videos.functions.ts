@@ -3,7 +3,9 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { pinFileToIPFS, createPresignedUploadUrl, pinByCid } from "./pinata.server";
 import { mockPaymentTx } from "./chain";
-import { stampCid, getTxStatus, explorerTxUrl } from "./txc.server";
+import { getTxStatus, explorerTxUrl } from "./txc.server";
+import { assignVideoWallet } from "./txc-wallets.server";
+import { recordChainEvent } from "./chain-events.server";
 import { quoteFee, MAX_UPLOAD_BYTES } from "./fees";
 
 const walletSchema = z
@@ -94,7 +96,13 @@ export const registerUpload = createServerFn({ method: "POST" })
     await assertCidUnclaimed(data.cid);
     const fee = quoteFee(data.sizeBytes, data.months);
     const paymentTx = mockPaymentTx(data.wallet, fee);
-    const stamp = await stampCid(data.cid, data.wallet);
+    const videoWallet = await assignVideoWallet();
+    const stamp = await recordChainEvent({
+      cid: data.cid,
+      videoWallet: videoWallet.address,
+      eventType: "C",
+      uploaderWallet: data.wallet,
+    });
 
     const expires = new Date();
     expires.setMonth(expires.getMonth() + data.months);
@@ -111,6 +119,8 @@ export const registerUpload = createServerFn({ method: "POST" })
       op_return_payload: stamp.payload,
       months_prepaid: data.months,
       expires_at: expires.toISOString(),
+      video_wallet: videoWallet.address,
+      derivation_index: videoWallet.derivationIndex,
     });
     if (vErr) {
       // Race condition: someone registered the same CID between our check
@@ -173,7 +183,13 @@ export const finalizeUpload = createServerFn({ method: "POST" })
     // 2. Mock payment + real on-chain stamp
     const fee = quoteFee(binary.byteLength, data.months);
     const paymentTx = mockPaymentTx(data.wallet, fee);
-    const stamp = await stampCid(pin.cid, data.wallet);
+    const videoWallet = await assignVideoWallet();
+    const stamp = await recordChainEvent({
+      cid: pin.cid,
+      videoWallet: videoWallet.address,
+      eventType: "C",
+      uploaderWallet: data.wallet,
+    });
 
     // 3. Persist
     const expires = new Date();
@@ -193,6 +209,8 @@ export const finalizeUpload = createServerFn({ method: "POST" })
         op_return_payload: stamp.payload,
         months_prepaid: data.months,
         expires_at: expires.toISOString(),
+        video_wallet: videoWallet.address,
+        derivation_index: videoWallet.derivationIndex,
       });
     if (vErr) {
       if (vErr.code === "23505") await assertCidUnclaimed(pin.cid);
@@ -267,7 +285,13 @@ export const addByCid = createServerFn({ method: "POST" })
 
     const fee = quoteFee(Math.max(sizeBytes, 1), data.months);
     const paymentTx = mockPaymentTx(data.wallet, fee);
-    const stamp = await stampCid(data.cid, data.wallet);
+    const videoWallet = await assignVideoWallet();
+    const stamp = await recordChainEvent({
+      cid: data.cid,
+      videoWallet: videoWallet.address,
+      eventType: "C",
+      uploaderWallet: data.wallet,
+    });
 
     // Best-effort: pin into our own Pinata account so streaming is reliable.
     await pinByCid(data.cid, data.title);
@@ -287,6 +311,8 @@ export const addByCid = createServerFn({ method: "POST" })
       op_return_payload: stamp.payload,
       months_prepaid: data.months,
       expires_at: expires.toISOString(),
+      video_wallet: videoWallet.address,
+      derivation_index: videoWallet.derivationIndex,
     });
     if (vErr) {
       if (vErr.code === "23505") await assertCidUnclaimed(data.cid);
@@ -404,6 +430,15 @@ export const pollTxStatus = createServerFn({ method: "POST" })
           block_hash: status.blockHash,
         })
         .eq("cid", data.cid);
+      // Mirror confirmation onto the corresponding chain_events row.
+      await supabaseAdmin
+        .from("chain_events")
+        .update({
+          status: "confirmed",
+          block_number: status.blockHeight,
+          block_hash: status.blockHash,
+        })
+        .eq("tx_hash", video.tx_hash);
       return {
         status: "active",
         txHash: video.tx_hash,
