@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, formatDate, formatTxc, MAX_UPLOAD_BYTES } from "@/lib/fees";
 import {
-  getUploadUrl,
   registerUpload,
   addByCid,
   getQuote,
@@ -110,7 +109,6 @@ async function uploadToPinata(
 function UploadPage() {
   const navigate = useNavigate();
   const { address, connect } = useWallet();
-  const getUrl = useServerFn(getUploadUrl);
   const register = useServerFn(registerUpload);
   const addCid = useServerFn(addByCid);
   const quoteFn = useServerFn(getQuote);
