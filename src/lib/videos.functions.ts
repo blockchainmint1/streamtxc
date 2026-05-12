@@ -1141,7 +1141,7 @@ export const submitOwnershipProof = createServerFn({ method: "POST" })
 
 /**
  * Send the 90/5/5 split for one paid comment:
- *   - 5% → TXC_PLATFORM_ADDRESS  (always)
+ *   - 5% → platform-labeled wallet address (always)
  *   - 5% → TXC_HOSTING_ADDRESS   (always)
  *   - 90% → owner_wallet          (only if owner_proof_status='verified',
  *                                   else accrue to videos.escrowed_creator_txc)
