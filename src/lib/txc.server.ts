@@ -32,14 +32,35 @@ import { createHash } from "crypto";
 
 export const TXC_PROTO_TAG = "TXCV1";
 
+/**
+ * Lifecycle event types stamped into OP_RETURN. The 1-char suffix keeps
+ * the payload tiny so we always fit under the 80-byte limit.
+ *   C  claim       — initial upload, video wallet created
+ *   P  payment     — uploader paid the hosting fee
+ *   R  renewal     — extended hosting period
+ *   X  takedown    — pin removed (expired, opt-out, etc.)
+ *   D  dmca        — DMCA / abuse complaint logged
+ */
+export type TxcEventType = "C" | "P" | "R" | "X" | "D";
+
 /** ≤80 bytes per the Bitcoin OP_RETURN standard data carrier limit. */
-export function buildOpReturnPayload(cid: string, wallet: string): string {
+export function buildOpReturnPayload(
+  cid: string,
+  wallet: string,
+  eventType: TxcEventType = "C",
+  extra?: string,
+): string {
   const short = wallet.startsWith("0x") ? wallet.slice(0, 12) : wallet;
-  const direct = `${TXC_PROTO_TAG}|${cid}|${short}`;
+  const tag = `${TXC_PROTO_TAG}${eventType}`;
+  const parts = [tag, cid, short];
+  if (extra) parts.push(extra);
+  const direct = parts.join("|");
   if (Buffer.byteLength(direct, "utf8") <= 80) return direct;
-  // Fallback: hash both into a single 32-byte commitment.
-  const h = createHash("sha256").update(`${cid}|${wallet}`).digest("hex");
-  return `${TXC_PROTO_TAG}|h:${h}`;
+  // Fallback: hash everything into a single 32-byte commitment.
+  const h = createHash("sha256")
+    .update(`${cid}|${wallet}|${extra ?? ""}`)
+    .digest("hex");
+  return `${tag}|h:${h}`;
 }
 
 function rpcConfigured(): boolean {
@@ -76,9 +97,22 @@ export interface StampResult {
   real: boolean;
 }
 
-/** Broadcast an OP_RETURN tx anchoring (cid, wallet) on TXC. */
-export async function stampCid(cid: string, wallet: string): Promise<StampResult> {
-  const payload = buildOpReturnPayload(cid, wallet);
+/**
+ * Broadcast an OP_RETURN tx for a video lifecycle event on TXC.
+ *
+ * `toAddress` is the per-video wallet — every event for a given video is
+ * sent to the same address so mempool.texitcoin.org/address/<addr> shows
+ * the complete public history of that video.
+ */
+export async function stampEvent(opts: {
+  cid: string;
+  wallet: string;
+  eventType: TxcEventType;
+  toAddress?: string;
+  extra?: string;
+}): Promise<StampResult> {
+  const { cid, wallet, eventType, toAddress, extra } = opts;
+  const payload = buildOpReturnPayload(cid, wallet, eventType, extra);
 
   if (!rpcConfigured()) {
     // Stub mode — deterministic 64-hex "txid" so the UI flow works.
@@ -88,12 +122,12 @@ export async function stampCid(cid: string, wallet: string): Promise<StampResult
     return { txid, payload, real: false };
   }
 
-  // Real Bitcoin-style flow:
-  // 1. Build a tx that pays a tiny amount back to ourselves + OP_RETURN data.
-  //    `walletcreatefundedpsbt` would be cleaner, but `sendmany` style funding
-  //    + `createrawtransaction` with a `data` output is the most portable.
+  // Real Bitcoin-style flow. Send the dust output to the per-video wallet
+  // (falls back to platform address if not provided) so all events for the
+  // video accumulate on the same address page in the explorer.
   const platformAddress = process.env.TXC_PLATFORM_ADDRESS;
   if (!platformAddress) throw new Error("TXC_PLATFORM_ADDRESS is not configured");
+  const recipient = toAddress || platformAddress;
 
   // OP_RETURN data must be hex-encoded.
   const dataHex = Buffer.from(payload, "utf8").toString("hex");
@@ -102,7 +136,7 @@ export async function stampCid(cid: string, wallet: string): Promise<StampResult
   // signrawtransactionwithwallet + sendrawtransaction. Standard bitcoind flow.
   const rawTx = await rpc<string>("createrawtransaction", [
     [],
-    [{ data: dataHex }, { [platformAddress]: 0.00001 }],
+    [{ data: dataHex }, { [recipient]: 0.00001 }],
   ]);
   const funded = await rpc<{ hex: string }>("fundrawtransaction", [rawTx]);
   const signed = await rpc<{ hex: string; complete: boolean }>(
@@ -113,6 +147,15 @@ export async function stampCid(cid: string, wallet: string): Promise<StampResult
   const txid = await rpc<string>("sendrawtransaction", [signed.hex]);
 
   return { txid, payload, real: true };
+}
+
+/** Backwards-compatible thin wrapper for the original claim-stamp flow. */
+export async function stampCid(
+  cid: string,
+  wallet: string,
+  toAddress?: string,
+): Promise<StampResult> {
+  return stampEvent({ cid, wallet, eventType: "C", toAddress });
 }
 
 export interface TxStatus {
