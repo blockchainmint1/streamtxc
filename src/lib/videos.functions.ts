@@ -13,7 +13,7 @@ import { getTxStatus, explorerTxUrl } from "./txc.server";
 import { assignVideoWallet } from "./txc-wallets.server";
 import { recordChainEvent, recordMetadataAnchor } from "./chain-events.server";
 import { recordOwnershipAnchor, recordSplitPayout } from "./chain-events.server";
-import { verifyMessage, sendToAddress } from "./txc.server";
+import { verifyMessage, sendToAddress, getPlatformAddress } from "./txc.server";
 import { retryStuckStampForVideo } from "./stamp-retry.server";
 import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
@@ -1171,13 +1171,22 @@ export async function sweepCommentPayout(commentId: string): Promise<{
   const amount = Number(comment.payment_received_txc ?? 0);
   if (amount <= 0) return { ok: false, status: "failed", details: { error: "no payment" } };
 
-  const platformAddr = process.env.TXC_PLATFORM_ADDRESS;
   const hostingAddr = process.env.TXC_HOSTING_ADDRESS;
-  if (!platformAddr || !hostingAddr) {
+  if (!hostingAddr) {
     return {
       ok: false,
       status: "failed",
-      details: { error: "TXC_PLATFORM_ADDRESS or TXC_HOSTING_ADDRESS not configured" },
+      details: { error: "TXC_HOSTING_ADDRESS not configured" },
+    };
+  }
+  let platformAddr: string;
+  try {
+    platformAddr = await getPlatformAddress();
+  } catch (e) {
+    return {
+      ok: false,
+      status: "failed",
+      details: { error: `Failed to resolve platform address: ${String(e)}` },
     };
   }
 

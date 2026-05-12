@@ -16,7 +16,7 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { getAddressReceived, stampCommentCid } from "@/lib/txc.server";
+import { getAddressReceived, stampCommentCid, getPlatformAddress } from "@/lib/txc.server";
 import { recordChainEvent } from "@/lib/chain-events.server";
 import { unpinByCid, pinJsonToIPFS } from "@/lib/pinata.server";
 import { PAYMENT_GRACE_HOURS } from "@/lib/fees";
@@ -41,13 +41,22 @@ async function sweepBoostPayout(
   if (!video)
     return { ok: false, status: "failed", details: { error: "video missing" } };
 
-  const platformAddr = process.env.TXC_PLATFORM_ADDRESS;
   const hostingAddr = process.env.TXC_HOSTING_ADDRESS;
-  if (!platformAddr || !hostingAddr) {
+  if (!hostingAddr) {
     return {
       ok: false,
       status: "failed",
-      details: { error: "platform/hosting addr not configured" },
+      details: { error: "hosting addr not configured" },
+    };
+  }
+  let platformAddr: string;
+  try {
+    platformAddr = await getPlatformAddress();
+  } catch (e) {
+    return {
+      ok: false,
+      status: "failed",
+      details: { error: `platform addr resolve failed: ${String(e)}` },
     };
   }
 
