@@ -62,6 +62,107 @@ export type Database = {
         }
         Relationships: []
       }
+      comment_boosts: {
+        Row: {
+          amount_txc: number
+          booster_wallet: string | null
+          comment_id: string
+          created_at: string
+          id: string
+          mock_tx_hash: string | null
+          op_return_payload: string | null
+          tx_hash: string | null
+        }
+        Insert: {
+          amount_txc: number
+          booster_wallet?: string | null
+          comment_id: string
+          created_at?: string
+          id?: string
+          mock_tx_hash?: string | null
+          op_return_payload?: string | null
+          tx_hash?: string | null
+        }
+        Update: {
+          amount_txc?: number
+          booster_wallet?: string | null
+          comment_id?: string
+          created_at?: string
+          id?: string
+          mock_tx_hash?: string | null
+          op_return_payload?: string | null
+          tx_hash?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_boosts_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comments: {
+        Row: {
+          body: string
+          boost_total_txc: number
+          commenter_wallet: string | null
+          created_at: string
+          creator_share_txc: number
+          hidden_at: string | null
+          hidden_reason: string | null
+          hosting_share_txc: number
+          id: string
+          initial_payment_txc: number
+          last_boost_at: string
+          mock_tx_hash: string | null
+          op_return_payload: string | null
+          platform_share_txc: number
+          status: string
+          tx_hash: string | null
+          video_cid: string
+        }
+        Insert: {
+          body: string
+          boost_total_txc?: number
+          commenter_wallet?: string | null
+          created_at?: string
+          creator_share_txc?: number
+          hidden_at?: string | null
+          hidden_reason?: string | null
+          hosting_share_txc?: number
+          id?: string
+          initial_payment_txc: number
+          last_boost_at?: string
+          mock_tx_hash?: string | null
+          op_return_payload?: string | null
+          platform_share_txc?: number
+          status?: string
+          tx_hash?: string | null
+          video_cid: string
+        }
+        Update: {
+          body?: string
+          boost_total_txc?: number
+          commenter_wallet?: string | null
+          created_at?: string
+          creator_share_txc?: number
+          hidden_at?: string | null
+          hidden_reason?: string | null
+          hosting_share_txc?: number
+          id?: string
+          initial_payment_txc?: number
+          last_boost_at?: string
+          mock_tx_hash?: string | null
+          op_return_payload?: string | null
+          platform_share_txc?: number
+          status?: string
+          tx_hash?: string | null
+          video_cid?: string
+        }
+        Relationships: []
+      }
       creator_credits: {
         Row: {
           credits: number
@@ -166,6 +267,7 @@ export type Database = {
           expires_at: string
           hidden_at: string | null
           hidden_reason: string | null
+          hosting_credit_txc: number
           mime_type: string | null
           months_prepaid: number
           op_return_payload: string | null
@@ -194,6 +296,7 @@ export type Database = {
           expires_at?: string
           hidden_at?: string | null
           hidden_reason?: string | null
+          hosting_credit_txc?: number
           mime_type?: string | null
           months_prepaid?: number
           op_return_payload?: string | null
@@ -222,6 +325,7 @@ export type Database = {
           expires_at?: string
           hidden_at?: string | null
           hidden_reason?: string | null
+          hosting_credit_txc?: number
           mime_type?: string | null
           months_prepaid?: number
           op_return_payload?: string | null
