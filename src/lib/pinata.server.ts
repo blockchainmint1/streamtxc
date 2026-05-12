@@ -109,3 +109,34 @@ export function gatewayUrl(cid: string): string {
   if (domain) return `https://${domain}/ipfs/${cid}`;
   return `https://gateway.pinata.cloud/ipfs/${cid}`;
 }
+
+/**
+ * Best-effort unpin. Looks up the file by CID in our Pinata account, then
+ * deletes it. Used by the payment watcher when a video's 24h grace expires
+ * without funds landing.
+ */
+export async function unpinByCid(cid: string): Promise<boolean> {
+  const jwt = process.env.PINATA_JWT;
+  if (!jwt) return false;
+  try {
+    const lookup = await fetch(
+      `${PINATA_API}/files/public?cid=${encodeURIComponent(cid)}`,
+      { headers: { Authorization: `Bearer ${jwt}` } },
+    );
+    if (!lookup.ok) return false;
+    const data = (await lookup.json()) as { data?: { files?: { id: string }[] } };
+    const files = data.data?.files ?? [];
+    let ok = false;
+    for (const f of files) {
+      const del = await fetch(`${PINATA_API}/files/public/${f.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      if (del.ok) ok = true;
+    }
+    return ok;
+  } catch (err) {
+    console.warn("unpinByCid failed", err);
+    return false;
+  }
+}
