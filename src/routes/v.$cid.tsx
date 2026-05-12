@@ -6,7 +6,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { Button } from "@/components/ui/button";
-import { getVideo, pollTxStatus } from "@/lib/videos.functions";
+import { getVideo, pollTxStatus, reportVideo } from "@/lib/videos.functions";
 import { formatBytes, shortenHash, formatTxc, formatDate } from "@/lib/fees";
 import {
   Copy,
@@ -20,8 +20,28 @@ import {
   CheckCircle2,
   Wallet,
   AlertTriangle,
+  Flag,
+  ShieldAlert,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/v/$cid")({
   component: WatchPage,
@@ -118,6 +138,22 @@ function WatchPage() {
                 {video.description}
               </p>
             )}
+            {video.hidden_at && (
+              <div className="border-2 border-amber-500/60 bg-amber-500/5 rounded-sm p-4 flex items-start gap-3">
+                <ShieldAlert className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="font-mono text-xs text-amber-500">
+                    [ UNDER REVIEW · HIDDEN FROM HOMEPAGE ]
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    This video has been reported and is hidden from public
+                    listings while a moderator reviews it. The file remains on
+                    IPFS — direct links still work — but it won't appear on the
+                    homepage or search until the report is resolved.
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap gap-4 font-mono text-xs text-muted-foreground border-t border-border pt-4">
               <span className="flex items-center gap-1.5">
                 <Eye className="h-3.5 w-3.5" /> {video.view_count} views
@@ -128,6 +164,7 @@ function WatchPage() {
               </span>
               <span>{formatBytes(video.size_bytes)}</span>
               <span>uploader: {shortenHash(video.owner_wallet)}</span>
+              <ReportButton cid={video.cid} />
             </div>
           </div>
 
@@ -421,5 +458,125 @@ function PaymentPanel({
         </>
       )}
     </div>
+  );
+}
+
+const REPORT_REASONS: { value: string; label: string }[] = [
+  { value: "nsfw", label: "Adult / pornographic content" },
+  { value: "csam", label: "Child sexual abuse material" },
+  { value: "violence", label: "Graphic violence or gore" },
+  { value: "copyright", label: "Copyright / stolen content" },
+  { value: "illegal", label: "Other illegal content" },
+  { value: "spam", label: "Spam or misleading" },
+  { value: "other", label: "Other (explain below)" },
+];
+
+function ReportButton({ cid }: { cid: string }) {
+  const reportFn = useServerFn(reportVideo);
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState<string>("");
+  const [details, setDetails] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit() {
+    if (!reason) {
+      toast.error("Pick a reason");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await reportFn({
+        data: { cid, reason: reason as never, details },
+      });
+      if (res.alreadyReported) {
+        toast("You've already reported this video today");
+      } else {
+        toast.success("Report received — video is hidden pending review");
+      }
+      setOpen(false);
+      setReason("");
+      setDetails("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to report");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          className="ml-auto flex items-center gap-1.5 text-muted-foreground hover:text-destructive transition-colors"
+          aria-label="Report this video"
+        >
+          <Flag className="h-3.5 w-3.5" />
+          report
+        </button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-mono">Report this video</DialogTitle>
+          <DialogDescription>
+            Reported videos are immediately hidden from the homepage while a
+            moderator reviews them. Abuse of this tool may result in IP-level
+            blocks.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label className="font-mono text-xs">REASON</Label>
+            <Select value={reason} onValueChange={setReason}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pick a reason" />
+              </SelectTrigger>
+              <SelectContent>
+                {REPORT_REASONS.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>
+                    {r.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label className="font-mono text-xs">
+              DETAILS (optional)
+            </Label>
+            <Textarea
+              value={details}
+              onChange={(e) => setDetails(e.target.value)}
+              maxLength={2000}
+              rows={3}
+              placeholder="Anything a moderator should know"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            onClick={() => setOpen(false)}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={submit}
+            disabled={submitting || !reason}
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Submitting…
+              </>
+            ) : (
+              <>
+                <Flag className="mr-2 h-3 w-3" /> Submit report
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

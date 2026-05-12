@@ -1,4 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestIP, getRequestHeader } from "@tanstack/react-start/server";
+import { createHash } from "crypto";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { pinFileToIPFS, createPresignedUploadUrl, pinByCid } from "./pinata.server";
@@ -395,6 +397,7 @@ export const listRecentVideos = createServerFn({ method: "GET" }).handler(
         "cid, title, owner_wallet, size_bytes, view_count, created_at, status",
       )
       .in("status", ["active", "mempool"])
+      .is("hidden_at", null)
       .order("created_at", { ascending: false })
       .limit(24);
     if (error) throw new Error(error.message);
@@ -428,6 +431,87 @@ export const listMyVideos = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return videos ?? [];
+  });
+
+// --- Content reports / takedowns -----------------------------------------
+
+const REPORT_REASONS = [
+  "nsfw",
+  "csam",
+  "violence",
+  "copyright",
+  "illegal",
+  "spam",
+  "other",
+] as const;
+
+function hashReporter(): string {
+  // Stable per-IP hash (with daily salt) so the same person can't spam reports
+  // on the same video, but their identity is never stored in plaintext.
+  const ip =
+    getRequestIP({ xForwardedFor: true }) ||
+    getRequestHeader("x-real-ip") ||
+    "unknown";
+  const day = new Date().toISOString().slice(0, 10);
+  return createHash("sha256").update(`${ip}|${day}`).digest("hex");
+}
+
+export const reportVideo = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        cid: z.string().min(1).max(200),
+        reason: z.enum(REPORT_REASONS),
+        details: z.string().max(2000).optional().default(""),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    // Make sure the video exists.
+    const { data: video, error: vErr } = await supabaseAdmin
+      .from("videos")
+      .select("cid, hidden_at, report_count")
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (vErr) throw new Error(vErr.message);
+    if (!video) throw new Error("Video not found");
+
+    const ipHash = hashReporter();
+
+    // Insert report; unique(cid, ip_hash) silently dedupes repeat reports
+    // from the same IP on the same day.
+    const { error: rErr } = await supabaseAdmin.from("video_reports").insert({
+      video_cid: data.cid,
+      reason: data.reason,
+      details: data.details || null,
+      reporter_ip_hash: ipHash,
+    });
+    if (rErr && rErr.code !== "23505") {
+      throw new Error(`Failed to file report: ${rErr.message}`);
+    }
+    const alreadyReported = rErr?.code === "23505";
+
+    // Recompute count from the source of truth and hide on first report.
+    const { count } = await supabaseAdmin
+      .from("video_reports")
+      .select("id", { count: "exact", head: true })
+      .eq("video_cid", data.cid);
+
+    const shouldHide = !video.hidden_at && (count ?? 0) > 0;
+    await supabaseAdmin
+      .from("videos")
+      .update({
+        report_count: count ?? 0,
+        ...(shouldHide
+          ? {
+              hidden_at: new Date().toISOString(),
+              hidden_reason: `auto-hidden after report (${data.reason})`,
+            }
+          : {}),
+      })
+      .eq("cid", data.cid);
+
+    return { ok: true, alreadyReported, reportCount: count ?? 0 };
   });
 
 // --- TXC tx confirmation polling ------------------------------------------
