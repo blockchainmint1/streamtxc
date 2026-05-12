@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useWallet } from "@/lib/wallet";
-import { formatBytes, MAX_UPLOAD_BYTES } from "@/lib/fees";
+import { formatBytes, formatDate, MAX_UPLOAD_BYTES } from "@/lib/fees";
 import { getUploadUrl, registerUpload, addByCid } from "@/lib/videos.functions";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -212,11 +212,7 @@ function UploadPage() {
                       {shortWallet(duplicate.ownerWallet)}
                     </span>{" "}
                     on{" "}
-                    {new Date(duplicate.createdAt).toLocaleDateString(undefined, {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
+                    {formatDate(duplicate.createdAt)}
                     . CIDs are content-addressed — same file, same ID, forever.
                     First wallet to stamp wins.
                   </p>
