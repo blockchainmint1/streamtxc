@@ -21,6 +21,8 @@ import {
   listMyVideos,
   editVideoMetadata,
   pinThumbnail,
+  getOwnershipChallenge,
+  submitOwnershipProof,
 } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, shortenHash } from "@/lib/fees";
@@ -31,6 +33,8 @@ import {
   Pencil,
   Loader2,
   Upload as UploadIcon,
+  ShieldCheck,
+  ShieldAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 
