@@ -49,6 +49,7 @@ function WatchPage() {
   const blockHash = chain?.blockHash ?? video?.block_hash ?? null;
   const txHash = chain?.txHash ?? video?.tx_hash ?? null;
   const confirmed = status === "active" && !!blockNumber;
+  const stampFailed = status === "stamp_failed";
 
   const [embedW, setEmbedW] = useState(640);
   const [embedH, setEmbedH] = useState(360);
@@ -159,6 +160,10 @@ function WatchPage() {
                   <div className="flex items-center gap-1.5 text-xs mt-0.5 text-primary font-mono">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     confirmed in block #{blockNumber}
+                  </div>
+                ) : stampFailed ? (
+                  <div className="text-xs mt-0.5 text-destructive font-mono">
+                    chain stamp failed — not in mempool yet
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5 text-xs mt-0.5 text-muted-foreground font-mono">
