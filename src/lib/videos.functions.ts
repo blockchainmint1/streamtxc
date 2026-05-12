@@ -429,7 +429,7 @@ export const listRecentVideos = createServerFn({ method: "POST" })
     z
       .object({
         sort: z
-          .enum(["newest", "expensive", "comments", "leaving-soon"])
+          .enum(["newest", "expensive", "comments", "leaving-soon", "most-viewed"])
           .default("newest"),
         limit: z.number().int().min(1).max(48).default(9),
         offset: z.number().int().min(0).default(0),
@@ -454,6 +454,8 @@ export const listRecentVideos = createServerFn({ method: "POST" })
       });
     } else if (sort === "leaving-soon") {
       query = query.order("expires_at", { ascending: true });
+    } else if (sort === "most-viewed") {
+      query = query.order("view_count", { ascending: false, nullsFirst: false });
     } else {
       // newest + comments both start from newest; we re-sort comments below
       query = query.order("created_at", { ascending: false });
