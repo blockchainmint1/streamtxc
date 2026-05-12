@@ -1152,10 +1152,10 @@ export async function sweepCommentPayout(commentId: string): Promise<{
   const hostingAmt = +(amount * 0.05).toFixed(8);
   const platformAmt = +(amount - creatorAmt - hostingAmt).toFixed(8);
 
-  const updates: Record<string, unknown> = {
+  const updates: Record<string, string> = {
     payout_attempted_at: new Date().toISOString(),
   };
-  const details: Record<string, unknown> = {};
+  const details: Record<string, string> = {};
   let allOk = true;
 
   // Platform leg
@@ -1233,7 +1233,10 @@ export async function sweepCommentPayout(commentId: string): Promise<{
       : "swept";
   updates.payout_status = status === "swept" ? "swept" : status === "escrowed" ? "escrowed" : "partial";
 
-  await supabaseAdmin.from("comments").update(updates).eq("id", commentId);
+  await supabaseAdmin
+    .from("comments")
+    .update(updates as never)
+    .eq("id", commentId);
   return { ok: allOk, status, details };
 }
 
