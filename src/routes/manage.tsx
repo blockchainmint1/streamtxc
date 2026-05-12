@@ -24,6 +24,8 @@ import {
   getOwnershipChallenge,
   submitOwnershipProof,
   retryOwnStamp,
+  buildBulkExtendQuote,
+  markBulkExtended,
 } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, shortenHash } from "@/lib/fees";
@@ -37,6 +39,8 @@ import {
   ShieldCheck,
   ShieldAlert,
   RefreshCw,
+  CalendarPlus,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 
