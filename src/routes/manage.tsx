@@ -25,7 +25,6 @@ import {
   submitOwnershipProof,
   retryOwnStamp,
   buildBulkExtendQuote,
-  markBulkExtended,
   verifyBulkExtensionTx,
 } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
