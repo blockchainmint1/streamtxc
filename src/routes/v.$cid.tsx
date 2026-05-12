@@ -18,6 +18,8 @@ import {
   Code2,
   Loader2,
   CheckCircle2,
+  Wallet,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -131,6 +133,16 @@ function WatchPage() {
 
           {/* Sidebar: chain info + embed */}
           <div className="space-y-4">
+            {video.video_wallet && video.payment_required_txc != null && (
+              <PaymentPanel
+                required={Number(video.payment_required_txc)}
+                received={Number(video.payment_received_txc ?? 0)}
+                wallet={video.video_wallet}
+                paidAt={video.paid_at ?? null}
+                createdAt={video.created_at}
+                onCopy={copy}
+              />
+            )}
             <div className="border border-border bg-card rounded-sm p-4 space-y-3">
               <h2 className="font-mono text-xs text-primary">[ ON-CHAIN PROOF ]</h2>
               <Field label="IPFS CID" value={video.cid} onCopy={copy} mono />
