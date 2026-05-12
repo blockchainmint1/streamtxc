@@ -261,20 +261,14 @@ function UploadPage() {
         return;
       }
 
-      // 3. Not on IPFS yet — ask our server for a presigned Pinata URL.
-      setStage("signing");
-      const safeName = sanitizeFilename(file.name);
-      const { url } = await getUrl({
-        data: { filename: safeName, sizeBytes: file.size },
-      });
-
-      // 4. Upload the file directly to Pinata with progress.
+      // 3. Not on IPFS yet — upload through our server proxy to Pinata.
       setStage("uploading");
+      const safeName = sanitizeFilename(file.name);
       const safeFile =
         safeName === file.name
           ? file
           : new File([file], safeName, { type: file.type });
-      const pinResult = await uploadToPinata(url, safeFile, (pct) =>
+      const pinResult = await uploadToPinata("", safeFile, (pct) =>
         setProgress(pct),
       );
 
