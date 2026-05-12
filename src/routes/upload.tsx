@@ -28,7 +28,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
-import { computeCidV1, isCidOnIpfs } from "@/lib/ipfs-cid";
+import { computeCids, findCidOnIpfs } from "@/lib/ipfs-cid";
 import { PinataSDK } from "pinata";
 
 export const Route = createFileRoute("/upload")({
@@ -86,7 +86,8 @@ function UploadPage() {
 
   const [file, setFile] = useState<File | null>(null);
   const [codecWarning, setCodecWarning] = useState<string | null>(null);
-  const [localCid, setLocalCid] = useState<string | null>(null);
+  const [localCids, setLocalCids] = useState<{ v1: string; v0: string } | null>(null);
+  const [matchedCid, setMatchedCid] = useState<string | null>(null);
   const [cidProbe, setCidProbe] = useState<"idle" | "checking" | "on-ipfs" | "off-ipfs">("idle");
   const [quote, setQuote] = useState<{
     txcAmount: number;
@@ -118,7 +119,8 @@ function UploadPage() {
    */
   useEffect(() => {
     if (!file || tooBig) {
-      setLocalCid(null);
+      setLocalCids(null);
+      setMatchedCid(null);
       setCidProbe("idle");
       setQuote(null);
       return;
@@ -127,16 +129,17 @@ function UploadPage() {
     (async () => {
       try {
         setCidProbe("checking");
-        const [cid, q] = await Promise.all([
-          computeCidV1(file),
+        const [cids, q] = await Promise.all([
+          computeCids(file),
           quoteFn({ data: { sizeBytes: file.size, months: 1 } }),
         ]);
         if (cancelled) return;
-        setLocalCid(cid);
+        setLocalCids(cids);
         setQuote({ txcAmount: q.txcAmount, usdAmount: q.usdAmount, txcUsd: q.txcUsd });
-        const onIpfs = await isCidOnIpfs(cid);
+        const hit = await findCidOnIpfs(cids);
         if (cancelled) return;
-        setCidProbe(onIpfs ? "on-ipfs" : "off-ipfs");
+        setMatchedCid(hit?.cid ?? null);
+        setCidProbe(hit ? "on-ipfs" : "off-ipfs");
       } catch (err) {
         if (!cancelled) setCidProbe("off-ipfs");
       }
@@ -192,11 +195,13 @@ function UploadPage() {
       //    background probe finished.
       setStage("hashing");
       setProgress(0);
-      const cid = localCid ?? (await computeCidV1(file));
+      const cids = localCids ?? (await computeCids(file));
       setStage("checking");
-      const alreadyPinned =
-        cidProbe === "on-ipfs" ? true : await isCidOnIpfs(cid);
-      if (alreadyPinned) {
+      const hit =
+        matchedCid
+          ? { cid: matchedCid }
+          : await findCidOnIpfs(cids);
+      if (hit) {
         toast("Found this file on IPFS — skipping upload", {
           description: "Registering existing CID instead.",
         });
@@ -204,7 +209,7 @@ function UploadPage() {
         const result = await addCid({
           data: {
             wallet: address,
-            cid,
+            cid: hit.cid,
             title,
             description,
             months,
@@ -467,7 +472,7 @@ function UploadPage() {
                 <div className="flex justify-between items-start gap-4">
                   <span className="text-muted-foreground shrink-0">cid</span>
                   <span className="text-foreground text-xs break-all text-right">
-                    {localCid ?? (
+                    {matchedCid ?? localCids?.v1 ?? (
                       <span className="text-muted-foreground inline-flex items-center gap-1.5">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         hashing…
