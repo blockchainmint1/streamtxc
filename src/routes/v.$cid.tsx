@@ -6,7 +6,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { Button } from "@/components/ui/button";
-import { getVideo } from "@/lib/videos.functions";
+import { getVideo, pollTxStatus } from "@/lib/videos.functions";
 import { formatBytes, shortenHash, formatTxc } from "@/lib/fees";
 import {
   Copy,
@@ -16,6 +16,8 @@ import {
   Hash,
   Check,
   Code2,
+  Loader2,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,10 +28,27 @@ export const Route = createFileRoute("/v/$cid")({
 function WatchPage() {
   const { cid } = Route.useParams();
   const fetchVideo = useServerFn(getVideo);
+  const pollTx = useServerFn(pollTxStatus);
   const { data: video, isLoading } = useQuery({
     queryKey: ["video", cid],
     queryFn: () => fetchVideo({ data: { cid } }),
   });
+
+  // Poll on-chain confirmation while still in mempool. Once confirmed the
+  // server fn updates the row and returns status='active', so we stop polling.
+  const { data: chain } = useQuery({
+    queryKey: ["tx-status", cid],
+    queryFn: () => pollTx({ data: { cid } }),
+    enabled: !!video,
+    refetchInterval: (q) =>
+      q.state.data?.status === "active" ? false : 15_000,
+  });
+
+  const status = chain?.status ?? video?.status;
+  const blockNumber = chain?.blockNumber ?? video?.block_number ?? null;
+  const blockHash = chain?.blockHash ?? video?.block_hash ?? null;
+  const txHash = chain?.txHash ?? video?.tx_hash ?? null;
+  const confirmed = status === "active" && !!blockNumber;
 
   const [embedW, setEmbedW] = useState(640);
   const [embedH, setEmbedH] = useState(360);
@@ -114,23 +133,42 @@ function WatchPage() {
             <div className="border border-border bg-card rounded-sm p-4 space-y-3">
               <h2 className="font-mono text-xs text-primary">[ ON-CHAIN PROOF ]</h2>
               <Field label="IPFS CID" value={video.cid} onCopy={copy} mono />
-              {video.mock_tx_hash && (
+              {txHash && (
                 <Field
                   label="TXC tx hash"
-                  value={video.mock_tx_hash}
-                  href={`https://explorer.texitcoin.org/tx/${video.mock_tx_hash}`}
+                  value={txHash}
+                  href={`https://mempool.texitcoin.org/tx/${txHash}`}
                   onCopy={copy}
                   mono
                 />
               )}
-              {video.mock_block_number && (
+              <div>
+                <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
+                  Confirmation
+                </div>
+                {confirmed ? (
+                  <div className="flex items-center gap-1.5 text-xs mt-0.5 text-primary font-mono">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    confirmed in block #{blockNumber}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-xs mt-0.5 text-muted-foreground font-mono">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    pending — in mempool
+                  </div>
+                )}
+              </div>
+              {blockHash && (
+                <Field label="Block hash" value={blockHash} onCopy={copy} mono />
+              )}
+              {video.op_return_payload && (
                 <Field
-                  label="Block #"
-                  value={String(video.mock_block_number)}
+                  label="OP_RETURN data"
+                  value={video.op_return_payload}
+                  onCopy={copy}
                   mono
                 />
               )}
-              <Field label="Status" value={video.status} mono />
               <Field
                 label="Expires"
                 value={new Date(video.expires_at).toLocaleDateString()}
