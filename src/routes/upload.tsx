@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Header } from "@/components/Header";
@@ -13,7 +13,8 @@ import { getUploadUrl, registerUpload, addByCid } from "@/lib/videos.functions";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { Upload, Loader2, FileVideo, Link2 } from "lucide-react";
+import { Upload, Loader2, FileVideo, Link2, AlertTriangle } from "lucide-react";
+import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
@@ -93,6 +94,7 @@ function UploadPage() {
     "idle" | "signing" | "uploading" | "registering"
   >("idle");
   const [progress, setProgress] = useState(0);
+  const [duplicate, setDuplicate] = useState<DuplicateCidInfo | null>(null);
 
   const tooBig = !!file && file.size > MAX_UPLOAD_BYTES;
 
@@ -103,6 +105,7 @@ function UploadPage() {
       toast.error(`File too large. Max ${formatBytes(MAX_UPLOAD_BYTES)}.`);
       return;
     }
+    setDuplicate(null);
 
     try {
       // 1. Ask our server for a presigned Pinata URL
@@ -136,7 +139,13 @@ function UploadPage() {
       navigate({ to: "/v/$cid", params: { cid: result.cid } });
     } catch (err) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : "Upload failed");
+      const dup = parseDuplicateCidError(err);
+      if (dup) {
+        setDuplicate(dup);
+        toast.error("This video is already on stream.");
+      } else {
+        toast.error(err instanceof Error ? err.message : "Upload failed");
+      }
       setStage("idle");
       setProgress(0);
     }
@@ -145,6 +154,7 @@ function UploadPage() {
   async function handleCidSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!cidInput || !cidTitle || !address) return;
+    setDuplicate(null);
     try {
       setCidStage("registering");
       const result = await addCid({
@@ -160,7 +170,13 @@ function UploadPage() {
       navigate({ to: "/v/$cid", params: { cid: result.cid } });
     } catch (err) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : "Failed to register CID");
+      const dup = parseDuplicateCidError(err);
+      if (dup) {
+        setDuplicate(dup);
+        toast.error("Nice try — this CID is already claimed.");
+      } else {
+        toast.error(err instanceof Error ? err.message : "Failed to register CID");
+      }
       setCidStage("idle");
     }
   }
@@ -179,6 +195,42 @@ function UploadPage() {
         </p>
 
         <Tabs defaultValue="file" className="w-full">
+          {duplicate && (
+            <div className="mb-6 border-2 border-destructive/60 bg-destructive/5 rounded-sm p-5">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-mono text-xs text-destructive mb-1">
+                    [ ALREADY ON STREAM ]
+                  </div>
+                  <div className="font-bold mb-2">
+                    "{duplicate.title}"
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    This exact content (CID match) was published by{" "}
+                    <span className="font-mono text-foreground">
+                      {shortWallet(duplicate.ownerWallet)}
+                    </span>{" "}
+                    on{" "}
+                    {new Date(duplicate.createdAt).toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                    . CIDs are content-addressed — same file, same ID, forever.
+                    First wallet to stamp wins.
+                  </p>
+                  <Link
+                    to="/v/$cid"
+                    params={{ cid: duplicate.cid }}
+                    className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline"
+                  >
+                    → view the original
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="file" className="font-mono text-xs">
               <Upload className="mr-2 h-3 w-3" /> Upload file

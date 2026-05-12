@@ -1,85 +1,61 @@
-## Goal
+## Duplicate CID Detection
 
-Replace the mock on-chain stamp with a **real TXC OP_RETURN transaction** anchoring each upload's CID + uploader wallet on the TXC blockchain. Skip user payments for now (free tier). Watch the mempool for confirmation and update the UI live.
+Since CIDs are content-addressed, the same video file always produces the same CID — which makes duplicate detection trivial and bulletproof. We just check the DB before stamping/pinning.
 
-## Architecture
+### Where duplicates can enter
 
-```text
-Upload finishes (Pinata returns CID)
-        │
-        ▼
-registerUpload() server fn
-        │
-        ├─ INSERT video row (status='stamping')
-        ├─ POST to TXC node RPC: build + sign + broadcast OP_RETURN tx
-        │     OP_RETURN payload: "TXCV1" + cid + ":" + wallet (≤80 bytes)
-        ├─ Save txid on row (status='mempool', block_number=null)
-        └─ Return { cid, txid }
-        ▼
-Watch page /v/$cid
-        │
-        ├─ Shows "⏳ In mempool — txid abc123…" with link to mempool.texitcoin.org
-        └─ useQuery polls /api/public/tx-status/$txid every 15s
-                │
-                ▼
-        Server fn hits mempool.texitcoin.org/api/tx/{txid}
-                │
-                ├─ unconfirmed → keep polling
-                └─ confirmed → UPDATE videos SET status='active',
-                                  block_number=X, block_hash=Y
-                              → UI flips to "✓ Confirmed in block #X"
+1. **`/upload` direct file upload** — user uploads a file we've seen before (post-Pinata, we know the CID).
+2. **"Add by CID"** flow — user pastes a CID claiming ownership of someone else's already-stamped video.
+3. **Race condition** — two users uploading the same file simultaneously.
+
+### Detection logic
+
+Before calling `stampCid` + inserting into `videos`, run:
+```sql
+SELECT cid, owner_wallet, title, created_at, tx_hash
+FROM videos WHERE cid = $1 LIMIT 1;
 ```
 
-## What we need from you (one-time setup)
+If a row exists → block with a friendly error showing:
+- Original uploader wallet (truncated)
+- Original upload date
+- Link to existing `/v/{cid}` page
+- TXC tx hash as proof of prior claim
 
-1. **Spin up a TXC hot wallet** for the platform. Fund it with a small amount of TXC (enough for ~10,000 OP_RETURN txs at network fee — probably <1 TXC).
-2. **Give us node RPC access**, ideally one of:
-   - **Preferred:** A Bitcoin-style JSON-RPC endpoint (`https://node.texitcoin.org` + RPC user/pass) supporting `createrawtransaction`, `signrawtransactionwithwallet`, `sendrawtransaction`. This is what `bitcoind`/`litecoind` exposes by default.
-   - **Acceptable:** A hosted wallet API at `wallet.texitcoin.org` with an endpoint that accepts "send X to address Y with OP_RETURN data Z" and returns a txid.
-3. We'll store the credentials as secrets: `TXC_RPC_URL`, `TXC_RPC_USER`, `TXC_RPC_PASS`, `TXC_PLATFORM_ADDRESS`.
+### UX per flow
 
-If the RPC details aren't ready yet, we can still build everything with a clearly-marked stub adapter (`txc.server.ts`) and swap the implementation in one place once you give us credentials.
+**Direct upload (`/upload`)**:
+After Pinata returns the CID but **before** we call `registerUpload`, check duplicates. If found, show a toast: *"This video was already published on stream by `tx1q3k...8z` on May 8, 2026. [View original →]"* — and skip stamping (no chain spam, no second pin from us).
 
-## Files we'll change
+**Add by CID**:
+Same check inside `addByCid` server fn. Throw a structured error the client renders inline: *"Nice try 😏 — this CID is already claimed."* with link to the original.
 
-- **`src/lib/txc.server.ts`** *(new)* — single adapter with two functions:
-  - `stampCid({ cid, wallet, sizeBytes })` → builds + broadcasts OP_RETURN tx, returns `{ txid }`
-  - `getTxStatus(txid)` → calls `mempool.texitcoin.org/api/tx/{txid}` and returns `{ confirmed, blockHeight?, blockHash? }`
-- **`src/lib/chain.ts`** — replace mock with calls to `txc.server.ts` (keep the same interface so callers don't change).
-- **`src/lib/videos.functions.ts`** — `registerUpload` now calls real `stampCid`; add `pollTxStatus` server fn for the watch page.
-- **DB migration** — add columns to `videos`:
-  - `op_return_payload text` (the exact bytes we wrote, for audit)
-  - `block_hash text` (in addition to existing `mock_block_number` which we'll rename to `block_number`)
-  - Rename `mock_tx_hash` → `tx_hash`. Statuses: `stamping | mempool | active | failed`.
-- **`src/routes/v.$cid.tsx`** — On-chain proof panel:
-  - Pending state: spinner + "In mempool" + link to `mempool.texitcoin.org/tx/{txid}`
-  - Confirmed state: green check + block number + block hash + same explorer link
-  - `useQuery` with 15s `refetchInterval` while `status='mempool'`.
-- **`src/routes/upload.tsx`** — On success, redirect straight to `/v/{cid}` so user sees the live confirmation flow.
+**Race condition**:
+Add a `UNIQUE` constraint on `videos.cid` (DB migration). Even if two requests pass the duplicate check simultaneously, the second `INSERT` fails. Catch the unique-violation error and return the same friendly response.
 
-## OP_RETURN payload format
+### Pinata-side dedup (bonus)
 
-Keep it under 80 bytes (TXC default `OP_RETURN` data limit, same as Bitcoin):
+Pinata itself dedups pins by CID across our account, so re-pinning costs nothing storage-wise. But we still want to reject early so:
+- We don't spam OP_RETURN txs for already-stamped CIDs
+- We don't double-charge in the future payment flow
+- The DB stays clean (one row per CID)
 
-```
-TXCV1|<cid>|<short-wallet>
-```
+### Optional: "claim" vs "republish"
 
-Example: `TXCV1|bafybeibo...wyq|tx1q3k...8z` — ~70 bytes for a CIDv1 + bech32-style address. If a CID + wallet exceed 80 bytes we fall back to `TXCV1|<sha256(cid+wallet) as hex>` and store the preimage in DB.
+Edge case — what if user A uploaded a video, then user B legitimately uploads the *same* file (e.g. a public domain clip)? Two reasonable policies:
 
-## Mempool-based UX (your idea, fully adopted)
+- **Strict (recommended for MVP)**: First wallet to stamp wins. Period. Matches "proof of first publication" semantics that the on-chain stamp implies.
+- **Permissive**: Allow multiple `videos` rows per CID with different wallets, show all claimants on the `/v/{cid}` page sorted by stamp time.
 
-- The moment `sendrawtransaction` returns a txid, we mark the video **viewable** (status `mempool`).
-- The watch page shows it immediately with a "⏳ Pending confirmation" badge.
-- Polling flips the badge to "✓ Confirmed" within ~1 block (typically 1–10 min depending on TXC block time).
-- No user-blocking wait anywhere — they upload, they watch, the proof firms up in the background.
+I'd ship **strict** for now — it's simpler, matches the on-chain story, and prevents drive-by claim-jacking. We can relax later if needed.
 
-## Out of scope (deferred)
+### Files to touch
 
-- **User payments / fee collection** — explicitly free for now per your call. When the wallet UX is ready we'll add an `invoice` step that watches the mempool for a payment from the uploader's wallet to ours, then unpins on non-payment. The `pins` table and `expires_at` column already exist for this.
-- **Reorg handling** — if a confirmed tx gets re-orged out we won't auto-revert. Vanishingly rare on a chain with any hashrate; can add later.
-- **Batching** — every upload posts its own tx. If volume gets high we can batch CIDs into Merkle roots (OpenTimestamps-style) and stamp one tx per minute. Not needed at MVP scale.
+- **Migration**: `ALTER TABLE videos ADD CONSTRAINT videos_cid_unique UNIQUE (cid);`
+- **`src/lib/videos.functions.ts`**: add duplicate check at top of `registerUpload` and `addByCid`; catch unique-violation on insert.
+- **`src/routes/upload.tsx`**: handle the new `DUPLICATE_CID` error response — show a clean inline message with the original uploader info and a link to `/v/{cid}` instead of erroring out.
+- **(optional)** `src/components/DuplicateNotice.tsx`: small reusable component for the "already exists" panel.
 
-## What ships
+### What ships
 
-Every video uploaded gets a real, verifiable TXC blockchain transaction whose `OP_RETURN` data permanently anchors `(cid, owner_wallet)`. Anyone can independently verify ownership by looking up the txid on `mempool.texitcoin.org` and reading the OP_RETURN bytes — no trust in our platform required. That's the whole point.
+Try to upload or claim a CID that's already on the platform → instant friendly rejection with proof of who got there first. No wasted on-chain stamps, no duplicate DB rows, no claim-jacking.
