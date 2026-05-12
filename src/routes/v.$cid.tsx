@@ -133,9 +133,18 @@ function WatchPage() {
             <div className="border border-border bg-card rounded-sm p-4 space-y-3">
               <h2 className="font-mono text-xs text-primary">[ ON-CHAIN PROOF ]</h2>
               <Field label="IPFS CID" value={video.cid} onCopy={copy} mono />
+              {video.video_wallet && (
+                <Field
+                  label="Video wallet (full chain history)"
+                  value={video.video_wallet}
+                  href={`https://mempool.texitcoin.org/address/${video.video_wallet}`}
+                  onCopy={copy}
+                  mono
+                />
+              )}
               {txHash && (
                 <Field
-                  label="TXC tx hash"
+                  label="Claim tx hash"
                   value={txHash}
                   href={`https://mempool.texitcoin.org/tx/${txHash}`}
                   onCopy={copy}
