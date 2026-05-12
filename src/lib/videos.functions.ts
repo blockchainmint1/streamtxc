@@ -14,6 +14,7 @@ import { assignVideoWallet } from "./txc-wallets.server";
 import { recordChainEvent, recordMetadataAnchor } from "./chain-events.server";
 import { recordOwnershipAnchor, recordSplitPayout } from "./chain-events.server";
 import { verifyMessage, sendToAddress } from "./txc.server";
+import { retryStuckStampForVideo } from "./stamp-retry.server";
 import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
 
