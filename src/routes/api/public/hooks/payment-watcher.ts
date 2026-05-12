@@ -16,9 +16,9 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { getAddressReceived, stampMessageBody } from "@/lib/txc.server";
+import { getAddressReceived, stampCommentCid } from "@/lib/txc.server";
 import { recordChainEvent } from "@/lib/chain-events.server";
-import { unpinByCid } from "@/lib/pinata.server";
+import { unpinByCid, pinJsonToIPFS } from "@/lib/pinata.server";
 import { PAYMENT_GRACE_HOURS } from "@/lib/fees";
 
 export const Route = createFileRoute("/api/public/hooks/payment-watcher")({
@@ -206,7 +206,8 @@ async function processPendingComments() {
     const received = await getAddressReceived(c.deposit_wallet);
 
     if (required > 0 && received >= required) {
-      // PAID — stamp the full body to chain, split shares, activate.
+      // PAID — pin the comment JSON to IPFS, anchor its CID on chain,
+      // split shares, activate.
       try {
         const { data: video } = await supabaseAdmin
           .from("videos")
@@ -215,28 +216,36 @@ async function processPendingComments() {
           .maybeSingle();
         const videoWallet = video?.video_wallet ?? c.deposit_wallet;
 
-        const stamp = await stampMessageBody({
-          commentId: c.id,
-          body: c.body,
+        // Pin a self-contained JSON record. Compact keys to keep it tiny.
+        const pinned = await pinJsonToIPFS(
+          {
+            v: 1,
+            kind: "comment",
+            video: c.video_cid,
+            amt: received.toFixed(8),
+            ts: Math.floor(Date.now() / 1000),
+            body: c.body,
+          },
+          `comment-${c.id}.json`,
+        );
+        const stamp = await stampCommentCid({
+          commentCid: pinned.cid,
           amountTxc: received,
           videoWallet,
         });
-        const chunkHashes = stamp.chunks.map((s) => s.txid);
 
         // Persist the chain trail.
         await supabaseAdmin.from("chain_events").insert({
           video_cid: c.video_cid,
           video_wallet: videoWallet,
           event_type: "M",
-          tx_hash: stamp.header.txid,
-          op_return_payload: stamp.header.payload,
+          tx_hash: stamp.txid,
+          op_return_payload: stamp.payload,
           to_wallet: videoWallet,
-          status: stamp.header.real ? "mempool" : "stamp_failed",
+          status: stamp.real ? "mempool" : "stamp_failed",
           metadata: {
             comment_id: c.id,
-            body_hash: stamp.bodyHash,
-            chunk_count: chunkHashes.length,
-            chunk_tx_hashes: chunkHashes,
+            comment_cid: pinned.cid,
           } as never,
         });
 
@@ -247,9 +256,9 @@ async function processPendingComments() {
             status: "active",
             paid_at: new Date().toISOString(),
             payment_received_txc: received,
-            tx_hash: stamp.header.txid,
-            op_return_payload: stamp.header.payload,
-            chunk_tx_hashes: chunkHashes,
+            tx_hash: stamp.txid,
+            op_return_payload: stamp.payload,
+            comment_cid: pinned.cid,
             boost_total_txc: received,
             initial_payment_txc: received,
             creator_share_txc: shares.creator,
@@ -272,8 +281,8 @@ async function processPendingComments() {
         results.push({
           comment_id: c.id,
           action: "activated",
-          chunks: chunkHashes.length,
-          header_tx: stamp.header.txid,
+          comment_cid: pinned.cid,
+          tx: stamp.txid,
         });
       } catch (err) {
         results.push({

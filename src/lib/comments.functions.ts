@@ -19,6 +19,7 @@ import { createHash } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { explorerTxUrl } from "./txc.server";
 import { assignVideoWallet } from "./txc-wallets.server";
+import { gatewayUrl } from "./pinata.server";
 
 const optionalWalletSchema = z
   .string()
@@ -171,7 +172,7 @@ export const getCommentStatus = createServerFn({ method: "POST" })
     const { data: row, error } = await supabaseAdmin
       .from("comments")
       .select(
-        "id, status, payment_received_txc, payment_required_txc, pending_expires_at, paid_at, tx_hash, chunk_tx_hashes",
+        "id, status, payment_received_txc, payment_required_txc, pending_expires_at, paid_at, tx_hash, comment_cid",
       )
       .eq("id", data.commentId)
       .maybeSingle();
@@ -180,6 +181,7 @@ export const getCommentStatus = createServerFn({ method: "POST" })
     return {
       ...row,
       explorerUrl: row.tx_hash ? explorerTxUrl(row.tx_hash) : null,
+      ipfsUrl: row.comment_cid ? gatewayUrl(row.comment_cid) : null,
     };
   });
 
@@ -213,7 +215,7 @@ export const listComments = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabaseAdmin
       .from("comments")
       .select(
-        "id, body, commenter_wallet, initial_payment_txc, boost_total_txc, last_boost_at, created_at, tx_hash, chunk_tx_hashes",
+        "id, body, commenter_wallet, initial_payment_txc, boost_total_txc, last_boost_at, created_at, tx_hash, comment_cid",
       )
       .eq("video_cid", data.videoCid)
       .eq("status", "active")
@@ -224,5 +226,6 @@ export const listComments = createServerFn({ method: "POST" })
     return (rows ?? []).map((r) => ({
       ...r,
       explorerUrl: r.tx_hash ? explorerTxUrl(r.tx_hash) : null,
+      ipfsUrl: r.comment_cid ? gatewayUrl(r.comment_cid) : null,
     }));
   });

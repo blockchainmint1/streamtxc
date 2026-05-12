@@ -1,0 +1,1 @@
+ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS comment_cid TEXT;

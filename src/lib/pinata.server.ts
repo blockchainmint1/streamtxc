@@ -45,6 +45,18 @@ export async function pinFileToIPFS(
 }
 
 /**
+ * Pin a small JSON object to IPFS. Returns the CID. Used to anchor
+ * comment bodies so the chain only needs to carry the CID pointer.
+ */
+export async function pinJsonToIPFS(
+  obj: unknown,
+  filename: string,
+): Promise<PinResult> {
+  const blob = new Blob([JSON.stringify(obj)], { type: "application/json" });
+  return pinFileToIPFS(blob, filename);
+}
+
+/**
  * Request a presigned URL the browser can POST a file to directly.
  * Avoids streaming large files through our Worker.
  */

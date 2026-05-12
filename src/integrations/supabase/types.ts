@@ -130,6 +130,7 @@ export type Database = {
           body_hash: string | null
           boost_total_txc: number
           chunk_tx_hashes: string[] | null
+          comment_cid: string | null
           commenter_wallet: string | null
           created_at: string
           creator_share_txc: number
@@ -157,6 +158,7 @@ export type Database = {
           body_hash?: string | null
           boost_total_txc?: number
           chunk_tx_hashes?: string[] | null
+          comment_cid?: string | null
           commenter_wallet?: string | null
           created_at?: string
           creator_share_txc?: number
@@ -184,6 +186,7 @@ export type Database = {
           body_hash?: string | null
           boost_total_txc?: number
           chunk_tx_hashes?: string[] | null
+          comment_cid?: string | null
           commenter_wallet?: string | null
           created_at?: string
           creator_share_txc?: number

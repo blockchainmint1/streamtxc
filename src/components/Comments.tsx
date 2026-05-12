@@ -51,8 +51,9 @@ interface CommentRow {
   last_boost_at: string;
   created_at: string;
   tx_hash: string | null;
-  chunk_tx_hashes: string[] | null;
+  comment_cid: string | null;
   explorerUrl: string | null;
+  ipfsUrl: string | null;
 }
 
 type PendingIntent = {
@@ -136,10 +137,11 @@ export function Comments({ cid }: { cid: string }) {
       </div>
 
       <p className="text-xs text-muted-foreground font-mono mb-6 leading-relaxed">
-        Comments are anchored on the TXC chain — the full text is split across
-        OP_RETURN outputs and broadcast in real txs. Pay more to rank higher;
-        anyone can <span className="text-primary">boost</span> a comment to
-        push it back up. Split:{" "}
+        Comments are pinned to IPFS and anchored on the TXC chain — the
+        on-chain tx carries the comment's content-addressed CID, so the
+        body is tamper-proof and verifiable by anyone. Pay more to rank
+        higher; anyone can <span className="text-primary">boost</span> a
+        comment to push it back up. Split:{" "}
         <span className="text-foreground">90% creator</span> /{" "}
         <span className="text-foreground">5% hosting</span> /{" "}
         <span className="text-foreground">5% platform</span>.
@@ -175,7 +177,7 @@ export function Comments({ cid }: { cid: string }) {
           />
           <div className="flex items-center justify-between mt-1">
             <span className="text-[10px] font-mono text-muted-foreground">
-              {body.length}/1000 • ~{Math.max(1, Math.ceil(new Blob([body]).size / 60))} OP_RETURN chunks
+              {body.length}/1000 • pinned to IPFS, CID anchored on chain
             </span>
             <div className="h-1 w-24 bg-muted rounded-full overflow-hidden">
               <div
@@ -378,7 +380,7 @@ function PaymentPanel({
         Send <span className="text-primary font-bold">{required} TXC</span> to
         the address below. Once detected, your{" "}
         {intent.kind === "comment"
-          ? "comment will be split into OP_RETURN chunks and broadcast on chain"
+          ? "comment will be pinned to IPFS and its CID anchored on chain"
           : "boost will be stamped on chain and applied"}
         .
       </p>
@@ -453,7 +455,6 @@ function CommentItem({
   const [boostId, setBoostId] = useState<string | null>(null);
 
   const isHot = rank === 0 && Number(c.boost_total_txc) >= 0.1;
-  const chunkCount = c.chunk_tx_hashes?.length ?? 0;
 
   return (
     <li className="border border-border rounded-md p-4 bg-card/40">
@@ -482,8 +483,18 @@ function CommentItem({
               rel="noreferrer"
               className="text-primary hover:underline flex items-center gap-1"
             >
-              chain ({chunkCount} {chunkCount === 1 ? "chunk" : "chunks"}){" "}
-              <ExternalLink className="h-3 w-3" />
+              chain <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+          {c.ipfsUrl && (
+            <a
+              href={c.ipfsUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary hover:underline flex items-center gap-1"
+              title="Pinned comment JSON on IPFS"
+            >
+              ipfs <ExternalLink className="h-3 w-3" />
             </a>
           )}
         </div>
