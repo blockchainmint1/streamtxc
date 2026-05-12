@@ -123,6 +123,111 @@ export interface StampResult {
   real: boolean;
 }
 
+export interface ChunkedStampResult {
+  /** Header tx (TXCV1M|<id8>|<bodyHash>|<total>|<amt>). */
+  header: StampResult;
+  /** Body chunk txs in order (TXCV1Mc|<id8>|<seq>|<text>). */
+  chunks: StampResult[];
+  /** Hex sha256 of the full body. */
+  bodyHash: string;
+}
+
+/** Per-chunk OP_RETURN budget. Header `TXCV1Mc|XXXXXXXX|NN|` ≈ 14 bytes,
+ * leaving ~66 bytes for body text. We use 60 to stay safely under 80. */
+const CHUNK_BODY_BYTES = 60;
+
+function chunkUtf8(body: string, max: number): string[] {
+  // Slice on byte boundaries that don't split a multi-byte char.
+  const buf = Buffer.from(body, "utf8");
+  const out: string[] = [];
+  let i = 0;
+  while (i < buf.length) {
+    let end = Math.min(i + max, buf.length);
+    // Walk back if we'd split a UTF-8 continuation byte.
+    while (end < buf.length && (buf[end] & 0xc0) === 0x80) end--;
+    out.push(buf.subarray(i, end).toString("utf8"));
+    i = end;
+  }
+  return out;
+}
+
+/**
+ * Anchor a full comment body on chain via N OP_RETURN txs:
+ *   header: TXCV1M|<id8>|<bodyHash16>|<total>|<amount>
+ *   chunks: TXCV1Mc|<id8>|<seq>|<utf8 chunk>
+ *
+ * All txs send a dust output to the per-video wallet so the address page
+ * shows the entire conversation in chronological order.
+ */
+export async function stampMessageBody(opts: {
+  commentId: string;
+  body: string;
+  amountTxc: number;
+  videoWallet: string;
+}): Promise<ChunkedStampResult> {
+  const { commentId, body, amountTxc, videoWallet } = opts;
+  const id8 = commentId.replace(/-/g, "").slice(0, 8);
+  const bodyHash = createHash("sha256").update(body, "utf8").digest("hex");
+  const bodyHash16 = bodyHash.slice(0, 16);
+
+  const chunks = chunkUtf8(body, CHUNK_BODY_BYTES);
+  const total = chunks.length;
+
+  // Header carries the metadata the chain needs to reassemble.
+  const headerExtra = `${id8}|${bodyHash16}|${total}|${amountTxc.toFixed(4)}`;
+  const header = await stampEvent({
+    cid: id8, // unused in payload structure for chunked flow
+    wallet: "0x0000000000",
+    eventType: "M",
+    toAddress: videoWallet,
+    extra: headerExtra,
+  });
+
+  // Body chunk txs use a dedicated `Mc` event tag — emitted as a custom
+  // payload (not the standard buildOpReturnPayload format) so we squeeze
+  // every byte of body text we can.
+  const chunkResults: StampResult[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const payload = `TXCV1Mc|${id8}|${String(i + 1).padStart(2, "0")}|${chunks[i]}`;
+    const r = await stampRawPayload({ payload, toAddress: videoWallet });
+    chunkResults.push(r);
+  }
+
+  return { header, chunks: chunkResults, bodyHash };
+}
+
+/** Broadcast an arbitrary OP_RETURN payload (≤80 bytes) to a recipient. */
+export async function stampRawPayload(opts: {
+  payload: string;
+  toAddress: string;
+}): Promise<StampResult> {
+  const { payload, toAddress } = opts;
+  if (Buffer.byteLength(payload, "utf8") > 80) {
+    throw new Error(`OP_RETURN payload too long: ${payload.length} bytes`);
+  }
+
+  if (!rpcConfigured()) {
+    const txid = createHash("sha256")
+      .update(`stub:${payload}:${Date.now()}:${Math.random()}`)
+      .digest("hex");
+    return { txid, payload, real: false };
+  }
+
+  const dataHex = Buffer.from(payload, "utf8").toString("hex");
+  const rawTx = await rpc<string>("createrawtransaction", [
+    [],
+    [{ data: dataHex }, { [toAddress]: 0.0001 }],
+  ]);
+  const funded = await rpc<{ hex: string }>("fundrawtransaction", [rawTx]);
+  const signed = await rpc<{ hex: string; complete: boolean }>(
+    "signrawtransactionwithwallet",
+    [funded.hex],
+  );
+  if (!signed.complete) throw new Error("TXC tx signing incomplete");
+  const txid = await rpc<string>("sendrawtransaction", [signed.hex]);
+  return { txid, payload, real: true };
+}
+
 /**
  * Broadcast an OP_RETURN tx for a video lifecycle event on TXC.
  *

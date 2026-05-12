@@ -1,31 +1,24 @@
-// Pay-to-comment server functions.
+// Pay-to-comment server functions (Option A: per-comment deposit wallet).
 //
-// Pricing model: minimum 0.01 TXC, user picks any amount above that. Higher
-// amounts boost the comment higher in the ranking.
+// Flow:
+//   1. createCommentIntent: derive a fresh deposit wallet, insert row as
+//      status='pending_payment' with a 30-min grace window. Return the
+//      address + amount + QR payload to the UI.
+//   2. UI polls getCommentStatus until status flips to 'active'.
+//   3. payment-watcher cron checks each pending wallet for incoming TXC.
+//      When received >= required: stamp the FULL body across N OP_RETURN
+//      chunks (header + body chunks all sent to the per-video wallet),
+//      split shares 90/5/5, accrue hosting credit, flip status='active'.
+//   4. If the grace window expires unpaid: status='expired_unpaid' (hidden).
 //
-// Split (per user request):
-//   90% → creator (per-video wallet)
-//    5% → hosting credit (accrues on videos.hosting_credit_txc)
-//    5% → platform
-//
-// Ranking: client-side score = boost_total_txc / (1 + ageHoursSinceLastBoost / 24)
-// so boosts decay back down. Server returns the raw rows; UI sorts.
-//
-// On-chain stamp: each comment is anchored with an `M` OP_RETURN event;
-// each boost with a `B` event. If the RPC is unreachable the recordChainEvent
-// helper degrades gracefully (placeholder txid, status=stamp_failed) so the
-// comment still posts.
+// Boosts follow the same pattern (amounts only, no body to chunk).
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { createHash } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { recordChainEvent } from "./chain-events.server";
-import { mockPaymentTx } from "./chain";
 import { explorerTxUrl } from "./txc.server";
-
-const walletSchema = z
-  .string()
-  .regex(/^0x[a-fA-F0-9]{40}$/, "Invalid wallet address");
+import { assignVideoWallet } from "./txc-wallets.server";
 
 const optionalWalletSchema = z
   .string()
@@ -40,26 +33,19 @@ const optionalWalletSchema = z
 const MIN_TXC = 0.01;
 const MAX_TXC = 10000;
 const MAX_BODY_LEN = 1000;
+const GRACE_MIN = 30;
 
 export const COMMENT_PRICING = {
   minTxc: MIN_TXC,
   creatorPct: 0.9,
   hostingPct: 0.05,
   platformPct: 0.05,
+  graceMinutes: GRACE_MIN,
 };
 
-function splitShares(amount: number) {
-  const creator = +(amount * COMMENT_PRICING.creatorPct).toFixed(8);
-  const hosting = +(amount * COMMENT_PRICING.hostingPct).toFixed(8);
-  // Platform takes the remainder so the three shares sum exactly to amount
-  // (avoids rounding drift on big numbers).
-  const platform = +(amount - creator - hosting).toFixed(8);
-  return { creator, hosting, platform };
-}
+// --- Create a pending comment intent -------------------------------------
 
-// --- Post a new comment ----------------------------------------------------
-
-export const postComment = createServerFn({ method: "POST" })
+export const createCommentIntent = createServerFn({ method: "POST" })
   .inputValidator((input) =>
     z
       .object({
@@ -71,73 +57,53 @@ export const postComment = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    // Make sure the video exists and isn't hidden.
     const { data: video, error: vErr } = await supabaseAdmin
       .from("videos")
-      .select("cid, video_wallet, hidden_at, hosting_credit_txc")
+      .select("cid, video_wallet, hidden_at")
       .eq("cid", data.videoCid)
       .maybeSingle();
     if (vErr) throw new Error(vErr.message);
     if (!video) throw new Error("Video not found");
     if (video.hidden_at) throw new Error("Comments disabled on hidden videos");
 
-    const shares = splitShares(data.amountTxc);
-
-    // Anchor the comment on chain. Use the video wallet as the recipient
-    // so the video's address page accumulates a complete public history.
-    // Stamper signature falls back to `0x0…0` for anonymous comments.
-    const stamperWallet =
-      data.commenterWallet ?? "0x0000000000000000000000000000000000000000";
-    const stamp = await recordChainEvent({
-      cid: data.videoCid,
-      videoWallet: video.video_wallet ?? stamperWallet,
-      eventType: "M",
-      uploaderWallet: stamperWallet,
-      extra: data.amountTxc.toFixed(4),
-    });
-
-    const paymentTx = mockPaymentTx(stamperWallet, data.amountTxc);
+    // Derive a fresh address for this comment's deposit.
+    const wallet = await assignVideoWallet();
+    const expiresAt = new Date(Date.now() + GRACE_MIN * 60_000).toISOString();
+    const bodyHash = createHash("sha256")
+      .update(data.body, "utf8")
+      .digest("hex");
 
     const { data: inserted, error: cErr } = await supabaseAdmin
       .from("comments")
       .insert({
         video_cid: data.videoCid,
         body: data.body,
+        body_hash: bodyHash,
         commenter_wallet: data.commenterWallet ?? null,
         initial_payment_txc: data.amountTxc,
-        boost_total_txc: data.amountTxc,
-        creator_share_txc: shares.creator,
-        hosting_share_txc: shares.hosting,
-        platform_share_txc: shares.platform,
-        tx_hash: stamp.real ? stamp.txid : null,
-        op_return_payload: stamp.payload,
-        mock_tx_hash: paymentTx,
-        last_boost_at: new Date().toISOString(),
+        boost_total_txc: 0, // becomes amountTxc on payment confirmation
+        status: "pending_payment",
+        deposit_wallet: wallet.address,
+        derivation_index: wallet.derivationIndex,
+        payment_required_txc: data.amountTxc,
+        pending_expires_at: expiresAt,
       })
       .select("id")
       .single();
-    if (cErr) throw new Error(`Failed to post comment: ${cErr.message}`);
-
-    // Accrue hosting credit on the video.
-    await supabaseAdmin
-      .from("videos")
-      .update({
-        hosting_credit_txc:
-          Number(video.hosting_credit_txc ?? 0) + shares.hosting,
-      })
-      .eq("cid", data.videoCid);
+    if (cErr) throw new Error(`Failed to create comment intent: ${cErr.message}`);
 
     return {
-      id: inserted.id,
-      txHash: stamp.real ? stamp.txid : null,
-      explorerUrl: stamp.real ? explorerTxUrl(stamp.txid) : null,
-      shares,
+      commentId: inserted.id,
+      depositWallet: wallet.address,
+      amountTxc: data.amountTxc,
+      expiresAt,
+      graceMinutes: GRACE_MIN,
     };
   });
 
-// --- Boost an existing comment --------------------------------------------
+// --- Create a pending boost intent ---------------------------------------
 
-export const boostComment = createServerFn({ method: "POST" })
+export const createBoostIntent = createServerFn({ method: "POST" })
   .inputValidator((input) =>
     z
       .object({
@@ -150,80 +116,94 @@ export const boostComment = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { data: comment, error: cErr } = await supabaseAdmin
       .from("comments")
-      .select(
-        "id, video_cid, boost_total_txc, creator_share_txc, hosting_share_txc, platform_share_txc",
-      )
+      .select("id, video_cid, status")
       .eq("id", data.commentId)
       .maybeSingle();
     if (cErr) throw new Error(cErr.message);
     if (!comment) throw new Error("Comment not found");
+    if (comment.status !== "active")
+      throw new Error("Comment is not active yet");
 
     const { data: video, error: vErr } = await supabaseAdmin
       .from("videos")
-      .select("video_wallet, hidden_at, hosting_credit_txc")
+      .select("video_wallet, hidden_at")
       .eq("cid", comment.video_cid)
       .maybeSingle();
     if (vErr) throw new Error(vErr.message);
     if (!video) throw new Error("Video not found");
     if (video.hidden_at) throw new Error("Boosts disabled on hidden videos");
 
-    const shares = splitShares(data.amountTxc);
-    const stamperWallet =
-      data.boosterWallet ?? "0x0000000000000000000000000000000000000000";
+    const wallet = await assignVideoWallet();
+    const expiresAt = new Date(Date.now() + GRACE_MIN * 60_000).toISOString();
 
-    const stamp = await recordChainEvent({
-      cid: comment.video_cid,
-      videoWallet: video.video_wallet ?? stamperWallet,
-      eventType: "B",
-      uploaderWallet: stamperWallet,
-      extra: `${comment.id.slice(0, 8)}:${data.amountTxc.toFixed(4)}`,
-    });
-
-    const paymentTx = mockPaymentTx(stamperWallet, data.amountTxc);
-
-    const { error: bErr } = await supabaseAdmin.from("comment_boosts").insert({
-      comment_id: data.commentId,
-      booster_wallet: data.boosterWallet ?? null,
-      amount_txc: data.amountTxc,
-      tx_hash: stamp.real ? stamp.txid : null,
-      op_return_payload: stamp.payload,
-      mock_tx_hash: paymentTx,
-    });
-    if (bErr) throw new Error(`Failed to record boost: ${bErr.message}`);
-
-    // Update aggregate totals on the comment + bump last_boost_at so the
-    // decay clock resets.
-    const { error: uErr } = await supabaseAdmin
-      .from("comments")
-      .update({
-        boost_total_txc: Number(comment.boost_total_txc) + data.amountTxc,
-        creator_share_txc:
-          Number(comment.creator_share_txc) + shares.creator,
-        hosting_share_txc:
-          Number(comment.hosting_share_txc) + shares.hosting,
-        platform_share_txc:
-          Number(comment.platform_share_txc) + shares.platform,
-        last_boost_at: new Date().toISOString(),
+    const { data: inserted, error: bErr } = await supabaseAdmin
+      .from("comment_boosts")
+      .insert({
+        comment_id: data.commentId,
+        booster_wallet: data.boosterWallet ?? null,
+        amount_txc: data.amountTxc,
+        status: "pending_payment",
+        deposit_wallet: wallet.address,
+        derivation_index: wallet.derivationIndex,
+        payment_required_txc: data.amountTxc,
+        pending_expires_at: expiresAt,
       })
-      .eq("id", data.commentId);
-    if (uErr) throw new Error(`Failed to update boost total: ${uErr.message}`);
-
-    await supabaseAdmin
-      .from("videos")
-      .update({
-        hosting_credit_txc:
-          Number(video.hosting_credit_txc ?? 0) + shares.hosting,
-      })
-      .eq("cid", comment.video_cid);
+      .select("id")
+      .single();
+    if (bErr) throw new Error(`Failed to create boost intent: ${bErr.message}`);
 
     return {
-      txHash: stamp.real ? stamp.txid : null,
-      explorerUrl: stamp.real ? explorerTxUrl(stamp.txid) : null,
-      shares,
+      boostId: inserted.id,
+      depositWallet: wallet.address,
+      amountTxc: data.amountTxc,
+      expiresAt,
+      graceMinutes: GRACE_MIN,
     };
   });
 
-// --- Listing --------------------------------------------------------------
+// --- Status polling ------------------------------------------------------
+
+export const getCommentStatus = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({ commentId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: row, error } = await supabaseAdmin
+      .from("comments")
+      .select(
+        "id, status, payment_received_txc, payment_required_txc, pending_expires_at, paid_at, tx_hash, chunk_tx_hashes",
+      )
+      .eq("id", data.commentId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("Comment not found");
+    return {
+      ...row,
+      explorerUrl: row.tx_hash ? explorerTxUrl(row.tx_hash) : null,
+    };
+  });
+
+export const getBoostStatus = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({ boostId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: row, error } = await supabaseAdmin
+      .from("comment_boosts")
+      .select(
+        "id, status, payment_received_txc, payment_required_txc, pending_expires_at, paid_at, tx_hash",
+      )
+      .eq("id", data.boostId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("Boost not found");
+    return {
+      ...row,
+      explorerUrl: row.tx_hash ? explorerTxUrl(row.tx_hash) : null,
+    };
+  });
+
+// --- Listing -------------------------------------------------------------
 
 export const listComments = createServerFn({ method: "POST" })
   .inputValidator((input) =>
@@ -233,7 +213,7 @@ export const listComments = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabaseAdmin
       .from("comments")
       .select(
-        "id, body, commenter_wallet, initial_payment_txc, boost_total_txc, last_boost_at, created_at, tx_hash",
+        "id, body, commenter_wallet, initial_payment_txc, boost_total_txc, last_boost_at, created_at, tx_hash, chunk_tx_hashes",
       )
       .eq("video_cid", data.videoCid)
       .eq("status", "active")
@@ -246,6 +226,3 @@ export const listComments = createServerFn({ method: "POST" })
       explorerUrl: r.tx_hash ? explorerTxUrl(r.tx_hash) : null,
     }));
   });
-
-// Re-export so the client can reference walletSchema when needed.
-export const _walletSchema = walletSchema;

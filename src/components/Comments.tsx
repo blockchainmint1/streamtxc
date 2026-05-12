@@ -1,18 +1,22 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
-  boostComment,
   COMMENT_PRICING,
+  createBoostIntent,
+  createCommentIntent,
+  getBoostStatus,
+  getCommentStatus,
   listComments,
-  postComment,
 } from "@/lib/comments.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { formatTxc, shortenHash } from "@/lib/fees";
 import {
+  Check,
+  Copy,
   ExternalLink,
   Flame,
   Loader2,
@@ -32,10 +36,6 @@ function timeAgo(iso: string): string {
   return `${d}d ago`;
 }
 
-/**
- * Decay-weighted score: a freshly-boosted comment outranks a long-cold one,
- * but a cold heavyweight still beats a tiny new one. 24h half-life.
- */
 function decayScore(boostTxc: number, lastBoostAt: string): number {
   const ageHours =
     (Date.now() - new Date(lastBoostAt).getTime()) / (1000 * 60 * 60);
@@ -51,13 +51,22 @@ interface CommentRow {
   last_boost_at: string;
   created_at: string;
   tx_hash: string | null;
+  chunk_tx_hashes: string[] | null;
   explorerUrl: string | null;
 }
 
+type PendingIntent = {
+  kind: "comment" | "boost";
+  id: string;
+  depositWallet: string;
+  amountTxc: number;
+  expiresAt: string;
+};
+
 export function Comments({ cid }: { cid: string }) {
   const fetchComments = useServerFn(listComments);
-  const postFn = useServerFn(postComment);
-  const boostFn = useServerFn(boostComment);
+  const createCommentFn = useServerFn(createCommentIntent);
+  const createBoostFn = useServerFn(createBoostIntent);
   const qc = useQueryClient();
 
   const { data: comments = [], isLoading } = useQuery<CommentRow[]>({
@@ -78,10 +87,11 @@ export function Comments({ cid }: { cid: string }) {
   const [body, setBody] = useState("");
   const [amount, setAmount] = useState<string>("0.01");
   const [wallet, setWallet] = useState("");
+  const [pending, setPending] = useState<PendingIntent | null>(null);
 
-  const post = useMutation({
+  const create = useMutation({
     mutationFn: () =>
-      postFn({
+      createCommentFn({
         data: {
           videoCid: cid,
           body: body.trim(),
@@ -90,17 +100,19 @@ export function Comments({ cid }: { cid: string }) {
         },
       }),
     onSuccess: (res) => {
-      toast.success("Comment posted on chain", {
-        description: res.txHash
-          ? `Anchored: ${shortenHash(res.txHash)}`
-          : "Stamp deferred (chain RPC offline)",
+      setPending({
+        kind: "comment",
+        id: res.commentId,
+        depositWallet: res.depositWallet,
+        amountTxc: res.amountTxc,
+        expiresAt: res.expiresAt,
       });
-      setBody("");
-      setAmount("0.01");
-      qc.invalidateQueries({ queryKey: ["comments", cid] });
+      toast.info("Send TXC to the deposit address to publish your comment", {
+        description: `${res.amountTxc} TXC required • ${res.graceMinutes}-min window`,
+      });
     },
     onError: (e) =>
-      toast.error("Failed to post", {
+      toast.error("Failed to create comment", {
         description: e instanceof Error ? e.message : "Unknown error",
       }),
   });
@@ -124,7 +136,8 @@ export function Comments({ cid }: { cid: string }) {
       </div>
 
       <p className="text-xs text-muted-foreground font-mono mb-6 leading-relaxed">
-        Comments are anchored on the TXC chain. Pay more to rank higher;
+        Comments are anchored on the TXC chain — the full text is split across
+        OP_RETURN outputs and broadcast in real txs. Pay more to rank higher;
         anyone can <span className="text-primary">boost</span> a comment to
         push it back up. Split:{" "}
         <span className="text-foreground">90% creator</span> /{" "}
@@ -132,83 +145,104 @@ export function Comments({ cid }: { cid: string }) {
         <span className="text-foreground">5% platform</span>.
       </p>
 
-      {/* --- Composer --- */}
-      <div className="border border-border rounded-md p-4 mb-6 bg-card/30">
-        <Label className="font-mono text-xs">Your comment</Label>
-        <Textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value.slice(0, 1000))}
-          placeholder="Say something on chain forever..."
-          className="mt-1 font-mono text-sm bg-input border-border min-h-[80px]"
+      {/* --- Composer or pending payment --- */}
+      {pending && pending.kind === "comment" ? (
+        <PaymentPanel
+          intent={pending}
+          onActive={() => {
+            toast.success("Comment activated on chain");
+            setPending(null);
+            setBody("");
+            setAmount("0.01");
+            qc.invalidateQueries({ queryKey: ["comments", cid] });
+          }}
+          onExpire={() => {
+            toast.error("Payment window expired", {
+              description: "Comment was discarded.",
+            });
+            setPending(null);
+          }}
+          onCancel={() => setPending(null)}
         />
-        <div className="flex items-center justify-between mt-1">
-          <span className="text-[10px] font-mono text-muted-foreground">
-            {body.length}/1000
-          </span>
-          <div className="h-1 w-24 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-primary transition-all"
-              style={{ width: `${charPct}%` }}
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-          <div>
-            <Label className="font-mono text-xs">
-              Pay (TXC) — min {COMMENT_PRICING.minTxc}
-            </Label>
-            <input
-              type="number"
-              step="0.01"
-              min={COMMENT_PRICING.minTxc}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="mt-1 w-full bg-input border border-border rounded-sm px-2 py-2 font-mono text-sm"
-            />
-            <div className="flex gap-1 mt-1">
-              {["0.01", "0.10", "1.00", "10.00"].map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setAmount(v)}
-                  className="text-[10px] font-mono px-2 py-0.5 border border-border rounded-sm hover:bg-primary/10 transition-colors"
-                >
-                  {v}
-                </button>
-              ))}
+      ) : (
+        <div className="border border-border rounded-md p-4 mb-6 bg-card/30">
+          <Label className="font-mono text-xs">Your comment</Label>
+          <Textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value.slice(0, 1000))}
+            placeholder="Say something on chain forever..."
+            className="mt-1 font-mono text-sm bg-input border-border min-h-[80px]"
+          />
+          <div className="flex items-center justify-between mt-1">
+            <span className="text-[10px] font-mono text-muted-foreground">
+              {body.length}/1000 • ~{Math.max(1, Math.ceil(new Blob([body]).size / 60))} OP_RETURN chunks
+            </span>
+            <div className="h-1 w-24 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${charPct}%` }}
+              />
             </div>
           </div>
-          <div>
-            <Label className="font-mono text-xs flex items-center gap-1">
-              <Wallet className="h-3 w-3" /> Your wallet (optional)
-            </Label>
-            <input
-              value={wallet}
-              onChange={(e) => setWallet(e.target.value)}
-              placeholder="0x… (leave blank to post anon)"
-              className="mt-1 w-full bg-input border border-border rounded-sm px-2 py-2 font-mono text-sm"
-            />
-          </div>
-        </div>
 
-        <Button
-          onClick={() => post.mutate()}
-          disabled={!canPost || post.isPending}
-          className="mt-4 w-full font-mono"
-        >
-          {post.isPending ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Stamping…
-            </>
-          ) : (
-            <>
-              <Rocket className="mr-2 h-4 w-4" />
-              Post for {Number(amount || 0).toFixed(2)} TXC
-            </>
-          )}
-        </Button>
-      </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+            <div>
+              <Label className="font-mono text-xs">
+                Pay (TXC) — min {COMMENT_PRICING.minTxc}
+              </Label>
+              <input
+                type="number"
+                step="0.01"
+                min={COMMENT_PRICING.minTxc}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="mt-1 w-full bg-input border border-border rounded-sm px-2 py-2 font-mono text-sm"
+              />
+              <div className="flex gap-1 mt-1">
+                {["0.01", "0.10", "1.00", "10.00"].map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setAmount(v)}
+                    className="text-[10px] font-mono px-2 py-0.5 border border-border rounded-sm hover:bg-primary/10 transition-colors"
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className="font-mono text-xs flex items-center gap-1">
+                <Wallet className="h-3 w-3" /> Your wallet (optional)
+              </Label>
+              <input
+                value={wallet}
+                onChange={(e) => setWallet(e.target.value)}
+                placeholder="0x… (leave blank to post anon)"
+                className="mt-1 w-full bg-input border border-border rounded-sm px-2 py-2 font-mono text-sm"
+              />
+            </div>
+          </div>
+
+          <Button
+            onClick={() => create.mutate()}
+            disabled={!canPost || create.isPending}
+            className="mt-4 w-full font-mono"
+          >
+            {create.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating
+                deposit address…
+              </>
+            ) : (
+              <>
+                <Rocket className="mr-2 h-4 w-4" />
+                Continue to payment ({Number(amount || 0).toFixed(2)} TXC)
+              </>
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* --- List --- */}
       {isLoading ? (
@@ -226,28 +260,43 @@ export function Comments({ cid }: { cid: string }) {
               key={c.id}
               c={c}
               rank={i}
-              onBoost={async (amt, w) => {
+              boostPending={pending?.kind === "boost" && pending.id === c.id ? pending : null}
+              onCreateBoost={async (amt, w) => {
                 try {
-                  const res = await boostFn({
+                  const res = await createBoostFn({
                     data: {
                       commentId: c.id,
                       amountTxc: amt,
                       boosterWallet: w || undefined,
                     },
                   });
-                  toast.success(`Boosted +${amt} TXC`, {
-                    description: res.txHash
-                      ? `Anchored: ${shortenHash(res.txHash)}`
-                      : "Stamp deferred",
+                  setPending({
+                    kind: "boost",
+                    id: c.id,
+                    depositWallet: res.depositWallet,
+                    amountTxc: res.amountTxc,
+                    expiresAt: res.expiresAt,
                   });
-                  qc.invalidateQueries({ queryKey: ["comments", cid] });
+                  toast.info(`Send ${amt} TXC to boost`);
+                  return res.boostId;
                 } catch (e) {
                   toast.error("Boost failed", {
                     description:
                       e instanceof Error ? e.message : "Unknown error",
                   });
+                  return null;
                 }
               }}
+              onBoostActive={() => {
+                toast.success("Boost confirmed on chain");
+                setPending(null);
+                qc.invalidateQueries({ queryKey: ["comments", cid] });
+              }}
+              onBoostExpire={() => {
+                toast.error("Boost payment window expired");
+                setPending(null);
+              }}
+              onCancelBoost={() => setPending(null)}
             />
           ))}
         </ul>
@@ -256,21 +305,155 @@ export function Comments({ cid }: { cid: string }) {
   );
 }
 
+// --- Payment panel (shared by comment + boost) ----------------------------
+
+function PaymentPanel({
+  intent,
+  onActive,
+  onExpire,
+  onCancel,
+  boostId,
+}: {
+  intent: PendingIntent;
+  onActive: () => void;
+  onExpire: () => void;
+  onCancel: () => void;
+  boostId?: string | null;
+}) {
+  const getStatusFn = useServerFn(
+    intent.kind === "comment" ? getCommentStatus : getBoostStatus,
+  );
+  const lookupId = intent.kind === "comment" ? intent.id : (boostId ?? "");
+
+  const { data: status } = useQuery({
+    queryKey: ["intent-status", intent.kind, lookupId],
+    queryFn: () =>
+      intent.kind === "comment"
+        ? getStatusFn({ data: { commentId: lookupId } } as never)
+        : getStatusFn({ data: { boostId: lookupId } } as never),
+    enabled: !!lookupId,
+    refetchInterval: 4_000,
+  });
+
+  // React to status flips.
+  useEffect(() => {
+    if (!status) return;
+    const s = (status as { status: string }).status;
+    if (s === "active") onActive();
+    else if (s === "expired_unpaid") onExpire();
+  }, [status, onActive, onExpire]);
+
+  const [copied, setCopied] = useState(false);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const msLeft = Math.max(0, new Date(intent.expiresAt).getTime() - now);
+  const minLeft = Math.floor(msLeft / 60000);
+  const secLeft = Math.floor((msLeft % 60000) / 1000);
+  const received = Number(
+    (status as { payment_received_txc?: number } | undefined)
+      ?.payment_received_txc ?? 0,
+  );
+  const required = intent.amountTxc;
+  const pct = Math.min(100, (received / required) * 100);
+
+  return (
+    <div className="border-2 border-primary/60 rounded-md p-5 mb-6 bg-card/40">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          <span className="font-mono text-sm font-bold text-primary">
+            WAITING FOR PAYMENT
+          </span>
+        </div>
+        <span className="font-mono text-xs text-muted-foreground">
+          {minLeft}:{String(secLeft).padStart(2, "0")} remaining
+        </span>
+      </div>
+
+      <p className="font-mono text-xs text-muted-foreground mb-3">
+        Send <span className="text-primary font-bold">{required} TXC</span> to
+        the address below. Once detected, your{" "}
+        {intent.kind === "comment"
+          ? "comment will be split into OP_RETURN chunks and broadcast on chain"
+          : "boost will be stamped on chain and applied"}
+        .
+      </p>
+
+      <div className="flex items-center gap-2 mb-3">
+        <code className="flex-1 font-mono text-xs bg-input border border-border rounded-sm px-2 py-2 break-all">
+          {intent.depositWallet}
+        </code>
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(intent.depositWallet);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}
+          className="border border-border rounded-sm p-2 hover:bg-primary/10 transition-colors"
+          title="Copy address"
+        >
+          {copied ? (
+            <Check className="h-4 w-4 text-primary" />
+          ) : (
+            <Copy className="h-4 w-4" />
+          )}
+        </button>
+      </div>
+
+      <div className="mb-3">
+        <div className="flex items-center justify-between font-mono text-[10px] text-muted-foreground mb-1">
+          <span>
+            Received: {received.toFixed(8)} / {required.toFixed(8)} TXC
+          </span>
+          <span>{pct.toFixed(0)}%</span>
+        </div>
+        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary transition-all"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      <button
+        onClick={onCancel}
+        className="text-[10px] font-mono text-muted-foreground hover:text-destructive underline"
+      >
+        Discard pending {intent.kind}
+      </button>
+    </div>
+  );
+}
+
 function CommentItem({
   c,
   rank,
-  onBoost,
+  boostPending,
+  onCreateBoost,
+  onBoostActive,
+  onBoostExpire,
+  onCancelBoost,
 }: {
   c: CommentRow;
   rank: number;
-  onBoost: (amount: number, wallet: string) => Promise<void>;
+  boostPending: PendingIntent | null;
+  onCreateBoost: (amount: number, wallet: string) => Promise<string | null>;
+  onBoostActive: () => void;
+  onBoostExpire: () => void;
+  onCancelBoost: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [boostAmt, setBoostAmt] = useState("0.10");
   const [boostWallet, setBoostWallet] = useState("");
   const [busy, setBusy] = useState(false);
+  const [boostId, setBoostId] = useState<string | null>(null);
 
   const isHot = rank === 0 && Number(c.boost_total_txc) >= 0.1;
+  const chunkCount = c.chunk_tx_hashes?.length ?? 0;
 
   return (
     <li className="border border-border rounded-md p-4 bg-card/40">
@@ -299,7 +482,8 @@ function CommentItem({
               rel="noreferrer"
               className="text-primary hover:underline flex items-center gap-1"
             >
-              chain <ExternalLink className="h-3 w-3" />
+              chain ({chunkCount} {chunkCount === 1 ? "chunk" : "chunks"}){" "}
+              <ExternalLink className="h-3 w-3" />
             </a>
           )}
         </div>
@@ -315,62 +499,83 @@ function CommentItem({
 
       <p className="text-sm whitespace-pre-wrap break-words">{c.body}</p>
 
-      <div className="mt-3 flex items-center justify-between">
-        <button
-          onClick={() => setOpen((o) => !o)}
-          className="text-xs font-mono text-primary hover:underline flex items-center gap-1"
-        >
-          <Rocket className="h-3 w-3" />
-          {open ? "Cancel" : "Boost"}
-        </button>
-      </div>
-
-      {open && (
-        <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
-          <div>
-            <Label className="font-mono text-[10px]">Amount (TXC)</Label>
-            <input
-              type="number"
-              step="0.01"
-              min={0.01}
-              value={boostAmt}
-              onChange={(e) => setBoostAmt(e.target.value)}
-              className="w-full bg-input border border-border rounded-sm px-2 py-1.5 font-mono text-sm"
-            />
-          </div>
-          <div>
-            <Label className="font-mono text-[10px]">Wallet (optional)</Label>
-            <input
-              value={boostWallet}
-              onChange={(e) => setBoostWallet(e.target.value)}
-              placeholder="0x…"
-              className="w-full bg-input border border-border rounded-sm px-2 py-1.5 font-mono text-xs"
-            />
-          </div>
-          <Button
-            size="sm"
-            disabled={busy || Number(boostAmt) < 0.01}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                await onBoost(Number(boostAmt), boostWallet.trim());
-                setOpen(false);
-                setBoostAmt("0.10");
-              } finally {
-                setBusy(false);
-              }
-            }}
-            className="font-mono"
-          >
-            {busy ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <>
-                <Flame className="mr-1 h-3 w-3" /> Boost
-              </>
-            )}
-          </Button>
+      {boostPending ? (
+        <div className="mt-3">
+          <PaymentPanel
+            intent={boostPending}
+            boostId={boostId}
+            onActive={onBoostActive}
+            onExpire={onBoostExpire}
+            onCancel={onCancelBoost}
+          />
         </div>
+      ) : (
+        <>
+          <div className="mt-3 flex items-center justify-between">
+            <button
+              onClick={() => setOpen((o) => !o)}
+              className="text-xs font-mono text-primary hover:underline flex items-center gap-1"
+            >
+              <Rocket className="h-3 w-3" />
+              {open ? "Cancel" : "Boost"}
+            </button>
+          </div>
+
+          {open && (
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
+              <div>
+                <Label className="font-mono text-[10px]">Amount (TXC)</Label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min={0.01}
+                  value={boostAmt}
+                  onChange={(e) => setBoostAmt(e.target.value)}
+                  className="w-full bg-input border border-border rounded-sm px-2 py-1.5 font-mono text-sm"
+                />
+              </div>
+              <div>
+                <Label className="font-mono text-[10px]">
+                  Wallet (optional)
+                </Label>
+                <input
+                  value={boostWallet}
+                  onChange={(e) => setBoostWallet(e.target.value)}
+                  placeholder="0x…"
+                  className="w-full bg-input border border-border rounded-sm px-2 py-1.5 font-mono text-xs"
+                />
+              </div>
+              <Button
+                size="sm"
+                disabled={busy || Number(boostAmt) < 0.01}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    const id = await onCreateBoost(
+                      Number(boostAmt),
+                      boostWallet.trim(),
+                    );
+                    if (id) {
+                      setBoostId(id);
+                      setOpen(false);
+                    }
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                className="font-mono"
+              >
+                {busy ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <>
+                    <Flame className="mr-1 h-3 w-3" /> Boost
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </li>
   );

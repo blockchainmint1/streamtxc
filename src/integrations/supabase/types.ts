@@ -68,9 +68,16 @@ export type Database = {
           booster_wallet: string | null
           comment_id: string
           created_at: string
+          deposit_wallet: string | null
+          derivation_index: number | null
           id: string
           mock_tx_hash: string | null
           op_return_payload: string | null
+          paid_at: string | null
+          payment_received_txc: number
+          payment_required_txc: number | null
+          pending_expires_at: string | null
+          status: string
           tx_hash: string | null
         }
         Insert: {
@@ -78,9 +85,16 @@ export type Database = {
           booster_wallet?: string | null
           comment_id: string
           created_at?: string
+          deposit_wallet?: string | null
+          derivation_index?: number | null
           id?: string
           mock_tx_hash?: string | null
           op_return_payload?: string | null
+          paid_at?: string | null
+          payment_received_txc?: number
+          payment_required_txc?: number | null
+          pending_expires_at?: string | null
+          status?: string
           tx_hash?: string | null
         }
         Update: {
@@ -88,9 +102,16 @@ export type Database = {
           booster_wallet?: string | null
           comment_id?: string
           created_at?: string
+          deposit_wallet?: string | null
+          derivation_index?: number | null
           id?: string
           mock_tx_hash?: string | null
           op_return_payload?: string | null
+          paid_at?: string | null
+          payment_received_txc?: number
+          payment_required_txc?: number | null
+          pending_expires_at?: string | null
+          status?: string
           tx_hash?: string | null
         }
         Relationships: [
@@ -106,10 +127,14 @@ export type Database = {
       comments: {
         Row: {
           body: string
+          body_hash: string | null
           boost_total_txc: number
+          chunk_tx_hashes: string[] | null
           commenter_wallet: string | null
           created_at: string
           creator_share_txc: number
+          deposit_wallet: string | null
+          derivation_index: number | null
           hidden_at: string | null
           hidden_reason: string | null
           hosting_share_txc: number
@@ -118,6 +143,10 @@ export type Database = {
           last_boost_at: string
           mock_tx_hash: string | null
           op_return_payload: string | null
+          paid_at: string | null
+          payment_received_txc: number
+          payment_required_txc: number | null
+          pending_expires_at: string | null
           platform_share_txc: number
           status: string
           tx_hash: string | null
@@ -125,10 +154,14 @@ export type Database = {
         }
         Insert: {
           body: string
+          body_hash?: string | null
           boost_total_txc?: number
+          chunk_tx_hashes?: string[] | null
           commenter_wallet?: string | null
           created_at?: string
           creator_share_txc?: number
+          deposit_wallet?: string | null
+          derivation_index?: number | null
           hidden_at?: string | null
           hidden_reason?: string | null
           hosting_share_txc?: number
@@ -137,6 +170,10 @@ export type Database = {
           last_boost_at?: string
           mock_tx_hash?: string | null
           op_return_payload?: string | null
+          paid_at?: string | null
+          payment_received_txc?: number
+          payment_required_txc?: number | null
+          pending_expires_at?: string | null
           platform_share_txc?: number
           status?: string
           tx_hash?: string | null
@@ -144,10 +181,14 @@ export type Database = {
         }
         Update: {
           body?: string
+          body_hash?: string | null
           boost_total_txc?: number
+          chunk_tx_hashes?: string[] | null
           commenter_wallet?: string | null
           created_at?: string
           creator_share_txc?: number
+          deposit_wallet?: string | null
+          derivation_index?: number | null
           hidden_at?: string | null
           hidden_reason?: string | null
           hosting_share_txc?: number
@@ -156,6 +197,10 @@ export type Database = {
           last_boost_at?: string
           mock_tx_hash?: string | null
           op_return_payload?: string | null
+          paid_at?: string | null
+          payment_received_txc?: number
+          payment_required_txc?: number | null
+          pending_expires_at?: string | null
           platform_share_txc?: number
           status?: string
           tx_hash?: string | null
