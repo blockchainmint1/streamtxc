@@ -81,13 +81,8 @@ async function uploadToPinata(
   file: File,
   _onProgress: (pct: number) => void,
 ): Promise<{ cid: string; size: number; id: string }> {
-  const safeName = sanitizeFilename(file.name);
-  const safeFile =
-    safeName === file.name
-      ? file
-      : new File([file], safeName, { type: file.type });
   const result = await browserPinata.upload.public
-    .file(safeFile)
+    .file(file)
     .url(url)
     .cidVersion("v1");
   return {
@@ -253,13 +248,18 @@ function UploadPage() {
 
       // 3. Not on IPFS yet — ask our server for a presigned Pinata URL.
       setStage("signing");
+      const safeName = sanitizeFilename(file.name);
       const { url } = await getUrl({
-        data: { filename: file.name, sizeBytes: file.size },
+        data: { filename: safeName, sizeBytes: file.size },
       });
 
       // 4. Upload the file directly to Pinata with progress.
       setStage("uploading");
-      const pinResult = await uploadToPinata(url, file, (pct) =>
+      const safeFile =
+        safeName === file.name
+          ? file
+          : new File([file], safeName, { type: file.type });
+      const pinResult = await uploadToPinata(url, safeFile, (pct) =>
         setProgress(pct),
       );
 
