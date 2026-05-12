@@ -15,6 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { Upload, Loader2, FileVideo, Link2, AlertTriangle } from "lucide-react";
 import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
+import { computeCidV1, isCidOnIpfs } from "@/lib/ipfs-cid";
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
@@ -94,7 +95,7 @@ function UploadPage() {
   const [cidNotFound, setCidNotFound] = useState<string | null>(null);
   const months = 1;
   const [stage, setStage] = useState<
-    "idle" | "signing" | "uploading" | "registering"
+    "idle" | "hashing" | "checking" | "signing" | "uploading" | "registering"
   >("idle");
   const [progress, setProgress] = useState(0);
   const [duplicate, setDuplicate] = useState<DuplicateCidInfo | null>(null);
@@ -111,20 +112,48 @@ function UploadPage() {
     setDuplicate(null);
 
     try {
-      // 1. Ask our server for a presigned Pinata URL
-      setStage("signing");
+      // 1. Hash the file locally to compute its CIDv1.
+      setStage("hashing");
       setProgress(0);
+      const localCid = await computeCidV1(file);
+
+      // 2. Check if the file is already on the public IPFS network.
+      //    If yes, skip the upload entirely and register by CID — saves the
+      //    user from re-uploading bytes that already exist out there.
+      setStage("checking");
+      const alreadyPinned = await isCidOnIpfs(localCid);
+      if (alreadyPinned) {
+        toast("Found this file on IPFS — skipping upload", {
+          description: "Registering existing CID instead.",
+        });
+        setStage("registering");
+        const result = await addCid({
+          data: {
+            wallet: address,
+            cid: localCid,
+            title,
+            description,
+            months,
+          },
+        });
+        toast.success("Registered from IPFS");
+        navigate({ to: "/v/$cid", params: { cid: result.cid } });
+        return;
+      }
+
+      // 3. Not on IPFS yet — ask our server for a presigned Pinata URL.
+      setStage("signing");
       const { url } = await getUrl({
         data: { filename: file.name, sizeBytes: file.size },
       });
 
-      // 2. Upload the file directly to Pinata with progress
+      // 4. Upload the file directly to Pinata with progress.
       setStage("uploading");
       const pinResult = await uploadToPinata(url, file, (pct) =>
         setProgress(pct),
       );
 
-      // 3. Register metadata + mock chain stamp
+      // 5. Register metadata + on-chain stamp.
       setStage("registering");
       const result = await register({
         data: {
@@ -347,6 +376,8 @@ function UploadPage() {
               {stage !== "idle" && (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {stage === "hashing" && "Hashing file…"}
+                  {stage === "checking" && "Checking IPFS for this file…"}
                   {stage === "signing" && "Requesting upload URL…"}
                   {stage === "uploading" && `Uploading ${progress.toFixed(0)}%…`}
                   {stage === "registering" && "Finalizing…"}
