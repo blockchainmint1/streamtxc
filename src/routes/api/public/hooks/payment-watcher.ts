@@ -34,9 +34,8 @@ async function handler() {
   const { data: pending, error } = await supabaseAdmin
     .from("videos")
     .select(
-      "cid, owner_wallet, video_wallet, payment_required_txc, months_prepaid, created_at",
+      "cid, owner_wallet, video_wallet, payment_required_txc, months_prepaid, created_at, paid_at, expires_at, payment_received_txc",
     )
-    .is("paid_at", null)
     .is("unpinned_at", null)
     .not("video_wallet", "is", null)
     .limit(100);
@@ -53,6 +52,36 @@ async function handler() {
     if (!v.video_wallet) continue;
     const required = Number(v.payment_required_txc ?? 0);
     const received = await getAddressReceived(v.video_wallet);
+    const monthsBase = v.months_prepaid ?? 1;
+    const monthlyRate = required > 0 ? required / monthsBase : 0;
+    // Fractional months credited: every monthlyRate TXC = 1 month of hosting.
+    const monthsCredited = monthlyRate > 0 ? received / monthlyRate : 0;
+    const extendedExpiresMs =
+      new Date(v.created_at).getTime() + monthsCredited * 30 * 24 * 3_600_000;
+    const extendedExpires = new Date(extendedExpiresMs).toISOString();
+
+    // Already-paid video: only update expires_at if more TXC arrived (top-ups extend life).
+    if (v.paid_at) {
+      const prevReceived = Number(v.payment_received_txc ?? 0);
+      if (received > prevReceived + 0.00000001) {
+        await supabaseAdmin
+          .from("videos")
+          .update({
+            payment_received_txc: received,
+            expires_at: extendedExpires,
+          })
+          .eq("cid", v.cid);
+        results.push({
+          cid: v.cid,
+          action: "extended",
+          received,
+          expires_at: extendedExpires,
+        });
+      } else {
+        results.push({ cid: v.cid, action: "paid_noop", received });
+      }
+      continue;
+    }
 
     if (required > 0 && received >= required) {
       // PAID — stamp proof and activate.
@@ -64,8 +93,6 @@ async function handler() {
           uploaderWallet: v.owner_wallet,
           extra: received.toFixed(4),
         });
-        const expires = new Date();
-        expires.setMonth(expires.getMonth() + (v.months_prepaid ?? 1));
         await supabaseAdmin
           .from("videos")
           .update({
@@ -73,10 +100,17 @@ async function handler() {
             payment_received_txc: received,
             payment_tx_hash: stamp.txid,
             status: "active",
-            expires_at: expires.toISOString(),
+            expires_at: extendedExpires,
           })
           .eq("cid", v.cid);
-        results.push({ cid: v.cid, action: "paid", received, txid: stamp.txid });
+        results.push({
+          cid: v.cid,
+          action: "paid",
+          received,
+          months: monthsCredited,
+          expires_at: extendedExpires,
+          txid: stamp.txid,
+        });
       } catch (err) {
         results.push({ cid: v.cid, action: "paid_failed", error: String(err) });
       }

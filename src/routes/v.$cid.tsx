@@ -23,9 +23,15 @@ import {
   Flag,
   ShieldAlert,
   QrCode,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -174,17 +180,24 @@ function WatchPage() {
           {/* Sidebar: chain info + embed */}
           <div className="space-y-4">
             {video.video_wallet && video.payment_required_txc != null && (
-              <PaymentPanel
-                required={Number(video.payment_required_txc)}
-                received={Number(video.payment_received_txc ?? 0)}
-                wallet={video.video_wallet}
-                paidAt={video.paid_at ?? null}
-                createdAt={video.created_at}
-                onCopy={copy}
-              />
+              <CollapsibleSection
+                title="[ HOSTING PAYMENT ]"
+                icon={<Wallet className="h-3.5 w-3.5" />}
+                defaultOpen={!video.paid_at}
+              >
+                <PaymentPanel
+                  required={Number(video.payment_required_txc)}
+                  received={Number(video.payment_received_txc ?? 0)}
+                  wallet={video.video_wallet}
+                  paidAt={video.paid_at ?? null}
+                  createdAt={video.created_at}
+                  expiresAt={video.expires_at}
+                  monthsPrepaid={video.months_prepaid ?? 1}
+                  onCopy={copy}
+                />
+              </CollapsibleSection>
             )}
-            <div className="border border-border bg-card rounded-sm p-4 space-y-3">
-              <h2 className="font-mono text-xs text-primary">[ ON-CHAIN PROOF ]</h2>
+            <CollapsibleSection title="[ ON-CHAIN PROOF ]" defaultOpen={false}>
               <Field label="IPFS CID" value={video.cid} onCopy={copy} mono />
               {video.video_wallet && (
                 <Field
@@ -240,12 +253,13 @@ function WatchPage() {
                 value={formatDate(video.expires_at)}
                 mono
               />
-            </div>
+            </CollapsibleSection>
 
-            <div className="border border-border bg-card rounded-sm p-4 space-y-3">
-              <h2 className="font-mono text-xs text-primary flex items-center gap-1.5">
-                <Code2 className="h-3.5 w-3.5" /> [ EMBED ]
-              </h2>
+            <CollapsibleSection
+              title="[ EMBED ]"
+              icon={<Code2 className="h-3.5 w-3.5" />}
+              defaultOpen={false}
+            >
               <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                 <label className="flex items-center gap-2">
                   <input
@@ -312,7 +326,7 @@ function WatchPage() {
                   </>
                 )}
               </Button>
-            </div>
+            </CollapsibleSection>
           </div>
         </div>
         <Comments cid={video.cid} />
@@ -378,6 +392,8 @@ function PaymentPanel({
   wallet,
   paidAt,
   createdAt,
+  expiresAt,
+  monthsPrepaid,
   onCopy,
 }: {
   required: number;
@@ -385,6 +401,8 @@ function PaymentPanel({
   wallet: string;
   paidAt: string | null;
   createdAt: string;
+  expiresAt: string;
+  monthsPrepaid: number;
   onCopy: (s: string) => void;
 }) {
   const paid = paidAt != null || received >= required;
@@ -393,6 +411,7 @@ function PaymentPanel({
   const ageHrs = (Date.now() - new Date(createdAt).getTime()) / 3_600_000;
   const graceLeft = Math.max(0, 24 - ageHrs);
   const [showQr, setShowQr] = useState(false);
+  const monthlyRate = monthsPrepaid > 0 ? required / monthsPrepaid : required;
   // BIP-21 style URI so wallet apps that scan can pre-fill the amount.
   const qrPayload =
     remaining > 0
@@ -400,15 +419,56 @@ function PaymentPanel({
       : `texitcoin:${wallet}`;
 
   return (
-    <div className="border border-border bg-card rounded-sm p-4 space-y-3">
-      <h2 className="font-mono text-xs text-primary flex items-center gap-1.5">
-        <Wallet className="h-3.5 w-3.5" /> [ HOSTING PAYMENT ]
-      </h2>
+    <>
       {paid ? (
-        <div className="flex items-center gap-1.5 text-xs text-primary font-mono">
-          <CheckCircle2 className="h-3.5 w-3.5" />
-          paid · {formatTxc(received)}
-        </div>
+        <>
+          <div className="flex items-center gap-1.5 text-xs text-primary font-mono">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            paid · {formatTxc(received)}
+          </div>
+          <div className="font-mono text-[11px] text-muted-foreground">
+            stays live until{" "}
+            <span className="text-foreground">{formatDate(expiresAt)}</span>
+            {monthlyRate > 0 && (
+              <>
+                {" "}· extend life by sending more TXC ({formatTxc(monthlyRate)} ={" "}
+                +1 month)
+              </>
+            )}
+          </div>
+          <div>
+            <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
+              top-up address
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 truncate text-xs font-mono bg-input border border-border rounded-sm px-2 py-1.5">
+                {wallet}
+              </code>
+              <button
+                onClick={() => onCopy(wallet)}
+                className="text-muted-foreground hover:text-primary"
+                aria-label="Copy address"
+              >
+                <Copy className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setShowQr((v) => !v)}
+                className={`transition-colors ${showQr ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
+                aria-label="Show QR code"
+              >
+                <QrCode className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {showQr && (
+              <div className="mt-3 flex flex-col items-center gap-2 bg-white p-3 rounded-sm">
+                <QRCodeSVG value={qrPayload} size={180} level="M" marginSize={2} />
+                <div className="font-mono text-[10px] text-black text-center break-all">
+                  {wallet.slice(0, 12)}…{wallet.slice(-8)}
+                </div>
+              </div>
+            )}
+          </div>
+        </>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2 font-mono text-xs">
@@ -429,6 +489,12 @@ function PaymentPanel({
             <div className="flex items-start gap-1.5 text-[11px] text-amber-500 font-mono">
               <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
               partial payment received — send the remainder to confirm
+            </div>
+          )}
+          {monthlyRate > 0 && (
+            <div className="font-mono text-[11px] text-muted-foreground">
+              rate: {formatTxc(monthlyRate)} per month · overpay extends hosting
+              automatically
             </div>
           )}
           <div>
@@ -487,7 +553,39 @@ function PaymentPanel({
           </a>
         </>
       )}
-    </div>
+    </>
+  );
+}
+
+function CollapsibleSection({
+  title,
+  icon,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <div className="border border-border bg-card rounded-sm">
+        <CollapsibleTrigger className="w-full flex items-center justify-between p-4 group">
+          <h2 className="font-mono text-xs text-primary flex items-center gap-1.5">
+            {icon}
+            {title}
+          </h2>
+          <ChevronDown
+            className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="px-4 pb-4 space-y-3">{children}</div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
   );
 }
 
