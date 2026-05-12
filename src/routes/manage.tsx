@@ -95,6 +95,50 @@ function RetryStampButton({ cid, wallet }: { cid: string; wallet: string }) {
   );
 }
 
+function ToggleVisibilityButton({
+  cid,
+  wallet,
+  hidden,
+}: {
+  cid: string;
+  wallet: string;
+  hidden: boolean;
+}) {
+  const qc = useQueryClient();
+  const toggle = useServerFn(setVideoVisibility);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="font-mono"
+      disabled={busy}
+      title={hidden ? "Show this video publicly" : "Hide from public listings"}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await toggle({ data: { wallet, cid, hidden: !hidden } });
+          toast.success(hidden ? "Video shown" : "Video hidden");
+          qc.invalidateQueries({ queryKey: ["my-videos"] });
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Failed");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? (
+        <Loader2 className="h-3 w-3 animate-spin" />
+      ) : hidden ? (
+        <EyeOff className="h-3 w-3" />
+      ) : (
+        <Eye className="h-3 w-3" />
+      )}
+      <span className="ml-1">{hidden ? "show" : "hide"}</span>
+    </Button>
+  );
+}
+
 function ManagePageInner() {
   const { address, connect } = useWallet();
   const fetchMine = useServerFn(listMyVideos);
