@@ -27,6 +27,7 @@ import {
   buildBulkExtendQuote,
   verifyBulkExtensionTx,
   setVideoVisibility,
+  setVideoFlagged,
 } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, shortenHash } from "@/lib/fees";
@@ -44,6 +45,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Flag,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -789,7 +791,8 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
     setVerifying(true);
     setVerifyResult(null);
     try {
-      const res = await verifyTx({ data: { txHash, requireConfirmed: true } });
+      // Mempool-OK: don't make the user wait for a block. We trust the txid.
+      const res = await verifyTx({ data: { txHash, requireConfirmed: false } });
       setVerifyResult(res);
       if (res.pending) {
         toast.message("TX not confirmed yet — try again after the next block.");
