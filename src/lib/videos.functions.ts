@@ -10,6 +10,30 @@ const walletSchema = z
   .string()
   .regex(/^0x[a-fA-F0-9]{40}$/, "Invalid wallet address");
 
+/**
+ * If a video with this CID already exists, throw a structured error the
+ * client can parse to show a friendly "already claimed" panel.
+ */
+async function assertCidUnclaimed(cid: string) {
+  const { data: existing } = await supabaseAdmin
+    .from("videos")
+    .select("cid, owner_wallet, title, created_at, tx_hash")
+    .eq("cid", cid)
+    .maybeSingle();
+  if (existing) {
+    throw new Error(
+      "DUPLICATE_CID:" +
+        JSON.stringify({
+          cid: existing.cid,
+          ownerWallet: existing.owner_wallet,
+          title: existing.title,
+          createdAt: existing.created_at,
+          txHash: existing.tx_hash,
+        }),
+    );
+  }
+}
+
 // --- Quote -----------------------------------------------------------------
 
 export const getQuote = createServerFn({ method: "POST" })
@@ -67,6 +91,7 @@ export const registerUpload = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    await assertCidUnclaimed(data.cid);
     const fee = quoteFee(data.sizeBytes, data.months);
     const paymentTx = mockPaymentTx(data.wallet, fee);
     const stamp = await stampCid(data.cid, data.wallet);
@@ -74,7 +99,7 @@ export const registerUpload = createServerFn({ method: "POST" })
     const expires = new Date();
     expires.setMonth(expires.getMonth() + data.months);
 
-    const { error: vErr } = await supabaseAdmin.from("videos").upsert({
+    const { error: vErr } = await supabaseAdmin.from("videos").insert({
       cid: data.cid,
       owner_wallet: data.wallet,
       title: data.title,
@@ -87,7 +112,12 @@ export const registerUpload = createServerFn({ method: "POST" })
       months_prepaid: data.months,
       expires_at: expires.toISOString(),
     });
-    if (vErr) throw new Error(`Failed to save video: ${vErr.message}`);
+    if (vErr) {
+      // Race condition: someone registered the same CID between our check
+      // and the insert. Re-run the duplicate check to surface a friendly error.
+      if (vErr.code === "23505") await assertCidUnclaimed(data.cid);
+      throw new Error(`Failed to save video: ${vErr.message}`);
+    }
 
     const { error: pErr } = await supabaseAdmin.from("payments").insert({
       video_cid: data.cid,
@@ -137,6 +167,9 @@ export const finalizeUpload = createServerFn({ method: "POST" })
     // 1. Pin to IPFS via Pinata
     const pin = await pinFileToIPFS(blob, data.filename);
 
+    // Reject duplicates BEFORE we stamp the chain.
+    await assertCidUnclaimed(pin.cid);
+
     // 2. Mock payment + real on-chain stamp
     const fee = quoteFee(binary.byteLength, data.months);
     const paymentTx = mockPaymentTx(data.wallet, fee);
@@ -148,7 +181,7 @@ export const finalizeUpload = createServerFn({ method: "POST" })
 
     const { error: vErr } = await supabaseAdmin
       .from("videos")
-      .upsert({
+      .insert({
         cid: pin.cid,
         owner_wallet: data.wallet,
         title: data.title,
@@ -161,7 +194,10 @@ export const finalizeUpload = createServerFn({ method: "POST" })
         months_prepaid: data.months,
         expires_at: expires.toISOString(),
       });
-    if (vErr) throw new Error(`Failed to save video: ${vErr.message}`);
+    if (vErr) {
+      if (vErr.code === "23505") await assertCidUnclaimed(pin.cid);
+      throw new Error(`Failed to save video: ${vErr.message}`);
+    }
 
     const { error: pErr } = await supabaseAdmin.from("payments").insert({
       video_cid: pin.cid,
@@ -203,13 +239,8 @@ export const addByCid = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    // Reject if already registered
-    const { data: existing } = await supabaseAdmin
-      .from("videos")
-      .select("cid")
-      .eq("cid", data.cid)
-      .maybeSingle();
-    if (existing) throw new Error("This CID is already registered");
+    // Reject if already registered (with structured details for the UI)
+    await assertCidUnclaimed(data.cid);
 
     // Probe the gateway to learn size + mime (HEAD, then ranged GET fallback)
     const gatewayDomain = process.env.PINATA_GATEWAY_DOMAIN;
@@ -257,7 +288,10 @@ export const addByCid = createServerFn({ method: "POST" })
       months_prepaid: data.months,
       expires_at: expires.toISOString(),
     });
-    if (vErr) throw new Error(`Failed to save video: ${vErr.message}`);
+    if (vErr) {
+      if (vErr.code === "23505") await assertCidUnclaimed(data.cid);
+      throw new Error(`Failed to save video: ${vErr.message}`);
+    }
 
     const { error: pErr } = await supabaseAdmin.from("payments").insert({
       video_cid: data.cid,
