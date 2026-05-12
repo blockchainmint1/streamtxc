@@ -427,6 +427,24 @@ async function processPendingBoosts() {
         }
 
         results.push({ boost_id: b.id, action: "activated", tx: stamp.txid });
+
+        // Sweep the boost amount under the parent comment. The split goes
+        // 90/5/5 the same way; recordSplitPayout writes its own S events.
+        try {
+          const sweep = await sweepBoostPayout(b.id, received, comment.video_cid);
+          results.push({
+            boost_id: b.id,
+            action: "sweep",
+            sweep_status: sweep.status,
+            sweep_details: sweep.details,
+          });
+        } catch (err) {
+          results.push({
+            boost_id: b.id,
+            action: "sweep_failed",
+            error: String(err),
+          });
+        }
       } catch (err) {
         results.push({
           boost_id: b.id,
