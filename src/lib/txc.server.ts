@@ -40,8 +40,10 @@ export const TXC_PROTO_TAG = "TXCV1";
  *   R  renewal     — extended hosting period
  *   X  takedown    — pin removed (expired, opt-out, etc.)
  *   D  dmca        — DMCA / abuse complaint logged
+ *   M  message     — pay-to-comment posted
+ *   B  boost       — comment boost top-up
  */
-export type TxcEventType = "C" | "P" | "R" | "X" | "D";
+export type TxcEventType = "C" | "P" | "R" | "X" | "D" | "M" | "B";
 
 /** ≤80 bytes per the Bitcoin OP_RETURN standard data carrier limit. */
 export function buildOpReturnPayload(
