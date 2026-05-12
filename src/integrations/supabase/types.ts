@@ -316,6 +316,7 @@ export type Database = {
           hidden_at: string | null
           hidden_reason: string | null
           hosting_credit_txc: number
+          metadata_cid: string | null
           mime_type: string | null
           months_prepaid: number
           op_return_payload: string | null
@@ -345,6 +346,7 @@ export type Database = {
           hidden_at?: string | null
           hidden_reason?: string | null
           hosting_credit_txc?: number
+          metadata_cid?: string | null
           mime_type?: string | null
           months_prepaid?: number
           op_return_payload?: string | null
@@ -374,6 +376,7 @@ export type Database = {
           hidden_at?: string | null
           hidden_reason?: string | null
           hosting_credit_txc?: number
+          metadata_cid?: string | null
           mime_type?: string | null
           months_prepaid?: number
           op_return_payload?: string | null
