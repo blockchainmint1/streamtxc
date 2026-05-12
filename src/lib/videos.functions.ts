@@ -497,12 +497,19 @@ export const reportVideo = createServerFn({ method: "POST" })
       .select("id", { count: "exact", head: true })
       .eq("video_cid", data.cid);
 
-    const updates: Record<string, unknown> = { report_count: count ?? 0 };
-    if (!video.hidden_at && (count ?? 0) > 0) {
-      updates.hidden_at = new Date().toISOString();
-      updates.hidden_reason = `auto-hidden after report (${data.reason})`;
-    }
-    await supabaseAdmin.from("videos").update(updates).eq("cid", data.cid);
+    const shouldHide = !video.hidden_at && (count ?? 0) > 0;
+    await supabaseAdmin
+      .from("videos")
+      .update({
+        report_count: count ?? 0,
+        ...(shouldHide
+          ? {
+              hidden_at: new Date().toISOString(),
+              hidden_reason: `auto-hidden after report (${data.reason})`,
+            }
+          : {}),
+      })
+      .eq("cid", data.cid);
 
     return { ok: true, alreadyReported, reportCount: count ?? 0 };
   });
