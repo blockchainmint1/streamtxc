@@ -23,8 +23,8 @@
 import { createHash } from "crypto";
 import { HDKey } from "@scure/bip32";
 import { base58check } from "@scure/base";
-import { sha256 } from "@noble/hashes/sha2";
-import { ripemd160 } from "@noble/hashes/legacy";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { ripemd160 } from "@noble/hashes/legacy.js";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 // TXC P2PKH version byte. 0x41 yields a base58check string starting with
