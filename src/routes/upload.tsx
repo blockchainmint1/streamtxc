@@ -88,7 +88,10 @@ function UploadPage() {
   const [cidInput, setCidInput] = useState("");
   const [cidTitle, setCidTitle] = useState("");
   const [cidDescription, setCidDescription] = useState("");
-  const [cidStage, setCidStage] = useState<"idle" | "registering">("idle");
+  const [cidStage, setCidStage] = useState<
+    "idle" | "fetching" | "registering"
+  >("idle");
+  const [cidNotFound, setCidNotFound] = useState<string | null>(null);
   const months = 1;
   const [stage, setStage] = useState<
     "idle" | "signing" | "uploading" | "registering"
@@ -155,8 +158,9 @@ function UploadPage() {
     e.preventDefault();
     if (!cidInput || !cidTitle || !address) return;
     setDuplicate(null);
+    setCidNotFound(null);
     try {
-      setCidStage("registering");
+      setCidStage("fetching");
       const result = await addCid({
         data: {
           wallet: address,
@@ -175,7 +179,14 @@ function UploadPage() {
         setDuplicate(dup);
         toast.error("Nice try — this CID is already claimed.");
       } else {
-        toast.error(err instanceof Error ? err.message : "Failed to register CID");
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("CID_NOT_FOUND")) {
+          const detail = msg.split("CID_NOT_FOUND:")[1] ?? "";
+          setCidNotFound(detail || "We couldn't find that CID on IPFS.");
+          toast.error("CID not found on IPFS");
+        } else {
+          toast.error(msg || "Failed to register CID");
+        }
       }
       setCidStage("idle");
     }
