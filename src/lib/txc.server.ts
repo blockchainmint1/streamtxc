@@ -67,8 +67,25 @@ function rpcConfigured(): boolean {
   return !!(process.env.TXC_RPC_URL && process.env.TXC_RPC_USER && process.env.TXC_RPC_PASS);
 }
 
+/**
+ * Build the full RPC URL from env. Accepts either a complete URL
+ * (`http://host:port`) or a bare host/IP plus optional `TXC_RPC_PORT`.
+ */
+function rpcUrl(): string {
+  const raw = process.env.TXC_RPC_URL!;
+  let u = raw.trim();
+  if (!/^https?:\/\//.test(u)) u = "http://" + u;
+  const hostPart = u.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  const hasPort = /:\d+$/.test(hostPart);
+  if (!hasPort) {
+    const port = process.env.TXC_RPC_PORT || "15739";
+    u = u.replace(/\/?$/, "") + ":" + port;
+  }
+  return u;
+}
+
 async function rpc<T = unknown>(method: string, params: unknown[]): Promise<T> {
-  const url = process.env.TXC_RPC_URL!;
+  const url = rpcUrl();
   const user = process.env.TXC_RPC_USER!;
   const pass = process.env.TXC_RPC_PASS!;
   const auth = Buffer.from(`${user}:${pass}`).toString("base64");
@@ -122,21 +139,28 @@ export async function stampEvent(opts: {
     return { txid, payload, real: false };
   }
 
-  // Real Bitcoin-style flow. Send the dust output to the per-video wallet
-  // (falls back to platform address if not provided) so all events for the
-  // video accumulate on the same address page in the explorer.
-  const platformAddress = process.env.TXC_PLATFORM_ADDRESS;
-  if (!platformAddress) throw new Error("TXC_PLATFORM_ADDRESS is not configured");
-  const recipient = toAddress || platformAddress;
+  // Real Bitcoin-style flow. Send a tiny output to the per-video wallet so
+  // every lifecycle event accumulates on the same explorer address page.
+  // If no per-video address was provided (older rows), fall back to a
+  // change address from the node's own wallet.
+  let recipient = toAddress;
+  if (!recipient) {
+    recipient = process.env.TXC_PLATFORM_ADDRESS;
+  }
+  if (!recipient) {
+    recipient = await rpc<string>("getrawchangeaddress", []);
+  }
 
   // OP_RETURN data must be hex-encoded.
   const dataHex = Buffer.from(payload, "utf8").toString("hex");
 
   // Use createrawtransaction with empty inputs, then fundrawtransaction +
   // signrawtransactionwithwallet + sendrawtransaction. Standard bitcoind flow.
+  // 0.0001 TXC (10k sats) — above the node's dust relay threshold for
+  // P2WPKH outputs we observed on this chain.
   const rawTx = await rpc<string>("createrawtransaction", [
     [],
-    [{ data: dataHex }, { [recipient]: 0.00001 }],
+    [{ data: dataHex }, { [recipient]: 0.0001 }],
   ]);
   const funded = await rpc<{ hex: string }>("fundrawtransaction", [rawTx]);
   const signed = await rpc<{ hex: string; complete: boolean }>(
