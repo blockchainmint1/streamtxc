@@ -380,7 +380,7 @@ function PaymentPanel({
         Send <span className="text-primary font-bold">{required} TXC</span> to
         the address below. Once detected, your{" "}
         {intent.kind === "comment"
-          ? "comment will be split into OP_RETURN chunks and broadcast on chain"
+          ? "comment will be pinned to IPFS and its CID anchored on chain"
           : "boost will be stamped on chain and applied"}
         .
       </p>
