@@ -103,6 +103,99 @@ export const finalizeUpload = createServerFn({ method: "POST" })
     };
   });
 
+// --- Add an existing IPFS CID (no re-upload) ------------------------------
+
+const cidSchema = z
+  .string()
+  .trim()
+  .min(46)
+  .max(120)
+  .regex(/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[A-Za-z2-7]{50,})$/, "Invalid IPFS CID");
+
+export const addByCid = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        wallet: walletSchema,
+        cid: cidSchema,
+        title: z.string().min(1).max(200),
+        description: z.string().max(2000).optional().default(""),
+        months: z.number().int().min(1).max(12).default(1),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    // Reject if already registered
+    const { data: existing } = await supabaseAdmin
+      .from("videos")
+      .select("cid")
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (existing) throw new Error("This CID is already registered");
+
+    // Probe the gateway to learn size + mime (HEAD, then ranged GET fallback)
+    const gatewayDomain = process.env.PINATA_GATEWAY_DOMAIN;
+    const url = gatewayDomain
+      ? `https://${gatewayDomain}/ipfs/${data.cid}`
+      : `https://gateway.pinata.cloud/ipfs/${data.cid}`;
+
+    let sizeBytes = 0;
+    let mimeType = "video/mp4";
+    try {
+      let probe = await fetch(url, { method: "HEAD" });
+      if (!probe.ok || !probe.headers.get("content-length")) {
+        probe = await fetch(url, { headers: { Range: "bytes=0-0" } });
+      }
+      sizeBytes = Number(
+        probe.headers.get("content-range")?.split("/")[1] ||
+          probe.headers.get("content-length") ||
+          0,
+      );
+      mimeType = probe.headers.get("content-type") || mimeType;
+    } catch {
+      // best-effort; continue with unknown size
+    }
+
+    const fee = quoteFee(Math.max(sizeBytes, 1), data.months);
+    const paymentTx = mockPaymentTx(data.wallet, fee);
+    const stamp = timestampCid(data.cid, data.wallet, sizeBytes);
+
+    const expires = new Date();
+    expires.setMonth(expires.getMonth() + data.months);
+
+    const { error: vErr } = await supabaseAdmin.from("videos").insert({
+      cid: data.cid,
+      owner_wallet: data.wallet,
+      title: data.title,
+      description: data.description || null,
+      size_bytes: sizeBytes,
+      mime_type: mimeType,
+      status: "active",
+      mock_tx_hash: stamp.txHash,
+      mock_block_number: stamp.blockNumber,
+      months_prepaid: data.months,
+      expires_at: expires.toISOString(),
+    });
+    if (vErr) throw new Error(`Failed to save video: ${vErr.message}`);
+
+    const { error: pErr } = await supabaseAdmin.from("payments").insert({
+      video_cid: data.cid,
+      wallet: data.wallet,
+      txc_amount: fee,
+      months_prepaid: data.months,
+      mock_tx_hash: paymentTx,
+    });
+    if (pErr) throw new Error(`Failed to save payment: ${pErr.message}`);
+
+    return {
+      cid: data.cid,
+      sizeBytes,
+      mimeType,
+      txHash: stamp.txHash,
+      blockNumber: stamp.blockNumber,
+    };
+  });
+
 // --- Listings --------------------------------------------------------------
 
 export const listRecentVideos = createServerFn({ method: "GET" }).handler(

@@ -19,6 +19,8 @@ export async function pinFileToIPFS(
   const form = new FormData();
   form.append("file", file, filename);
   form.append("network", "public");
+  // Request CIDv1 (bafy…) instead of legacy CIDv0 (Qm…)
+  form.append("pinataOptions", JSON.stringify({ cidVersion: 1 }));
 
   const res = await fetch(`${PINATA_BASE}/files`, {
     method: "POST",

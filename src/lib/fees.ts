@@ -4,7 +4,7 @@
 export const RATE_PER_MB_PER_MONTH = 0.05; // TXC
 export const REWARD_CREDIT_PER_VIEW = 0.001; // TXC equivalent
 export const VIEW_DEBOUNCE_SECONDS = 30;
-export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB MVP cap
+export const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024; // 1 GB cap
 
 export function quoteFee(sizeBytes: number, months = 1): number {
   const sizeMB = sizeBytes / (1024 * 1024);
