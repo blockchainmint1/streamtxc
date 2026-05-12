@@ -3,7 +3,11 @@ import { getRequestIP, getRequestHeader } from "@tanstack/react-start/server";
 import { createHash } from "crypto";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { pinFileToIPFS, createPresignedUploadUrl, pinByCid } from "./pinata.server";
+import {
+  pinFileToIPFS,
+  createPresignedUploadUrl,
+  pinByCid,
+} from "./pinata.server";
 import { mockPaymentTx } from "./chain";
 import { getTxStatus, explorerTxUrl } from "./txc.server";
 import { assignVideoWallet } from "./txc-wallets.server";
@@ -14,6 +18,14 @@ import { getTxcUsdPrice } from "./txc-price.server";
 const walletSchema = z
   .string()
   .regex(/^0x[a-fA-F0-9]{40}$/, "Invalid wallet address");
+
+const cidStringSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[A-Za-z2-7]{50,})$/,
+    "Invalid CID",
+  );
 
 /**
  * If a video with this CID already exists, throw a structured error the
