@@ -1,5 +1,23 @@
 // TXC blockchain adapter (server-only).
 //
+// CHAIN FACTS (don't forget again):
+//   - TEXITcoin (TXC) is a Layer 1 Scrypt PoW UTXO chain — Litecoin/Dogecoin
+//     lineage, NOT a Bitcoin Core fork. Scrypt only changes the mining algo;
+//     the tx format (incl. OP_RETURN ≤80 bytes) and JSON-RPC surface
+//     (createrawtransaction / fundrawtransaction / signrawtransactionwithwallet
+//     / sendrawtransaction) are inherited from the Bitcoin/Litecoin codebase,
+//     so this adapter Just Works against a TXC node.
+//   - Block explorer:  https://explorer.texitcoin.org
+//   - Mempool (preferred for OP_RETURN inspection):
+//                      https://mempool.texitcoin.org   ← canonical for our UI
+//   - Web wallet:      https://wallet.texitcoin.org
+//   - Project site:    https://texitcoin.org
+//
+// We deliberately link users to mempool.texitcoin.org instead of the block
+// explorer because the mempool UI surfaces OP_RETURN payload data directly on
+// the tx page, which is the whole point of our "on-chain proof" — readers
+// need to see the CID anchored in the tx, not hunt for it.
+//
 // Real implementation: Bitcoin-style JSON-RPC against a TXC node. We build a
 // transaction with one tiny self-pay output and one OP_RETURN output carrying
 // our anchor payload, sign it with the platform hot wallet, broadcast it, and
