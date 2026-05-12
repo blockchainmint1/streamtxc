@@ -70,16 +70,26 @@ function rpcConfigured(): boolean {
 }
 
 /**
- * fundrawtransaction options. Pinning the change address to a single
- * platform wallet is CRITICAL — without it, the TXC node picks a change
- * address from its keypool, which is derived from the SAME xpub on the
- * SAME `m/0/i` external chain we use for per-video deposit wallets.
- * That means change from our OP_RETURN stamps would land on future
- * videos' deposit addresses and silently "pay" them.
+ * fundrawtransaction options.
+ *
+ * IMPORTANT history: we used to pin `changeAddress` to TXC_PLATFORM_ADDRESS
+ * out of fear that the node's keypool change addresses would collide with
+ * per-video deposit wallets (also derived from the same xpub). That fear
+ * was wrong AND the fix was actively harmful:
+ *   - Per-video deposit wallets are derived on the EXTERNAL chain (m/0/i).
+ *     bitcoind's `getrawchangeaddress` pulls from the INTERNAL/change
+ *     keypool (m/1/i) — a separate branch — so there is no collision.
+ *   - Pinning change to TXC_PLATFORM_ADDRESS meant every topup to the hot
+ *     wallet got swept to the platform legacy address on the very next
+ *     stamp. Net effect: hot wallet drained itself after one tx, and
+ *     funds had to be manually returned each time.
+ *
+ * Letting bitcoind pick its own change address keeps the funds inside the
+ * same hot wallet that signs OP_RETURN txs, so a single topup lasts
+ * thousands of stamps.
  */
 function fundOptions(): Record<string, unknown> {
-  const changeAddress = process.env.TXC_PLATFORM_ADDRESS;
-  return changeAddress ? { changeAddress } : {};
+  return {};
 }
 
 /**
