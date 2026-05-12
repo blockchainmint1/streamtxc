@@ -12,7 +12,7 @@ import { ArrowUpRight, AlertTriangle } from "lucide-react";
 
 export const Route = createFileRoute("/manage")({
   head: () => ({
-    meta: [{ title: "My videos — video.texitcoin" }],
+    meta: [{ title: "My videos — stream.texitcoin" }],
   }),
   component: ManagePage,
 });
