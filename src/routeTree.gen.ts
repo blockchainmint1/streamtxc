@@ -9,38 +9,121 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UploadRouteImport } from './routes/upload'
+import { Route as ManageRouteImport } from './routes/manage'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as VCidRouteImport } from './routes/v.$cid'
+import { Route as EmbedCidRouteImport } from './routes/embed.$cid'
+import { Route as ApiStreamCidRouteImport } from './routes/api/stream.$cid'
 
+const UploadRoute = UploadRouteImport.update({
+  id: '/upload',
+  path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ManageRoute = ManageRouteImport.update({
+  id: '/manage',
+  path: '/manage',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VCidRoute = VCidRouteImport.update({
+  id: '/v/$cid',
+  path: '/v/$cid',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmbedCidRoute = EmbedCidRouteImport.update({
+  id: '/embed/$cid',
+  path: '/embed/$cid',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStreamCidRoute = ApiStreamCidRouteImport.update({
+  id: '/api/stream/$cid',
+  path: '/api/stream/$cid',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/manage': typeof ManageRoute
+  '/upload': typeof UploadRoute
+  '/embed/$cid': typeof EmbedCidRoute
+  '/v/$cid': typeof VCidRoute
+  '/api/stream/$cid': typeof ApiStreamCidRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/manage': typeof ManageRoute
+  '/upload': typeof UploadRoute
+  '/embed/$cid': typeof EmbedCidRoute
+  '/v/$cid': typeof VCidRoute
+  '/api/stream/$cid': typeof ApiStreamCidRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/manage': typeof ManageRoute
+  '/upload': typeof UploadRoute
+  '/embed/$cid': typeof EmbedCidRoute
+  '/v/$cid': typeof VCidRoute
+  '/api/stream/$cid': typeof ApiStreamCidRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/manage'
+    | '/upload'
+    | '/embed/$cid'
+    | '/v/$cid'
+    | '/api/stream/$cid'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/manage'
+    | '/upload'
+    | '/embed/$cid'
+    | '/v/$cid'
+    | '/api/stream/$cid'
+  id:
+    | '__root__'
+    | '/'
+    | '/manage'
+    | '/upload'
+    | '/embed/$cid'
+    | '/v/$cid'
+    | '/api/stream/$cid'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ManageRoute: typeof ManageRoute
+  UploadRoute: typeof UploadRoute
+  EmbedCidRoute: typeof EmbedCidRoute
+  VCidRoute: typeof VCidRoute
+  ApiStreamCidRoute: typeof ApiStreamCidRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/upload': {
+      id: '/upload'
+      path: '/upload'
+      fullPath: '/upload'
+      preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/manage': {
+      id: '/manage'
+      path: '/manage'
+      fullPath: '/manage'
+      preLoaderRoute: typeof ManageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +131,38 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v/$cid': {
+      id: '/v/$cid'
+      path: '/v/$cid'
+      fullPath: '/v/$cid'
+      preLoaderRoute: typeof VCidRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/embed/$cid': {
+      id: '/embed/$cid'
+      path: '/embed/$cid'
+      fullPath: '/embed/$cid'
+      preLoaderRoute: typeof EmbedCidRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/stream/$cid': {
+      id: '/api/stream/$cid'
+      path: '/api/stream/$cid'
+      fullPath: '/api/stream/$cid'
+      preLoaderRoute: typeof ApiStreamCidRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ManageRoute: ManageRoute,
+  UploadRoute: UploadRoute,
+  EmbedCidRoute: EmbedCidRoute,
+  VCidRoute: VCidRoute,
+  ApiStreamCidRoute: ApiStreamCidRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
