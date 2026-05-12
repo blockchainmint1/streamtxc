@@ -8,12 +8,25 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useWallet } from "@/lib/wallet";
-import { formatBytes, formatDate, MAX_UPLOAD_BYTES } from "@/lib/fees";
-import { getUploadUrl, registerUpload, addByCid } from "@/lib/videos.functions";
+import { formatBytes, formatDate, formatTxc, MAX_UPLOAD_BYTES } from "@/lib/fees";
+import {
+  getUploadUrl,
+  registerUpload,
+  addByCid,
+  getQuote,
+} from "@/lib/videos.functions";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { Upload, Loader2, FileVideo, Link2, AlertTriangle } from "lucide-react";
+import {
+  Upload,
+  Loader2,
+  FileVideo,
+  Link2,
+  AlertTriangle,
+  CheckCircle2,
+  Sparkles,
+} from "lucide-react";
 import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
 import { computeCidV1, isCidOnIpfs } from "@/lib/ipfs-cid";
 
@@ -76,6 +89,7 @@ function UploadPage() {
   const getUrl = useServerFn(getUploadUrl);
   const register = useServerFn(registerUpload);
   const addCid = useServerFn(addByCid);
+  const quoteFn = useServerFn(getQuote);
 
   // Auto-provision an anonymous owner id so uploads are free and frictionless
   // until the real TXC wallet integration lands.
@@ -85,6 +99,13 @@ function UploadPage() {
 
   const [file, setFile] = useState<File | null>(null);
   const [codecWarning, setCodecWarning] = useState<string | null>(null);
+  const [localCid, setLocalCid] = useState<string | null>(null);
+  const [cidProbe, setCidProbe] = useState<"idle" | "checking" | "on-ipfs" | "off-ipfs">("idle");
+  const [quote, setQuote] = useState<{
+    txcAmount: number;
+    usdAmount: number;
+    txcUsd: number;
+  } | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [cidInput, setCidInput] = useState("");
@@ -102,6 +123,41 @@ function UploadPage() {
   const [duplicate, setDuplicate] = useState<DuplicateCidInfo | null>(null);
 
   const tooBig = !!file && file.size > MAX_UPLOAD_BYTES;
+
+  /**
+   * When a file is selected, kick off (in parallel) the local CIDv1 hash,
+   * the IPFS gateway probe, and the live TXC quote so the user sees the
+   * real cost + a "Publish your video" affordance before clicking submit.
+   */
+  useEffect(() => {
+    if (!file || tooBig) {
+      setLocalCid(null);
+      setCidProbe("idle");
+      setQuote(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        setCidProbe("checking");
+        const [cid, q] = await Promise.all([
+          computeCidV1(file),
+          quoteFn({ data: { sizeBytes: file.size, months: 1 } }),
+        ]);
+        if (cancelled) return;
+        setLocalCid(cid);
+        setQuote({ txcAmount: q.txcAmount, usdAmount: q.usdAmount, txcUsd: q.txcUsd });
+        const onIpfs = await isCidOnIpfs(cid);
+        if (cancelled) return;
+        setCidProbe(onIpfs ? "on-ipfs" : "off-ipfs");
+      } catch (err) {
+        if (!cancelled) setCidProbe("off-ipfs");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [file, tooBig, quoteFn]);
 
   /**
    * Best-effort browser playability probe. Most browsers don't play
@@ -144,16 +200,15 @@ function UploadPage() {
     setDuplicate(null);
 
     try {
-      // 1. Hash the file locally to compute its CIDv1.
+      // 1. Reuse the CID + IPFS check computed when the file was selected.
+      //    Falls back to recomputing if the user submitted before the
+      //    background probe finished.
       setStage("hashing");
       setProgress(0);
-      const localCid = await computeCidV1(file);
-
-      // 2. Check if the file is already on the public IPFS network.
-      //    If yes, skip the upload entirely and register by CID — saves the
-      //    user from re-uploading bytes that already exist out there.
+      const cid = localCid ?? (await computeCidV1(file));
       setStage("checking");
-      const alreadyPinned = await isCidOnIpfs(localCid);
+      const alreadyPinned =
+        cidProbe === "on-ipfs" ? true : await isCidOnIpfs(cid);
       if (alreadyPinned) {
         toast("Found this file on IPFS — skipping upload", {
           description: "Registering existing CID instead.",
@@ -162,7 +217,7 @@ function UploadPage() {
         const result = await addCid({
           data: {
             wallet: address,
-            cid: localCid,
+            cid,
             title,
             description,
             months,
@@ -421,9 +476,57 @@ function UploadPage() {
             </div>
 
             {file && !tooBig && (
-              <div className="border border-border bg-card rounded-sm p-4 font-mono text-sm flex justify-between">
-                <span className="text-muted-foreground">cost</span>
-                <span className="text-primary font-bold">FREE (beta)</span>
+              <div className="border border-border bg-card rounded-sm p-4 space-y-3 font-mono text-sm">
+                <div className="flex justify-between items-start gap-4">
+                  <span className="text-muted-foreground shrink-0">cid</span>
+                  <span className="text-foreground text-xs break-all text-right">
+                    {localCid ?? (
+                      <span className="text-muted-foreground inline-flex items-center gap-1.5">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        hashing…
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">on ipfs?</span>
+                  {cidProbe === "checking" || cidProbe === "idle" ? (
+                    <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      checking…
+                    </span>
+                  ) : cidProbe === "on-ipfs" ? (
+                    <span className="text-primary inline-flex items-center gap-1.5 text-xs">
+                      <CheckCircle2 className="h-3 w-3" />
+                      already pinned — no upload needed
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">no — will upload</span>
+                  )}
+                </div>
+                <div className="flex justify-between items-center border-t border-border pt-3">
+                  <span className="text-muted-foreground">cost · 1 month</span>
+                  {quote ? (
+                    <span className="text-right">
+                      <span className="text-primary font-bold">
+                        {formatTxc(quote.txcAmount)}
+                      </span>
+                      <span className="block text-[10px] text-muted-foreground">
+                        ≈ ${quote.usdAmount.toFixed(4)} @ ${quote.txcUsd.toFixed(4)}/TXC
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      pricing…
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  $0.01 / MB / month, paid in TXC. After publishing you'll get a
+                  per-video TXC address — send the amount above within 24h or
+                  the file is unpinned.
+                </p>
               </div>
             )}
 
@@ -443,10 +546,17 @@ function UploadPage() {
               className="w-full font-mono"
             >
               {stage === "idle" && (
-                <>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload to IPFS
-                </>
+                cidProbe === "on-ipfs" ? (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Publish your video
+                  </>
+                ) : (
+                  <>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Upload to IPFS & publish
+                  </>
+                )
               )}
               {stage !== "idle" && (
                 <>

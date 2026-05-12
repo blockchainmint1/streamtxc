@@ -18,6 +18,8 @@ import {
   Code2,
   Loader2,
   CheckCircle2,
+  Wallet,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -131,6 +133,16 @@ function WatchPage() {
 
           {/* Sidebar: chain info + embed */}
           <div className="space-y-4">
+            {video.video_wallet && video.payment_required_txc != null && (
+              <PaymentPanel
+                required={Number(video.payment_required_txc)}
+                received={Number(video.payment_received_txc ?? 0)}
+                wallet={video.video_wallet}
+                paidAt={video.paid_at ?? null}
+                createdAt={video.created_at}
+                onCopy={copy}
+              />
+            )}
             <div className="border border-border bg-card rounded-sm p-4 space-y-3">
               <h2 className="font-mono text-xs text-primary">[ ON-CHAIN PROOF ]</h2>
               <Field label="IPFS CID" value={video.cid} onCopy={copy} mono />
@@ -315,6 +327,99 @@ function Field({
           </a>
         )}
       </div>
+    </div>
+  );
+}
+
+function PaymentPanel({
+  required,
+  received,
+  wallet,
+  paidAt,
+  createdAt,
+  onCopy,
+}: {
+  required: number;
+  received: number;
+  wallet: string;
+  paidAt: string | null;
+  createdAt: string;
+  onCopy: (s: string) => void;
+}) {
+  const paid = paidAt != null || received >= required;
+  const partial = !paid && received > 0;
+  const remaining = Math.max(0, +(required - received).toFixed(8));
+  const ageHrs = (Date.now() - new Date(createdAt).getTime()) / 3_600_000;
+  const graceLeft = Math.max(0, 24 - ageHrs);
+
+  return (
+    <div className="border border-border bg-card rounded-sm p-4 space-y-3">
+      <h2 className="font-mono text-xs text-primary flex items-center gap-1.5">
+        <Wallet className="h-3.5 w-3.5" /> [ HOSTING PAYMENT ]
+      </h2>
+      {paid ? (
+        <div className="flex items-center gap-1.5 text-xs text-primary font-mono">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          paid · {formatTxc(received)}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+            <div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                amount due
+              </div>
+              <div className="text-primary font-bold">{formatTxc(remaining)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                received
+              </div>
+              <div>{formatTxc(received)}</div>
+            </div>
+          </div>
+          {partial && (
+            <div className="flex items-start gap-1.5 text-[11px] text-amber-500 font-mono">
+              <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+              partial payment received — send the remainder to confirm
+            </div>
+          )}
+          <div>
+            <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
+              send TXC to
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 truncate text-xs font-mono bg-input border border-border rounded-sm px-2 py-1.5">
+                {wallet}
+              </code>
+              <button
+                onClick={() => onCopy(wallet)}
+                className="text-muted-foreground hover:text-primary"
+                aria-label="Copy address"
+              >
+                <Copy className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Send exactly the amount above from any TXC wallet. Confirmation is
+            automatic — your video stays live as soon as the payment lands.
+            Unpaid videos are unpinned after{" "}
+            <span className="text-foreground">
+              {graceLeft > 0 ? `${graceLeft.toFixed(1)}h` : "0h"}
+            </span>
+            .
+          </p>
+          <a
+            href={`https://mempool.texitcoin.org/address/${wallet}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 font-mono text-[11px] text-primary hover:underline"
+          >
+            view address on mempool <ExternalLink className="h-3 w-3" />
+          </a>
+        </>
+      )}
     </div>
   );
 }
