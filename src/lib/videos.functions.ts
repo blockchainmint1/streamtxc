@@ -12,6 +12,8 @@ import { mockPaymentTx } from "./chain";
 import { getTxStatus, explorerTxUrl } from "./txc.server";
 import { assignVideoWallet } from "./txc-wallets.server";
 import { recordChainEvent, recordMetadataAnchor } from "./chain-events.server";
+import { recordOwnershipAnchor, recordSplitPayout } from "./chain-events.server";
+import { verifyMessage, sendToAddress } from "./txc.server";
 import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
 
