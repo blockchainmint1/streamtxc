@@ -6,7 +6,7 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { listRecentVideos } from "@/lib/videos.functions";
 import { formatBytes, shortenHash } from "@/lib/fees";
-import { ArrowUpRight, Upload, Database, Coins, Eye } from "lucide-react";
+import { ArrowUpRight, Upload, Database, Coins, Eye, Play } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   component: IndexPage,
@@ -114,8 +114,17 @@ function IndexPage() {
                 params={{ cid: v.cid }}
                 className="group block bg-card border border-border rounded-sm overflow-hidden hover:border-primary transition-colors"
               >
-                <div className="aspect-video bg-secondary flex items-center justify-center">
-                  <Database className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors" />
+                <div className="relative aspect-video bg-secondary overflow-hidden">
+                  <video
+                    src={`/api/stream/${v.cid}#t=0.5`}
+                    preload="metadata"
+                    muted
+                    playsInline
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-background/0 group-hover:bg-background/30 transition-colors">
+                    <Play className="h-10 w-10 text-background opacity-0 group-hover:opacity-100 fill-background transition-opacity" />
+                  </div>
                 </div>
                 <div className="p-4">
                   <h3 className="font-bold text-sm truncate">{v.title}</h3>
