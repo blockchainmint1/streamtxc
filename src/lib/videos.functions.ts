@@ -115,6 +115,16 @@ export const registerUpload = createServerFn({ method: "POST" })
     const videoStatus = stamp.real ? "mempool" : "stamp_failed";
     const txHash = stamp.real ? stamp.txid : null;
 
+    // Anchor title/description on IPFS + chain ("T" stamp). Best-effort —
+    // a failure here doesn't block the upload, the row just lacks metadata_cid.
+    const meta = await recordMetadataAnchor({
+      videoCid: data.cid,
+      videoWallet: videoWallet.address,
+      uploaderWallet: data.wallet,
+      title: data.title,
+      description: data.description ?? "",
+    });
+
     const expires = new Date();
     expires.setMonth(expires.getMonth() + data.months);
 
@@ -133,6 +143,7 @@ export const registerUpload = createServerFn({ method: "POST" })
       video_wallet: videoWallet.address,
       derivation_index: videoWallet.derivationIndex,
       payment_required_txc: fee,
+      metadata_cid: meta?.metaCid ?? null,
     });
     if (vErr) {
       // Race condition: someone registered the same CID between our check
@@ -207,6 +218,14 @@ export const finalizeUpload = createServerFn({ method: "POST" })
     const videoStatus = stamp.real ? "mempool" : "stamp_failed";
     const txHash = stamp.real ? stamp.txid : null;
 
+    const meta = await recordMetadataAnchor({
+      videoCid: pin.cid,
+      videoWallet: videoWallet.address,
+      uploaderWallet: data.wallet,
+      title: data.title,
+      description: data.description ?? "",
+    });
+
     // 3. Persist
     const expires = new Date();
     expires.setMonth(expires.getMonth() + data.months);
@@ -228,6 +247,7 @@ export const finalizeUpload = createServerFn({ method: "POST" })
         video_wallet: videoWallet.address,
         derivation_index: videoWallet.derivationIndex,
         payment_required_txc: fee,
+        metadata_cid: meta?.metaCid ?? null,
       });
     if (vErr) {
       if (vErr.code === "23505") await assertCidUnclaimed(pin.cid);
@@ -351,6 +371,14 @@ export const addByCid = createServerFn({ method: "POST" })
     const videoStatus = stamp.real ? "mempool" : "stamp_failed";
     const txHash = stamp.real ? stamp.txid : null;
 
+    const meta = await recordMetadataAnchor({
+      videoCid: data.cid,
+      videoWallet: videoWallet.address,
+      uploaderWallet: data.wallet,
+      title: data.title,
+      description: data.description ?? "",
+    });
+
     const expires = new Date();
     expires.setMonth(expires.getMonth() + data.months);
 
@@ -369,6 +397,7 @@ export const addByCid = createServerFn({ method: "POST" })
       video_wallet: videoWallet.address,
       derivation_index: videoWallet.derivationIndex,
       payment_required_txc: fee,
+      metadata_cid: meta?.metaCid ?? null,
     });
     if (vErr) {
       if (vErr.code === "23505") await assertCidUnclaimed(data.cid);
