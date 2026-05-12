@@ -24,6 +24,12 @@ import {
   ShieldAlert,
   QrCode,
   ChevronDown,
+  Share2,
+  Twitter,
+  Facebook,
+  Send,
+  MessageCircle,
+  Link as LinkIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
@@ -175,6 +181,11 @@ function WatchPage() {
               <span>uploader: {shortenHash(video.owner_wallet)}</span>
               <ReportButton cid={video.cid} />
             </div>
+            <ShareBar
+              title={video.title}
+              url={origin ? `${origin}/v/${video.cid}` : `/v/${video.cid}`}
+              onCopy={copy}
+            />
           </div>
 
           {/* Sidebar: chain info + embed */}
