@@ -118,6 +118,42 @@ export type Database = {
           },
         ]
       }
+      video_reports: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          reason: string
+          reporter_ip_hash: string
+          reviewed_at: string | null
+          reviewer_note: string | null
+          status: string
+          video_cid: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          reason: string
+          reporter_ip_hash: string
+          reviewed_at?: string | null
+          reviewer_note?: string | null
+          status?: string
+          video_cid: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          reason?: string
+          reporter_ip_hash?: string
+          reviewed_at?: string | null
+          reviewer_note?: string | null
+          status?: string
+          video_cid?: string
+        }
+        Relationships: []
+      }
       videos: {
         Row: {
           block_hash: string | null
@@ -128,6 +164,8 @@ export type Database = {
           description: string | null
           duration_s: number | null
           expires_at: string
+          hidden_at: string | null
+          hidden_reason: string | null
           mime_type: string | null
           months_prepaid: number
           op_return_payload: string | null
@@ -136,6 +174,7 @@ export type Database = {
           payment_received_txc: number
           payment_required_txc: number | null
           payment_tx_hash: string | null
+          report_count: number
           size_bytes: number
           status: string
           title: string
@@ -153,6 +192,8 @@ export type Database = {
           description?: string | null
           duration_s?: number | null
           expires_at?: string
+          hidden_at?: string | null
+          hidden_reason?: string | null
           mime_type?: string | null
           months_prepaid?: number
           op_return_payload?: string | null
@@ -161,6 +202,7 @@ export type Database = {
           payment_received_txc?: number
           payment_required_txc?: number | null
           payment_tx_hash?: string | null
+          report_count?: number
           size_bytes: number
           status?: string
           title: string
@@ -178,6 +220,8 @@ export type Database = {
           description?: string | null
           duration_s?: number | null
           expires_at?: string
+          hidden_at?: string | null
+          hidden_reason?: string | null
           mime_type?: string | null
           months_prepaid?: number
           op_return_payload?: string | null
@@ -186,6 +230,7 @@ export type Database = {
           payment_received_txc?: number
           payment_required_txc?: number | null
           payment_tx_hash?: string | null
+          report_count?: number
           size_bytes?: number
           status?: string
           title?: string
