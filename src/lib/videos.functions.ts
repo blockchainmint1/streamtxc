@@ -670,6 +670,44 @@ export const setVideoVisibility = createServerFn({ method: "POST" })
     return { cid: data.cid, hidden: data.hidden };
   });
 
+/**
+ * Owner-side "flagged for follow-up" marker. Doesn't affect public visibility
+ * — just shows a badge in /manage so the owner can come back to it.
+ */
+export const setVideoFlagged = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        wallet: walletSchema,
+        cid: cidStringSchema,
+        flagged: z.boolean(),
+        reason: z.string().max(200).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: row, error: rErr } = await supabaseAdmin
+      .from("videos")
+      .select("cid, owner_wallet")
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (rErr) throw new Error(rErr.message);
+    if (!row) throw new Error("Video not found");
+    if (row.owner_wallet.toLowerCase() !== data.wallet.toLowerCase()) {
+      throw new Error("Not the owner of this video");
+    }
+
+    const { error } = await supabaseAdmin
+      .from("videos")
+      .update({
+        flagged_at: data.flagged ? new Date().toISOString() : null,
+        flagged_reason: data.flagged ? (data.reason ?? "owner-flagged") : null,
+      })
+      .eq("cid", data.cid);
+    if (error) throw new Error(error.message);
+    return { cid: data.cid, flagged: data.flagged };
+  });
+
 // --- Bulk extend (sendmany helper) ----------------------------------------
 
 /**
