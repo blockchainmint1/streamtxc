@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as VCidRouteImport } from './routes/v.$cid'
 import { Route as EmbedCidRouteImport } from './routes/embed.$cid'
 import { Route as ApiStreamCidRouteImport } from './routes/api/stream.$cid'
+import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
 
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
@@ -46,6 +47,12 @@ const ApiStreamCidRoute = ApiStreamCidRouteImport.update({
   path: '/api/stream/$cid',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksPaymentWatcherRoute =
+  ApiPublicHooksPaymentWatcherRouteImport.update({
+    id: '/api/public/hooks/payment-watcher',
+    path: '/api/public/hooks/payment-watcher',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByFullPath {
   '/embed/$cid': typeof EmbedCidRoute
   '/v/$cid': typeof VCidRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
+  '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +70,7 @@ export interface FileRoutesByTo {
   '/embed/$cid': typeof EmbedCidRoute
   '/v/$cid': typeof VCidRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
+  '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +80,7 @@ export interface FileRoutesById {
   '/embed/$cid': typeof EmbedCidRoute
   '/v/$cid': typeof VCidRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
+  '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,6 +91,7 @@ export interface FileRouteTypes {
     | '/embed/$cid'
     | '/v/$cid'
     | '/api/stream/$cid'
+    | '/api/public/hooks/payment-watcher'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,6 +100,7 @@ export interface FileRouteTypes {
     | '/embed/$cid'
     | '/v/$cid'
     | '/api/stream/$cid'
+    | '/api/public/hooks/payment-watcher'
   id:
     | '__root__'
     | '/'
@@ -97,6 +109,7 @@ export interface FileRouteTypes {
     | '/embed/$cid'
     | '/v/$cid'
     | '/api/stream/$cid'
+    | '/api/public/hooks/payment-watcher'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -106,6 +119,7 @@ export interface RootRouteChildren {
   EmbedCidRoute: typeof EmbedCidRoute
   VCidRoute: typeof VCidRoute
   ApiStreamCidRoute: typeof ApiStreamCidRoute
+  ApiPublicHooksPaymentWatcherRoute: typeof ApiPublicHooksPaymentWatcherRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -152,6 +166,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStreamCidRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/payment-watcher': {
+      id: '/api/public/hooks/payment-watcher'
+      path: '/api/public/hooks/payment-watcher'
+      fullPath: '/api/public/hooks/payment-watcher'
+      preLoaderRoute: typeof ApiPublicHooksPaymentWatcherRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -162,6 +183,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmbedCidRoute: EmbedCidRoute,
   VCidRoute: VCidRoute,
   ApiStreamCidRoute: ApiStreamCidRoute,
+  ApiPublicHooksPaymentWatcherRoute: ApiPublicHooksPaymentWatcherRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

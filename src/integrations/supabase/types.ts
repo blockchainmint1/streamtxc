@@ -132,10 +132,15 @@ export type Database = {
           months_prepaid: number
           op_return_payload: string | null
           owner_wallet: string
+          paid_at: string | null
+          payment_received_txc: number
+          payment_required_txc: number | null
+          payment_tx_hash: string | null
           size_bytes: number
           status: string
           title: string
           tx_hash: string | null
+          unpinned_at: string | null
           video_wallet: string | null
           view_count: number
         }
@@ -152,10 +157,15 @@ export type Database = {
           months_prepaid?: number
           op_return_payload?: string | null
           owner_wallet: string
+          paid_at?: string | null
+          payment_received_txc?: number
+          payment_required_txc?: number | null
+          payment_tx_hash?: string | null
           size_bytes: number
           status?: string
           title: string
           tx_hash?: string | null
+          unpinned_at?: string | null
           video_wallet?: string | null
           view_count?: number
         }
@@ -172,10 +182,15 @@ export type Database = {
           months_prepaid?: number
           op_return_payload?: string | null
           owner_wallet?: string
+          paid_at?: string | null
+          payment_received_txc?: number
+          payment_required_txc?: number | null
+          payment_tx_hash?: string | null
           size_bytes?: number
           status?: string
           title?: string
           tx_hash?: string | null
+          unpinned_at?: string | null
           video_wallet?: string | null
           view_count?: number
         }
