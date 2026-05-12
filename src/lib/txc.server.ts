@@ -166,7 +166,10 @@ export async function stampRawPayload(opts: {
     [],
     [{ data: dataHex }, { [toAddress]: 0.0001 }],
   ]);
-  const funded = await rpc<{ hex: string }>("fundrawtransaction", [rawTx]);
+  const funded = await rpc<{ hex: string }>("fundrawtransaction", [
+    rawTx,
+    fundOptions(),
+  ]);
   const signed = await rpc<{ hex: string; complete: boolean }>(
     "signrawtransactionwithwallet",
     [funded.hex],
@@ -224,7 +227,10 @@ export async function stampEvent(opts: {
     [],
     [{ data: dataHex }, { [recipient]: 0.0001 }],
   ]);
-  const funded = await rpc<{ hex: string }>("fundrawtransaction", [rawTx]);
+  const funded = await rpc<{ hex: string }>("fundrawtransaction", [
+    rawTx,
+    fundOptions(),
+  ]);
   const signed = await rpc<{ hex: string; complete: boolean }>(
     "signrawtransactionwithwallet",
     [funded.hex],
