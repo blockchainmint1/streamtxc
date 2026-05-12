@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UploadRouteImport } from './routes/upload'
+import { Route as ManageRouteImport } from './routes/manage'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VCidRouteImport } from './routes/v.$cid'
 import { Route as ApiStreamCidRouteImport } from './routes/api/stream.$cid'
@@ -17,6 +18,11 @@ import { Route as ApiStreamCidRouteImport } from './routes/api/stream.$cid'
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
   path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ManageRoute = ManageRouteImport.update({
+  id: '/manage',
+  path: '/manage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -37,12 +43,14 @@ const ApiStreamCidRoute = ApiStreamCidRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/manage': typeof ManageRoute
   '/upload': typeof UploadRoute
   '/v/$cid': typeof VCidRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/manage': typeof ManageRoute
   '/upload': typeof UploadRoute
   '/v/$cid': typeof VCidRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/manage': typeof ManageRoute
   '/upload': typeof UploadRoute
   '/v/$cid': typeof VCidRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/upload' | '/v/$cid' | '/api/stream/$cid'
+  fullPaths: '/' | '/manage' | '/upload' | '/v/$cid' | '/api/stream/$cid'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/upload' | '/v/$cid' | '/api/stream/$cid'
-  id: '__root__' | '/' | '/upload' | '/v/$cid' | '/api/stream/$cid'
+  to: '/' | '/manage' | '/upload' | '/v/$cid' | '/api/stream/$cid'
+  id: '__root__' | '/' | '/manage' | '/upload' | '/v/$cid' | '/api/stream/$cid'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ManageRoute: typeof ManageRoute
   UploadRoute: typeof UploadRoute
   VCidRoute: typeof VCidRoute
   ApiStreamCidRoute: typeof ApiStreamCidRoute
@@ -76,6 +86,13 @@ declare module '@tanstack/react-router' {
       path: '/upload'
       fullPath: '/upload'
       preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/manage': {
+      id: '/manage'
+      path: '/manage'
+      fullPath: '/manage'
+      preLoaderRoute: typeof ManageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ManageRoute: ManageRoute,
   UploadRoute: UploadRoute,
   VCidRoute: VCidRoute,
   ApiStreamCidRoute: ApiStreamCidRoute,
