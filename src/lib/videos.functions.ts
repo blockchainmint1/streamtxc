@@ -1117,7 +1117,7 @@ export const submitOwnershipProof = createServerFn({ method: "POST" })
 export async function sweepCommentPayout(commentId: string): Promise<{
   ok: boolean;
   status: "swept" | "partial" | "escrowed" | "failed";
-  details: Record<string, unknown>;
+  details: Record<string, string>;
 }> {
   const { data: comment } = await supabaseAdmin
     .from("comments")
