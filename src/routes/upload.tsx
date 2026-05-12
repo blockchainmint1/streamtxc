@@ -30,6 +30,7 @@ import {
 import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
 import { computeCids, findCidOnIpfs } from "@/lib/ipfs-cid";
 import { PinataSDK } from "pinata";
+import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
@@ -118,6 +119,7 @@ function UploadPage() {
   } | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [thumbnailCid, setThumbnailCid] = useState<string | null>(null);
   const [cidInput, setCidInput] = useState("");
   const [cidTitle, setCidTitle] = useState("");
   const [cidDescription, setCidDescription] = useState("");
@@ -235,6 +237,7 @@ function UploadPage() {
             title,
             description,
             months,
+            thumbnailCid: thumbnailCid ?? undefined,
           },
         });
         if (result.chainStatus === "stamp_failed") {
@@ -274,6 +277,7 @@ function UploadPage() {
           sizeBytes: pinResult.size || file.size,
           mimeType: file.type || "video/mp4",
           months,
+          thumbnailCid: thumbnailCid ?? undefined,
         },
       });
 
