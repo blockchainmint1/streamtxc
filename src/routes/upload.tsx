@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -34,9 +34,9 @@ function UploadPage() {
 
   // Auto-provision an anonymous owner id so uploads are free and frictionless
   // until the real TXC wallet integration lands.
-  if (typeof window !== "undefined" && !address) {
-    connect();
-  }
+  useEffect(() => {
+    if (!address) connect();
+  }, [address, connect]);
 
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
