@@ -413,6 +413,7 @@ function UploadPage() {
                       setFile(f);
                       setCodecWarning(checkCodec(f));
                       if (!title) setTitle(f.name.replace(/\.[^.]+$/, ""));
+                      setThumbnailCid(null);
                     }
                   }}
                 />
