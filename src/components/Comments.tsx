@@ -51,8 +51,9 @@ interface CommentRow {
   last_boost_at: string;
   created_at: string;
   tx_hash: string | null;
-  chunk_tx_hashes: string[] | null;
+  comment_cid: string | null;
   explorerUrl: string | null;
+  ipfsUrl: string | null;
 }
 
 type PendingIntent = {
@@ -136,10 +137,11 @@ export function Comments({ cid }: { cid: string }) {
       </div>
 
       <p className="text-xs text-muted-foreground font-mono mb-6 leading-relaxed">
-        Comments are anchored on the TXC chain — the full text is split across
-        OP_RETURN outputs and broadcast in real txs. Pay more to rank higher;
-        anyone can <span className="text-primary">boost</span> a comment to
-        push it back up. Split:{" "}
+        Comments are pinned to IPFS and anchored on the TXC chain — the
+        on-chain tx carries the comment's content-addressed CID, so the
+        body is tamper-proof and verifiable by anyone. Pay more to rank
+        higher; anyone can <span className="text-primary">boost</span> a
+        comment to push it back up. Split:{" "}
         <span className="text-foreground">90% creator</span> /{" "}
         <span className="text-foreground">5% hosting</span> /{" "}
         <span className="text-foreground">5% platform</span>.
@@ -175,7 +177,7 @@ export function Comments({ cid }: { cid: string }) {
           />
           <div className="flex items-center justify-between mt-1">
             <span className="text-[10px] font-mono text-muted-foreground">
-              {body.length}/1000 • ~{Math.max(1, Math.ceil(new Blob([body]).size / 60))} OP_RETURN chunks
+              {body.length}/1000 • pinned to IPFS, CID anchored on chain
             </span>
             <div className="h-1 w-24 bg-muted rounded-full overflow-hidden">
               <div
