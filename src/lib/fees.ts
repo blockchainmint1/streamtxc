@@ -1,14 +1,31 @@
 // TXC pricing for video hosting.
-// Quote = sizeMB * RATE_PER_MB * monthsPrepaid
+// Quote in USD ($0.01/MB/month) → converted to TXC at the live spot price.
 
-export const RATE_PER_MB_PER_MONTH = 0.05; // TXC
-export const REWARD_CREDIT_PER_VIEW = 0.001; // TXC equivalent
+export const RATE_USD_PER_MB_PER_MONTH = 0.01; // USD
+export const FALLBACK_TXC_USD = 0.10; // used only if the price feed is down
+export const REWARD_CREDIT_PER_VIEW_USD = 0.0001; // USD equivalent
 export const VIEW_DEBOUNCE_SECONDS = 30;
 export const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024; // 1 GB cap
+export const PAYMENT_GRACE_HOURS = 24; // unpaid videos are unpinned after this
 
-export function quoteFee(sizeBytes: number, months = 1): number {
+/** Quote in USD — pure, no network. */
+export function quoteUsd(sizeBytes: number, months = 1): number {
   const sizeMB = sizeBytes / (1024 * 1024);
-  return Math.max(0.01, +(sizeMB * RATE_PER_MB_PER_MONTH * months).toFixed(4));
+  return +(sizeMB * RATE_USD_PER_MB_PER_MONTH * months).toFixed(4);
+}
+
+/** Convert a USD quote to TXC at a given spot price. */
+export function usdToTxc(usd: number, txcUsd: number): number {
+  const safe = txcUsd > 0 ? txcUsd : FALLBACK_TXC_USD;
+  return Math.max(0.0001, +(usd / safe).toFixed(4));
+}
+
+/**
+ * Convenience client-side quote when a price is already known.
+ * Server callers should use `quoteFeeWithLivePrice` from fees.server.ts.
+ */
+export function quoteFee(sizeBytes: number, months = 1, txcUsd = FALLBACK_TXC_USD): number {
+  return usdToTxc(quoteUsd(sizeBytes, months), txcUsd);
 }
 
 export function formatTxc(amount: number | string): string {
