@@ -29,6 +29,45 @@ export const Route = createFileRoute("/upload")({
   component: UploadPage,
 });
 
+/**
+ * Upload a file directly to a Pinata presigned URL using XHR so we get
+ * progress events. Returns the parsed Pinata response.
+ */
+function uploadToPinata(
+  url: string,
+  file: File,
+  onProgress: (pct: number) => void,
+): Promise<{ cid: string; size: number; id: string }> {
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    form.append("file", file, file.name);
+    form.append("network", "public");
+    form.append("pinataOptions", JSON.stringify({ cidVersion: 1 }));
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url, true);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress((e.loaded / e.total) * 100);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const json = JSON.parse(xhr.responseText) as {
+            data: { cid: string; size: number; id: string };
+          };
+          resolve(json.data);
+        } catch (err) {
+          reject(new Error("Bad response from Pinata"));
+        }
+      } else {
+        reject(new Error(`Pinata upload failed [${xhr.status}]: ${xhr.responseText}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Network error during upload"));
+    xhr.send(form);
+  });
+}
+
 function UploadPage() {
   const navigate = useNavigate();
   const { address, connect } = useWallet();
