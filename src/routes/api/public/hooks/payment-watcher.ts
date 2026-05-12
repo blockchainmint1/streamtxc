@@ -22,7 +22,6 @@ import { unpinByCid, pinJsonToIPFS } from "@/lib/pinata.server";
 import { PAYMENT_GRACE_HOURS } from "@/lib/fees";
 import { sweepCommentPayout } from "@/lib/videos.functions";
 import { recordSplitPayout } from "@/lib/chain-events.server";
-import { supabaseAdmin as _admin } from "@/integrations/supabase/client.server";
 
 // Boost is just additional comment revenue — apply the same 90/5/5 split
 // against the boost amount (not the cumulative comment total) and log it.
