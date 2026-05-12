@@ -430,6 +430,15 @@ export const pollTxStatus = createServerFn({ method: "POST" })
           block_hash: status.blockHash,
         })
         .eq("cid", data.cid);
+      // Mirror confirmation onto the corresponding chain_events row.
+      await supabaseAdmin
+        .from("chain_events")
+        .update({
+          status: "confirmed",
+          block_number: status.blockHeight,
+          block_hash: status.blockHash,
+        })
+        .eq("tx_hash", video.tx_hash);
       return {
         status: "active",
         txHash: video.tx_hash,
