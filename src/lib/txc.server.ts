@@ -252,9 +252,7 @@ export async function stampRawPayload(opts: {
   }
 
   if (!rpcConfigured()) {
-    const txid = createHash("sha256")
-      .update(`stub:${payload}:${Date.now()}:${Math.random()}`)
-      .digest("hex");
+    const txid = stubHex(`stub:${payload}:${Date.now()}:${Math.random()}`);
     return { txid, payload, real: false };
   }
 
@@ -295,9 +293,7 @@ export async function stampEvent(opts: {
 
   if (!rpcConfigured()) {
     // Stub mode — deterministic 64-hex "txid" so the UI flow works.
-    const txid = createHash("sha256")
-      .update(`stub:${payload}:${Date.now()}:${Math.random()}`)
-      .digest("hex");
+    const txid = stubHex(`stub:${payload}:${Date.now()}:${Math.random()}`);
     return { txid, payload, real: false };
   }
 
@@ -431,9 +427,7 @@ export async function sendToAddress(
   const amount = +amountTxc.toFixed(8);
   if (amount <= 0) throw new Error("sendToAddress: amount must be > 0");
   if (!rpcConfigured()) {
-    const txid = createHash("sha256")
-      .update(`stub:pay:${address}:${amount}:${Date.now()}:${Math.random()}`)
-      .digest("hex");
+    const txid = stubHex(`stub:pay:${address}:${amount}:${Date.now()}:${Math.random()}`);
     return { txid, payload: `pay:${amount}`, real: false };
   }
   const txid = await rpc<string>("sendtoaddress", [address, amount]);

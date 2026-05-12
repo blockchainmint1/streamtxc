@@ -56,9 +56,7 @@ export async function recordChainEvent(
     // txid, log loudly, and return so the video still saves. Operator can
     // re-stamp later from the chain_events row.
     console.error("recordChainEvent: stamp broadcast failed", err);
-    const fakeTxid = createHash("sha256")
-      .update(`pending:${input.cid}:${input.eventType}:${Date.now()}`)
-      .digest("hex");
+    const fakeTxid = stubHex(`pending:${input.cid}:${input.eventType}:${Date.now()}`);
     stamp = {
       txid: fakeTxid,
       payload: `${input.eventType}|${input.cid}|${input.videoWallet}`,
@@ -138,9 +136,7 @@ export async function recordMetadataAnchor(input: {
     });
   } catch (err) {
     console.error("recordMetadataAnchor: stamp broadcast failed", err);
-    const fakeTxid = createHash("sha256")
-      .update(`pending:${input.videoCid}:T:${Date.now()}`)
-      .digest("hex");
+    const fakeTxid = stubHex(`pending:${input.videoCid}:T:${Date.now()}`);
     stamp = { txid: fakeTxid, payload, real: false };
   }
 
@@ -181,9 +177,7 @@ export async function recordOwnershipAnchor(input: {
     });
   } catch (err) {
     console.error("recordOwnershipAnchor: stamp broadcast failed", err);
-    const fakeTxid = createHash("sha256")
-      .update(`pending:${input.videoCid}:O:${Date.now()}`)
-      .digest("hex");
+    const fakeTxid = stubHex(`pending:${input.videoCid}:O:${Date.now()}`);
     stamp = { txid: fakeTxid, payload, real: false };
   }
 
