@@ -1,108 +1,85 @@
+## Goal
 
-# video.texitcoin.org — MVP Plan
+Replace the mock on-chain stamp with a **real TXC OP_RETURN transaction** anchoring each upload's CID + uploader wallet on the TXC blockchain. Skip user payments for now (free tier). Watch the mempool for confirmation and update the UI live.
 
-A loginless, wallet-authenticated video platform. Upload an MP4, pay TXC by file size, get a CID timestamped on-chain, stream via HLS through our gateway, embed anywhere, earn rewards as views accrue.
-
-## Core flow
+## Architecture
 
 ```text
-[Uploader]
-   │  1. Connect wallet, drop MP4
-   ▼
-[Web app]  ── 2. Quote fee (size × rate) ──> [Wallet signs TXC payment (mocked)]
-   │
-   │  3. Upload to our transcode worker
-   ▼
-[Transcode worker]  ── ffmpeg → HLS (360p/720p/1080p) ──> [Pinata pin]
-   │                                                          │
-   │  4. Get root CID                                          │
-   ▼                                                          ▼
-[TXC chain]  ◄── 5. Timestamp { cid, wallet, size, ts } ──  (mocked)
-   │
-   ▼
-[Gateway]  stream.video.texitcoin.org/{cid}/index.m3u8
-   │  - proxies IPFS, logs every segment request → views
-   │  - enforces pin lifecycle (active / expiring / unpinned)
-   ▼
-[HLS.js player]  embeddable iframe with mute / autoplay / start / size
+Upload finishes (Pinata returns CID)
+        │
+        ▼
+registerUpload() server fn
+        │
+        ├─ INSERT video row (status='stamping')
+        ├─ POST to TXC node RPC: build + sign + broadcast OP_RETURN tx
+        │     OP_RETURN payload: "TXCV1" + cid + ":" + wallet (≤80 bytes)
+        ├─ Save txid on row (status='mempool', block_number=null)
+        └─ Return { cid, txid }
+        ▼
+Watch page /v/$cid
+        │
+        ├─ Shows "⏳ In mempool — txid abc123…" with link to mempool.texitcoin.org
+        └─ useQuery polls /api/public/tx-status/$txid every 15s
+                │
+                ▼
+        Server fn hits mempool.texitcoin.org/api/tx/{txid}
+                │
+                ├─ unconfirmed → keep polling
+                └─ confirmed → UPDATE videos SET status='active',
+                                  block_number=X, block_hash=Y
+                              → UI flips to "✓ Confirmed in block #X"
 ```
 
-## Pages (TanStack Start routes)
+## What we need from you (one-time setup)
 
-- `/` — Landing: pitch, "Upload a video" CTA, featured videos.
-- `/upload` — Wallet connect → file picker → fee quote → pay → progress.
-- `/v/$cid` — Watch page: player, title, uploader wallet, on-chain timestamp link, view count, IPFS CID, embed code generator.
-- `/manage` — Wallet-gated dashboard: list of videos owned by connected wallet, credits remaining, expiry warnings, top-up button.
-- `/embed/$cid` — Bare iframe target (no chrome) with query params `?mute=1&autoplay=1&t=42`.
-- `/api/upload` — Receives MP4 + payment proof; enqueues transcode job.
-- `/api/stream/$cid/$` — Gateway proxy for `.m3u8` and `.ts` segments; logs views.
-- `/api/quote` — `{ sizeBytes } → { txcAmount, expiresAt }`.
+1. **Spin up a TXC hot wallet** for the platform. Fund it with a small amount of TXC (enough for ~10,000 OP_RETURN txs at network fee — probably <1 TXC).
+2. **Give us node RPC access**, ideally one of:
+   - **Preferred:** A Bitcoin-style JSON-RPC endpoint (`https://node.texitcoin.org` + RPC user/pass) supporting `createrawtransaction`, `signrawtransactionwithwallet`, `sendrawtransaction`. This is what `bitcoind`/`litecoind` exposes by default.
+   - **Acceptable:** A hosted wallet API at `wallet.texitcoin.org` with an endpoint that accepts "send X to address Y with OP_RETURN data Z" and returns a txid.
+3. We'll store the credentials as secrets: `TXC_RPC_URL`, `TXC_RPC_USER`, `TXC_RPC_PASS`, `TXC_PLATFORM_ADDRESS`.
 
-## Technical details
+If the RPC details aren't ready yet, we can still build everything with a clearly-marked stub adapter (`txc.server.ts`) and swap the implementation in one place once you give us credentials.
 
-**Stack additions**
-- `hls.js` — player.
-- `@pinata/sdk` — pinning (server-side; JWT in secrets).
-- `wagmi` + `viem` — wallet connection (EVM-style; we'll target whatever TXC exposes; mocked for now).
-- `zod` — validation.
-- Lovable Cloud (Supabase) — metadata store: `videos`, `view_events`, `payments`, `pins`.
+## Files we'll change
 
-**Transcoding worker (out of scope for the Worker SSR runtime)**
-ffmpeg won't run inside the Cloudflare Worker. We need an external worker:
-- v1 mock: a stub `/api/upload` that accepts the file, fakes a 30s "transcoding" delay, pins the *original MP4* to Pinata, and writes a single-rendition `index.m3u8` pointing at the MP4. Lets the entire UX work end-to-end while we provision real transcoding.
-- v1.1 real: small Node service on a VPS (Hetzner ~$5/mo) running ffmpeg + a Redis queue, called over HTTPS from `/api/upload`. Out of scope for this build but the contract is defined.
+- **`src/lib/txc.server.ts`** *(new)* — single adapter with two functions:
+  - `stampCid({ cid, wallet, sizeBytes })` → builds + broadcasts OP_RETURN tx, returns `{ txid }`
+  - `getTxStatus(txid)` → calls `mempool.texitcoin.org/api/tx/{txid}` and returns `{ confirmed, blockHeight?, blockHash? }`
+- **`src/lib/chain.ts`** — replace mock with calls to `txc.server.ts` (keep the same interface so callers don't change).
+- **`src/lib/videos.functions.ts`** — `registerUpload` now calls real `stampCid`; add `pollTxStatus` server fn for the watch page.
+- **DB migration** — add columns to `videos`:
+  - `op_return_payload text` (the exact bytes we wrote, for audit)
+  - `block_hash text` (in addition to existing `mock_block_number` which we'll rename to `block_number`)
+  - Rename `mock_tx_hash` → `tx_hash`. Statuses: `stamping | mempool | active | failed`.
+- **`src/routes/v.$cid.tsx`** — On-chain proof panel:
+  - Pending state: spinner + "In mempool" + link to `mempool.texitcoin.org/tx/{txid}`
+  - Confirmed state: green check + block number + block hash + same explorer link
+  - `useQuery` with 15s `refetchInterval` while `status='mempool'`.
+- **`src/routes/upload.tsx`** — On success, redirect straight to `/v/{cid}` so user sees the live confirmation flow.
 
-**Playback gateway (`/api/stream/$cid/$`)**
-- Streams from Pinata's dedicated gateway with `Range` support.
-- Rewrites segment URLs in `.m3u8` to stay on our domain.
-- Logs each `.ts` segment fetch (debounced per IP+CID per 30s) → `view_events`.
-- View = N segments fetched (e.g. ≥3) to filter scrubs/bots.
+## OP_RETURN payload format
 
-**On-chain timestamping (mocked)**
-- `chain.ts` module with one function `timestampCid(cid, wallet, sizeBytes) → { txHash, blockNumber, explorerUrl }`.
-- v1 returns a deterministic fake hash + a placeholder explorer URL.
-- Swap implementation later when TXC RPC is ready; rest of app unchanged.
+Keep it under 80 bytes (TXC default `OP_RETURN` data limit, same as Bitcoin):
 
-**Wallet & payment (mocked)**
-- wagmi connect modal (MetaMask injected provider works for any EVM-compatible chain).
-- `payForUpload({ amount })` returns mock tx hash; persisted to `payments` table as proof.
-- Real implementation slot is identical: `wallet.sendTransaction(...)`.
-
-**Pricing & lifecycle**
-- Quote: `txcAmount = sizeMB × rate × monthsPrepaid`. Rate stored as a config row, easy to tune.
-- Cron-style server route `/api/public/lifecycle-tick` (called daily by external scheduler later): for each video, compute `viewsLast30d`. If below threshold AND credits exhausted → mark `expiring`, email-less notice on `/manage`. After grace period → unpin from Pinata, keep CID record.
-- Reward accrual: each qualifying view adds to `creator_credits` (off-chain ledger v1; on-chain payout later).
-
-**Embed code generator**
-On `/v/$cid`, a textarea renders:
-```html
-<iframe src="https://video.texitcoin.org/embed/{cid}?autoplay=0&mute=0"
-        width="640" height="360" allow="autoplay; fullscreen" frameborder="0"></iframe>
 ```
-Toggles update the URL live.
+TXCV1|<cid>|<short-wallet>
+```
 
-**Database (Lovable Cloud)**
-- `videos`: cid, owner_wallet, title, size_bytes, duration_s, status (transcoding/active/expiring/unpinned), tx_hash, created_at.
-- `payments`: video_cid, wallet, txc_amount, tx_hash, months_prepaid.
-- `view_events`: video_cid, ip_hash, ts (rolled up nightly into `video_stats`).
-- `pins`: video_cid, pinata_id, expires_at.
-- RLS: public read on `videos` + `video_stats`; writes only via server functions.
+Example: `TXCV1|bafybeibo...wyq|tx1q3k...8z` — ~70 bytes for a CIDv1 + bech32-style address. If a CID + wallet exceed 80 bytes we fall back to `TXCV1|<sha256(cid+wallet) as hex>` and store the preimage in DB.
 
-## Out of scope for this build (explicit)
+## Mempool-based UX (your idea, fully adopted)
 
-- Real ffmpeg worker infrastructure (mock pipeline ships; real worker is a separate provisioning task).
-- Real TXC chain calls (mocked behind a swappable interface).
-- Email/push notifications (surface warnings on `/manage` only).
-- DRM, age-gating, content moderation tooling.
-- Reward payout transactions (we accrue credits; payout comes later).
+- The moment `sendrawtransaction` returns a txid, we mark the video **viewable** (status `mempool`).
+- The watch page shows it immediately with a "⏳ Pending confirmation" badge.
+- Polling flips the badge to "✓ Confirmed" within ~1 block (typically 1–10 min depending on TXC block time).
+- No user-blocking wait anywhere — they upload, they watch, the proof firms up in the background.
 
-## Risks & mitigations
+## Out of scope (deferred)
 
-- **Pinata gateway rate limits** under load → cache `.m3u8` and segments at the Worker edge for 60s; consider Cloudflare Stream as a future hot-content tier.
-- **Abuse uploads (illegal content)** → CID-based blocklist table checked at gateway; takedown = unpin + add to blocklist.
-- **Wallet UX on mobile** → use WalletConnect via wagmi connectors, not just injected.
-- **MVP without real transcoder** = poor seek/streaming on large files → cap MVP uploads at 100MB until real worker is online.
+- **User payments / fee collection** — explicitly free for now per your call. When the wallet UX is ready we'll add an `invoice` step that watches the mempool for a payment from the uploader's wallet to ours, then unpins on non-payment. The `pins` table and `expires_at` column already exist for this.
+- **Reorg handling** — if a confirmed tx gets re-orged out we won't auto-revert. Vanishingly rare on a chain with any hashrate; can add later.
+- **Batching** — every upload posts its own tx. If volume gets high we can batch CIDs into Merkle roots (OpenTimestamps-style) and stamp one tx per minute. Not needed at MVP scale.
 
-## What ships at the end of this build
+## What ships
 
-A working site where you can: connect a wallet, upload a small MP4, "pay" mock TXC, watch it play through our HLS gateway, see a view counter increment, copy an embed iframe that works on a third-party site, and see the video listed in `/manage` with a (mocked) on-chain timestamp link. Every real-world swap-in (ffmpeg worker, TXC RPC) is behind a single interface.
+Every video uploaded gets a real, verifiable TXC blockchain transaction whose `OP_RETURN` data permanently anchors `(cid, owner_wallet)`. Anyone can independently verify ownership by looking up the txid on `mempool.texitcoin.org` and reading the OP_RETURN bytes — no trust in our platform required. That's the whole point.
