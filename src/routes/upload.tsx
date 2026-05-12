@@ -354,12 +354,12 @@ function UploadPage() {
       <Header />
       <main className="mx-auto w-full max-w-3xl px-6 py-12 flex-1">
         <div className="font-mono text-xs text-primary mb-3">
-          [ FREE WHILE IN BETA · NO ACCOUNT REQUIRED ]
+          [ PAY-AS-YOU-GO · NO ACCOUNT REQUIRED ]
         </div>
         <h1 className="text-4xl font-bold tracking-tight mb-2">Upload video</h1>
         <p className="text-muted-foreground mb-10">
-          Pin to IPFS. Get an embeddable player. TXC payment + on-chain
-          timestamping land once the wallet integration is live.
+          Pin to IPFS. Pay in TXC. Get an embeddable player and an on-chain
+          timestamp receipt.
         </p>
 
         <Tabs defaultValue="file" className="w-full">
