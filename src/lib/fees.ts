@@ -28,3 +28,12 @@ export function shortenHash(hash: string, head = 6, tail = 4): string {
   if (hash.length <= head + tail + 3) return hash;
   return `${hash.slice(0, head)}…${hash.slice(-tail)}`;
 }
+
+/** ISO calendar date in YYYY-MM-DD (local time). Standard format across the app. */
+export function formatDate(input: string | number | Date): string {
+  const d = input instanceof Date ? input : new Date(input);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
