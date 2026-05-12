@@ -100,7 +100,8 @@ export const registerUpload = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     await assertCidUnclaimed(data.cid);
-    const fee = quoteFee(data.sizeBytes, data.months);
+    const _price = (await getTxcUsdPrice()).usd;
+    const fee = usdToTxc(quoteUsd(data.sizeBytes, data.months), _price);
     const paymentTx = mockPaymentTx(data.wallet, fee);
     const videoWallet = await assignVideoWallet();
     const stamp = await recordChainEvent({
@@ -187,7 +188,8 @@ export const finalizeUpload = createServerFn({ method: "POST" })
     await assertCidUnclaimed(pin.cid);
 
     // 2. Mock payment + real on-chain stamp
-    const fee = quoteFee(binary.byteLength, data.months);
+    const _price = (await getTxcUsdPrice()).usd;
+    const fee = usdToTxc(quoteUsd(binary.byteLength, data.months), _price);
     const paymentTx = mockPaymentTx(data.wallet, fee);
     const videoWallet = await assignVideoWallet();
     const stamp = await recordChainEvent({
@@ -289,7 +291,8 @@ export const addByCid = createServerFn({ method: "POST" })
       // best-effort; continue with unknown size
     }
 
-    const fee = quoteFee(Math.max(sizeBytes, 1), data.months);
+    const _price = (await getTxcUsdPrice()).usd;
+    const fee = usdToTxc(quoteUsd(Math.max(sizeBytes, 1), data.months), _price);
     const paymentTx = mockPaymentTx(data.wallet, fee);
     const videoWallet = await assignVideoWallet();
     const stamp = await recordChainEvent({
