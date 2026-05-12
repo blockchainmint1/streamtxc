@@ -12,6 +12,8 @@ import { mockPaymentTx } from "./chain";
 import { getTxStatus, explorerTxUrl } from "./txc.server";
 import { assignVideoWallet } from "./txc-wallets.server";
 import { recordChainEvent, recordMetadataAnchor } from "./chain-events.server";
+import { recordOwnershipAnchor, recordSplitPayout } from "./chain-events.server";
+import { verifyMessage, sendToAddress } from "./txc.server";
 import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
 
@@ -934,4 +936,336 @@ export const editVideoMetadata = createServerFn({ method: "POST" })
       txid: meta?.stamp.real ? meta.stamp.txid : null,
       stamped: !!meta?.stamp.real,
     };
+  });
+
+// --- Ownership proof ------------------------------------------------------
+
+/**
+ * Build the canonical ownership-challenge message. The exact format matters —
+ * the user signs THIS string in their TXC wallet, so any drift between
+ * frontend and verifier breaks the proof.
+ */
+function buildOwnershipMessage(opts: {
+  cid: string;
+  wallet: string;
+  nonce: string;
+}): string {
+  return [
+    "stream.texitcoin ownership v1",
+    `cid=${opts.cid}`,
+    `wallet=${opts.wallet}`,
+    `nonce=${opts.nonce}`,
+  ].join("\n");
+}
+
+const txcWalletSchema = z
+  .string()
+  .trim()
+  .min(8)
+  .max(120)
+  .regex(/^[a-zA-Z0-9]+$/, "Invalid TXC address");
+
+/**
+ * Issue a fresh nonce + return the exact message the user must sign in
+ * their TXC web wallet. Re-callable: each call rotates the nonce so an
+ * abandoned attempt can't be replayed.
+ */
+export const getOwnershipChallenge = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        cid: z.string().min(1).max(200),
+        ownerWallet: txcWalletSchema,
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: video, error } = await supabaseAdmin
+      .from("videos")
+      .select("cid, owner_wallet, video_wallet")
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!video) throw new Error("Video not found");
+
+    // Generate a 16-byte hex nonce. We persist it so the verify step can
+    // re-derive the exact same message without trusting the client.
+    const nonce = createHash("sha256")
+      .update(`${data.cid}:${data.ownerWallet}:${Date.now()}:${Math.random()}`)
+      .digest("hex")
+      .slice(0, 32);
+
+    const { error: uErr } = await supabaseAdmin
+      .from("videos")
+      .update({ owner_nonce: nonce })
+      .eq("cid", data.cid);
+    if (uErr) throw new Error(uErr.message);
+
+    const message = buildOwnershipMessage({
+      cid: data.cid,
+      wallet: data.ownerWallet,
+      nonce,
+    });
+    return { message, nonce, walletToSignWith: data.ownerWallet };
+  });
+
+/**
+ * Verify a signed challenge. On success: stores the wallet+sig, stamps an
+ * "O" anchor on chain, and (best-effort) sweeps any escrowed creator
+ * earnings to the now-verified wallet.
+ */
+export const submitOwnershipProof = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        cid: z.string().min(1).max(200),
+        ownerWallet: txcWalletSchema,
+        signature: z.string().trim().min(8).max(200),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: video, error } = await supabaseAdmin
+      .from("videos")
+      .select(
+        "cid, owner_wallet, video_wallet, owner_nonce, escrowed_creator_txc",
+      )
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!video) throw new Error("Video not found");
+    if (!video.owner_nonce)
+      throw new Error("No active challenge — request a new one");
+
+    const message = buildOwnershipMessage({
+      cid: video.cid,
+      wallet: data.ownerWallet,
+      nonce: video.owner_nonce,
+    });
+    const ok = await verifyMessage(data.ownerWallet, data.signature, message);
+    if (!ok) throw new Error("Signature did not verify against that wallet");
+
+    const verifiedAt = new Date().toISOString();
+    let stampTxid: string | null = null;
+    if (video.video_wallet) {
+      const stamp = await recordOwnershipAnchor({
+        videoCid: video.cid,
+        videoWallet: video.video_wallet,
+        ownerWallet: data.ownerWallet,
+      });
+      stampTxid = stamp.real ? stamp.txid : null;
+    }
+
+    const { error: uErr } = await supabaseAdmin
+      .from("videos")
+      .update({
+        owner_wallet: data.ownerWallet,
+        owner_proof_status: "verified",
+        owner_signature: data.signature,
+        owner_verified_at: verifiedAt,
+        ownership_tx_hash: stampTxid,
+        owner_nonce: null,
+      })
+      .eq("cid", data.cid);
+    if (uErr) throw new Error(uErr.message);
+
+    // Auto-release any escrowed creator share that accrued while unverified.
+    let releasedTxc = 0;
+    let releaseTx: string | null = null;
+    const escrowed = Number(video.escrowed_creator_txc ?? 0);
+    if (escrowed > 0 && video.video_wallet) {
+      try {
+        const stamp = await recordSplitPayout({
+          videoCid: video.cid,
+          videoWallet: video.video_wallet,
+          commentId: "escrow-release",
+          toAddress: data.ownerWallet,
+          amountTxc: escrowed,
+          kind: "creator",
+        });
+        if (stamp) {
+          releaseTx = stamp.txid;
+          releasedTxc = escrowed;
+          await supabaseAdmin
+            .from("videos")
+            .update({ escrowed_creator_txc: 0 })
+            .eq("cid", data.cid);
+        }
+      } catch (err) {
+        console.error("escrow release failed", err);
+      }
+    }
+
+    return {
+      verified: true,
+      ownershipTxHash: stampTxid,
+      releasedTxc,
+      releaseTx,
+    };
+  });
+
+// --- Comment payout sweep -------------------------------------------------
+
+/**
+ * Send the 90/5/5 split for one paid comment:
+ *   - 5% → TXC_PLATFORM_ADDRESS  (always)
+ *   - 5% → TXC_HOSTING_ADDRESS   (always)
+ *   - 90% → owner_wallet          (only if owner_proof_status='verified',
+ *                                   else accrue to videos.escrowed_creator_txc)
+ * Idempotent: skips legs that already have a tx hash.
+ */
+export async function sweepCommentPayout(commentId: string): Promise<{
+  ok: boolean;
+  status: "swept" | "partial" | "escrowed" | "failed";
+  details: Record<string, string>;
+}> {
+  const { data: comment } = await supabaseAdmin
+    .from("comments")
+    .select(
+      "id, video_cid, payment_received_txc, payout_status, creator_payout_tx_hash, hosting_payout_tx_hash, platform_payout_tx_hash",
+    )
+    .eq("id", commentId)
+    .maybeSingle();
+  if (!comment) return { ok: false, status: "failed", details: { error: "comment not found" } };
+
+  const { data: video } = await supabaseAdmin
+    .from("videos")
+    .select("cid, video_wallet, owner_wallet, owner_proof_status, escrowed_creator_txc")
+    .eq("cid", comment.video_cid)
+    .maybeSingle();
+  if (!video) return { ok: false, status: "failed", details: { error: "video not found" } };
+
+  const amount = Number(comment.payment_received_txc ?? 0);
+  if (amount <= 0) return { ok: false, status: "failed", details: { error: "no payment" } };
+
+  const platformAddr = process.env.TXC_PLATFORM_ADDRESS;
+  const hostingAddr = process.env.TXC_HOSTING_ADDRESS;
+  if (!platformAddr || !hostingAddr) {
+    return {
+      ok: false,
+      status: "failed",
+      details: { error: "TXC_PLATFORM_ADDRESS or TXC_HOSTING_ADDRESS not configured" },
+    };
+  }
+
+  const creatorAmt = +(amount * 0.9).toFixed(8);
+  const hostingAmt = +(amount * 0.05).toFixed(8);
+  const platformAmt = +(amount - creatorAmt - hostingAmt).toFixed(8);
+
+  const updates: Record<string, string> = {
+    payout_attempted_at: new Date().toISOString(),
+  };
+  const details: Record<string, string> = {};
+  let allOk = true;
+
+  // Platform leg
+  if (!comment.platform_payout_tx_hash) {
+    try {
+      const r = await recordSplitPayout({
+        videoCid: video.cid,
+        videoWallet: video.video_wallet ?? platformAddr,
+        commentId: comment.id,
+        toAddress: platformAddr,
+        amountTxc: platformAmt,
+        kind: "platform",
+      });
+      if (r) updates.platform_payout_tx_hash = r.txid;
+      details.platform = r?.txid ?? "skipped";
+    } catch (e) {
+      allOk = false;
+      details.platform_error = String(e);
+    }
+  }
+
+  // Hosting leg
+  if (!comment.hosting_payout_tx_hash) {
+    try {
+      const r = await recordSplitPayout({
+        videoCid: video.cid,
+        videoWallet: video.video_wallet ?? hostingAddr,
+        commentId: comment.id,
+        toAddress: hostingAddr,
+        amountTxc: hostingAmt,
+        kind: "hosting",
+      });
+      if (r) updates.hosting_payout_tx_hash = r.txid;
+      details.hosting = r?.txid ?? "skipped";
+    } catch (e) {
+      allOk = false;
+      details.hosting_error = String(e);
+    }
+  }
+
+  // Creator leg — only if verified, else escrow.
+  let escrowed = false;
+  if (!comment.creator_payout_tx_hash) {
+    if (video.owner_proof_status === "verified" && video.owner_wallet) {
+      try {
+        const r = await recordSplitPayout({
+          videoCid: video.cid,
+          videoWallet: video.video_wallet ?? video.owner_wallet,
+          commentId: comment.id,
+          toAddress: video.owner_wallet,
+          amountTxc: creatorAmt,
+          kind: "creator",
+        });
+        if (r) updates.creator_payout_tx_hash = r.txid;
+        details.creator = r?.txid ?? "skipped";
+      } catch (e) {
+        allOk = false;
+        details.creator_error = String(e);
+      }
+    } else {
+      escrowed = true;
+      const newEscrow = Number(video.escrowed_creator_txc ?? 0) + creatorAmt;
+      await supabaseAdmin
+        .from("videos")
+        .update({ escrowed_creator_txc: newEscrow })
+        .eq("cid", video.cid);
+      details.creator = "escrowed";
+    }
+  }
+
+  const status: "swept" | "partial" | "escrowed" | "failed" = !allOk
+    ? "partial"
+    : escrowed
+      ? "escrowed"
+      : "swept";
+  updates.payout_status = status === "swept" ? "swept" : status === "escrowed" ? "escrowed" : "partial";
+
+  await supabaseAdmin
+    .from("comments")
+    .update(updates as never)
+    .eq("id", commentId);
+  return { ok: allOk, status, details };
+}
+
+/**
+ * Manually re-attempt sweep for one comment from the UI (e.g. after an RPC
+ * outage). Owner-only.
+ */
+export const retryCommentPayout = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        wallet: walletSchema,
+        commentId: z.string().uuid(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: c } = await supabaseAdmin
+      .from("comments")
+      .select("video_cid")
+      .eq("id", data.commentId)
+      .maybeSingle();
+    if (!c) throw new Error("Comment not found");
+    const { data: v } = await supabaseAdmin
+      .from("videos")
+      .select("owner_wallet")
+      .eq("cid", c.video_cid)
+      .maybeSingle();
+    if (!v || v.owner_wallet.toLowerCase() !== data.wallet.toLowerCase())
+      throw new Error("Only the video owner can retry payouts");
+    return await sweepCommentPayout(data.commentId);
   });

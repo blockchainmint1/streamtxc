@@ -7,6 +7,7 @@ import {
   stampEvent,
   stampRawPayload,
   TXC_PROTO_TAG,
+  sendToAddress,
   type TxcEventType,
   type StampResult,
 } from "./txc.server";
@@ -145,4 +146,89 @@ export async function recordMetadataAnchor(input: {
   }
 
   return { metaCid, stamp };
+}
+
+/**
+ * Stamp an "O" (ownership) anchor: TXCV1O|<videoCid>|<wallet>
+ * Sent to the per-video wallet so it appears alongside C/T/P events on the
+ * video's address page.
+ */
+export async function recordOwnershipAnchor(input: {
+  videoCid: string;
+  videoWallet: string;
+  ownerWallet: string;
+}): Promise<StampResult> {
+  const payload = `${TXC_PROTO_TAG}O|${input.videoCid}|${input.ownerWallet}`;
+  let stamp: StampResult;
+  try {
+    stamp = await stampRawPayload({
+      payload,
+      toAddress: input.videoWallet,
+    });
+  } catch (err) {
+    console.error("recordOwnershipAnchor: stamp broadcast failed", err);
+    const fakeTxid = createHash("sha256")
+      .update(`pending:${input.videoCid}:O:${Date.now()}`)
+      .digest("hex");
+    stamp = { txid: fakeTxid, payload, real: false };
+  }
+
+  const { error } = await supabaseAdmin.from("chain_events").insert({
+    video_cid: input.videoCid,
+    video_wallet: input.videoWallet,
+    event_type: "O",
+    tx_hash: stamp.txid,
+    op_return_payload: stamp.payload,
+    from_wallet: input.ownerWallet,
+    to_wallet: input.videoWallet,
+    status: stamp.real ? "mempool" : "stamp_failed",
+    metadata: { ownerWallet: input.ownerWallet } as never,
+  });
+  if (error) {
+    console.error("recordOwnershipAnchor: failed to insert event row", error);
+  }
+  return stamp;
+}
+
+/**
+ * Send one leg of a comment-revenue split and log it as an "S" chain_event.
+ * `kind` is creator | hosting | platform — used purely for accounting/UI.
+ * Returns null if amount rounds to <= 0 (dust) so callers can skip the leg.
+ */
+export async function recordSplitPayout(input: {
+  videoCid: string;
+  videoWallet: string;
+  commentId: string;
+  toAddress: string;
+  amountTxc: number;
+  kind: "creator" | "hosting" | "platform";
+}): Promise<StampResult | null> {
+  const amount = +input.amountTxc.toFixed(8);
+  if (amount <= 0) return null;
+  let stamp: StampResult;
+  try {
+    stamp = await sendToAddress(input.toAddress, amount);
+  } catch (err) {
+    console.error(`recordSplitPayout(${input.kind}) send failed`, err);
+    throw err;
+  }
+  const { error } = await supabaseAdmin.from("chain_events").insert({
+    video_cid: input.videoCid,
+    video_wallet: input.videoWallet,
+    event_type: "S",
+    tx_hash: stamp.txid,
+    op_return_payload: `${TXC_PROTO_TAG}S|${input.kind}|${amount.toFixed(4)}`,
+    from_wallet: input.videoWallet,
+    to_wallet: input.toAddress,
+    status: stamp.real ? "mempool" : "stamp_failed",
+    metadata: {
+      comment_id: input.commentId,
+      kind: input.kind,
+      amount,
+    } as never,
+  });
+  if (error) {
+    console.error("recordSplitPayout: failed to insert event row", error);
+  }
+  return stamp;
 }

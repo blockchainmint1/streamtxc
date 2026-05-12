@@ -21,6 +21,8 @@ import {
   listMyVideos,
   editVideoMetadata,
   pinThumbnail,
+  getOwnershipChallenge,
+  submitOwnershipProof,
 } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, shortenHash } from "@/lib/fees";
@@ -31,6 +33,8 @@ import {
   Pencil,
   Loader2,
   Upload as UploadIcon,
+  ShieldCheck,
+  ShieldAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -85,6 +89,7 @@ function ManagePage() {
                   <th className="text-left px-4 py-3">Size</th>
                   <th className="text-left px-4 py-3">Views</th>
                   <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-left px-4 py-3">Owner</th>
                   <th className="text-left px-4 py-3">Expires</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -140,6 +145,22 @@ function ManagePage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 font-mono text-xs">
+                        {v.owner_proof_status === "verified" ? (
+                          <span className="inline-flex items-center gap-1 text-primary">
+                            <ShieldCheck className="h-3 w-3" /> verified
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-amber-500">
+                            <ShieldAlert className="h-3 w-3" /> unverified
+                          </span>
+                        )}
+                        {Number(v.escrowed_creator_txc ?? 0) > 0 && (
+                          <div className="text-[10px] text-amber-500 mt-0.5">
+                            escrow: {Number(v.escrowed_creator_txc).toFixed(4)} TXC
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs">
                         <span
                           className={
                             expiring ? "text-destructive flex items-center gap-1" : ""
@@ -151,6 +172,12 @@ function ManagePage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <VerifyOwnershipDialog
+                            cid={v.cid}
+                            verified={v.owner_proof_status === "verified"}
+                            currentWallet={v.owner_wallet}
+                            escrowed={Number(v.escrowed_creator_txc ?? 0)}
+                          />
                           <EditVideoDialog
                             cid={v.cid}
                             initialTitle={v.title}
@@ -411,6 +438,219 @@ function EditVideoDialog({
             )}
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function VerifyOwnershipDialog({
+  cid,
+  verified,
+  currentWallet,
+  escrowed,
+}: {
+  cid: string;
+  verified: boolean;
+  currentWallet: string;
+  escrowed: number;
+}) {
+  const qc = useQueryClient();
+  const challenge = useServerFn(getOwnershipChallenge);
+  const submit = useServerFn(submitOwnershipProof);
+  const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<"wallet" | "sign">("wallet");
+  const [wallet, setWallet] = useState(currentWallet);
+  const [message, setMessage] = useState("");
+  const [signature, setSignature] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  function reset() {
+    setStep("wallet");
+    setWallet(currentWallet);
+    setMessage("");
+    setSignature("");
+    setBusy(false);
+  }
+
+  async function handleStartChallenge() {
+    if (!wallet) return;
+    setBusy(true);
+    try {
+      const res = await challenge({ data: { cid, ownerWallet: wallet } });
+      setMessage(res.message);
+      setStep("sign");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to start");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSubmit() {
+    if (!signature) return;
+    setBusy(true);
+    try {
+      const res = await submit({
+        data: { cid, ownerWallet: wallet, signature: signature.trim() },
+      });
+      if (res.releasedTxc > 0) {
+        toast.success(
+          `Verified — released ${res.releasedTxc.toFixed(4)} TXC from escrow`,
+        );
+      } else {
+        toast.success("Wallet ownership verified on chain");
+      }
+      qc.invalidateQueries({ queryKey: ["my-videos"] });
+      setOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Verification failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) reset();
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button
+          size="sm"
+          variant={verified ? "ghost" : "outline"}
+          className="font-mono"
+          title={
+            verified
+              ? "Ownership verified on chain"
+              : "Prove you control the payout wallet"
+          }
+        >
+          {verified ? (
+            <ShieldCheck className="h-3 w-3" />
+          ) : (
+            <>
+              <ShieldAlert className="mr-1 h-3 w-3" /> verify
+            </>
+          )}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="font-mono text-sm">
+            [ {verified ? "OWNERSHIP — VERIFIED" : "PROVE OWNERSHIP"} ]
+          </DialogTitle>
+          <DialogDescription>
+            Sign a one-time challenge in your TXC web wallet to prove you
+            control the payout address. Until verified, the 90% creator share
+            of every paid comment is held in escrow on this video and released
+            the moment you verify.
+            {escrowed > 0 && (
+              <span className="block mt-2 text-amber-500 font-mono text-xs">
+                {escrowed.toFixed(4)} TXC currently held in escrow.
+              </span>
+            )}
+          </DialogDescription>
+        </DialogHeader>
+
+        {step === "wallet" ? (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="font-mono text-xs">PAYOUT TXC ADDRESS</Label>
+              <Input
+                value={wallet}
+                onChange={(e) => setWallet(e.target.value)}
+                placeholder="txc1q..."
+                className="font-mono text-xs"
+              />
+              <p className="font-mono text-[10px] text-muted-foreground">
+                Comment revenue (90%) will be sent to this address. Open it in{" "}
+                <a
+                  href="https://wallet.texitcoin.org"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  wallet.texitcoin.org
+                </a>{" "}
+                — you'll need its "Sign message" feature next.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                className="font-mono"
+                onClick={() => setOpen(false)}
+                disabled={busy}
+              >
+                cancel
+              </Button>
+              <Button
+                className="font-mono"
+                onClick={handleStartChallenge}
+                disabled={!wallet || busy}
+              >
+                {busy ? (
+                  <>
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" /> issuing…
+                  </>
+                ) : (
+                  "next: sign message"
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="font-mono text-xs">1. SIGN THIS MESSAGE</Label>
+              <Textarea
+                value={message}
+                readOnly
+                rows={5}
+                className="font-mono text-[11px]"
+              />
+              <p className="font-mono text-[10px] text-muted-foreground">
+                Open wallet.texitcoin.org → Sign message → paste this exactly.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label className="font-mono text-xs">2. PASTE SIGNATURE</Label>
+              <Textarea
+                value={signature}
+                onChange={(e) => setSignature(e.target.value)}
+                rows={3}
+                placeholder="H+...="
+                className="font-mono text-[11px]"
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                className="font-mono"
+                onClick={() => setStep("wallet")}
+                disabled={busy}
+              >
+                back
+              </Button>
+              <Button
+                className="font-mono"
+                onClick={handleSubmit}
+                disabled={!signature || busy}
+              >
+                {busy ? (
+                  <>
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" /> verifying…
+                  </>
+                ) : (
+                  "verify & stamp"
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

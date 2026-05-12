@@ -20,6 +20,109 @@ import { getAddressReceived, stampCommentCid } from "@/lib/txc.server";
 import { recordChainEvent } from "@/lib/chain-events.server";
 import { unpinByCid, pinJsonToIPFS } from "@/lib/pinata.server";
 import { PAYMENT_GRACE_HOURS } from "@/lib/fees";
+import { sweepCommentPayout } from "@/lib/videos.functions";
+import { recordSplitPayout } from "@/lib/chain-events.server";
+
+// Boost is just additional comment revenue — apply the same 90/5/5 split
+// against the boost amount (not the cumulative comment total) and log it.
+// Creator share is escrowed if the video owner isn't verified yet.
+async function sweepBoostPayout(
+  _boostId: string,
+  amount: number,
+  videoCid: string,
+): Promise<{ ok: boolean; status: string; details: Record<string, string> }> {
+  const { data: video } = await supabaseAdmin
+    .from("videos")
+    .select(
+      "cid, video_wallet, owner_wallet, owner_proof_status, escrowed_creator_txc",
+    )
+    .eq("cid", videoCid)
+    .maybeSingle();
+  if (!video)
+    return { ok: false, status: "failed", details: { error: "video missing" } };
+
+  const platformAddr = process.env.TXC_PLATFORM_ADDRESS;
+  const hostingAddr = process.env.TXC_HOSTING_ADDRESS;
+  if (!platformAddr || !hostingAddr) {
+    return {
+      ok: false,
+      status: "failed",
+      details: { error: "platform/hosting addr not configured" },
+    };
+  }
+
+  const creatorAmt = +(amount * 0.9).toFixed(8);
+  const hostingAmt = +(amount * 0.05).toFixed(8);
+  const platformAmt = +(amount - creatorAmt - hostingAmt).toFixed(8);
+
+  const details: Record<string, string> = {};
+  let allOk = true;
+
+  try {
+    const r = await recordSplitPayout({
+      videoCid,
+      videoWallet: video.video_wallet ?? platformAddr,
+      commentId: _boostId,
+      toAddress: platformAddr,
+      amountTxc: platformAmt,
+      kind: "platform",
+    });
+    details.platform = r?.txid ?? "skipped";
+  } catch (e) {
+    allOk = false;
+    details.platform_error = String(e);
+  }
+
+  try {
+    const r = await recordSplitPayout({
+      videoCid,
+      videoWallet: video.video_wallet ?? hostingAddr,
+      commentId: _boostId,
+      toAddress: hostingAddr,
+      amountTxc: hostingAmt,
+      kind: "hosting",
+    });
+    details.hosting = r?.txid ?? "skipped";
+  } catch (e) {
+    allOk = false;
+    details.hosting_error = String(e);
+  }
+
+  if (video.owner_proof_status === "verified" && video.owner_wallet) {
+    try {
+      const r = await recordSplitPayout({
+        videoCid,
+        videoWallet: video.video_wallet ?? video.owner_wallet,
+        commentId: _boostId,
+        toAddress: video.owner_wallet,
+        amountTxc: creatorAmt,
+        kind: "creator",
+      });
+      details.creator = r?.txid ?? "skipped";
+    } catch (e) {
+      allOk = false;
+      details.creator_error = String(e);
+    }
+  } else {
+    const newEscrow =
+      Number(video.escrowed_creator_txc ?? 0) + creatorAmt;
+    await supabaseAdmin
+      .from("videos")
+      .update({ escrowed_creator_txc: newEscrow })
+      .eq("cid", videoCid);
+    details.creator = "escrowed";
+  }
+
+  return {
+    ok: allOk,
+    status: !allOk
+      ? "partial"
+      : details.creator === "escrowed"
+        ? "escrowed"
+        : "swept",
+    details,
+  };
+}
 
 export const Route = createFileRoute("/api/public/hooks/payment-watcher")({
   server: {
@@ -284,6 +387,25 @@ async function processPendingComments() {
           comment_cid: pinned.cid,
           tx: stamp.txid,
         });
+
+        // Best-effort: sweep the 90/5/5 split immediately. If RPC is down
+        // we'll have a row with payout_status='partial' and the owner can
+        // hit "Retry payout" from /manage.
+        try {
+          const sweep = await sweepCommentPayout(c.id);
+          results.push({
+            comment_id: c.id,
+            action: "sweep",
+            sweep_status: sweep.status,
+            sweep_details: sweep.details,
+          });
+        } catch (err) {
+          results.push({
+            comment_id: c.id,
+            action: "sweep_failed",
+            error: String(err),
+          });
+        }
       } catch (err) {
         results.push({
           comment_id: c.id,
@@ -407,6 +529,24 @@ async function processPendingBoosts() {
         }
 
         results.push({ boost_id: b.id, action: "activated", tx: stamp.txid });
+
+        // Sweep the boost amount under the parent comment. The split goes
+        // 90/5/5 the same way; recordSplitPayout writes its own S events.
+        try {
+          const sweep = await sweepBoostPayout(b.id, received, comment.video_cid);
+          results.push({
+            boost_id: b.id,
+            action: "sweep",
+            sweep_status: sweep.status,
+            sweep_details: sweep.details,
+          });
+        } catch (err) {
+          results.push({
+            boost_id: b.id,
+            action: "sweep_failed",
+            error: String(err),
+          });
+        }
       } catch (err) {
         results.push({
           boost_id: b.id,

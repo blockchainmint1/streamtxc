@@ -44,8 +44,20 @@ export const TXC_PROTO_TAG = "TXCV1";
  *   B  boost       — comment boost top-up
  *   T  title/meta  — anchored IPFS CID of a metadata JSON blob
  *                    (title, description, uploader, timestamp)
+ *   O  ownership   — wallet ↔ video CID proven by a signed challenge
+ *   S  split       — comment-revenue payout leg (creator|hosting|platform)
  */
-export type TxcEventType = "C" | "P" | "R" | "X" | "D" | "M" | "B" | "T";
+export type TxcEventType =
+  | "C"
+  | "P"
+  | "R"
+  | "X"
+  | "D"
+  | "M"
+  | "B"
+  | "T"
+  | "O"
+  | "S";
 
 /** ≤80 bytes per the Bitcoin OP_RETURN standard data carrier limit. */
 export function buildOpReturnPayload(
@@ -326,6 +338,49 @@ export async function getTxStatus(
 export function explorerTxUrl(txid: string): string {
   const base = process.env.TXC_MEMPOOL_URL || "https://mempool.texitcoin.org";
   return `${base}/tx/${txid}`;
+}
+
+/**
+ * Verify a Bitcoin-style signed message (the same flow the TXC web wallet
+ * exposes under "Sign message"). Uses the node's `verifymessage` RPC so we
+ * never need to ship a JS secp256k1 implementation. In stub mode (no RPC
+ * configured) we accept any non-empty signature so local dev still works.
+ */
+export async function verifyMessage(
+  address: string,
+  signature: string,
+  message: string,
+): Promise<boolean> {
+  if (!rpcConfigured()) {
+    return signature.trim().length >= 8;
+  }
+  try {
+    return await rpc<boolean>("verifymessage", [address, signature, message]);
+  } catch (err) {
+    console.error("verifyMessage RPC failed", err);
+    return false;
+  }
+}
+
+/**
+ * Send TXC from the platform hot wallet to a recipient. Used for splitting
+ * comment revenue (creator / hosting / platform legs). Stub mode returns a
+ * fake txid so flows still work without RPC.
+ */
+export async function sendToAddress(
+  address: string,
+  amountTxc: number,
+): Promise<StampResult> {
+  const amount = +amountTxc.toFixed(8);
+  if (amount <= 0) throw new Error("sendToAddress: amount must be > 0");
+  if (!rpcConfigured()) {
+    const txid = createHash("sha256")
+      .update(`stub:pay:${address}:${amount}:${Date.now()}:${Math.random()}`)
+      .digest("hex");
+    return { txid, payload: `pay:${amount}`, real: false };
+  }
+  const txid = await rpc<string>("sendtoaddress", [address, amount]);
+  return { txid, payload: `pay:${amount}`, real: true };
 }
 
 /**
