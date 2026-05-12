@@ -970,7 +970,7 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
 
             <div className="border-t border-border pt-4 space-y-2">
               <Label className="font-mono text-xs text-muted-foreground">
-                paste txid to verify (after broadcast + 1 confirmation)
+                paste txid to verify (mempool is fine — no need to wait for a block)
               </Label>
               <div className="flex gap-2">
                 <Input
