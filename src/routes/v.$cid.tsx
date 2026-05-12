@@ -22,8 +22,10 @@ import {
   AlertTriangle,
   Flag,
   ShieldAlert,
+  QrCode,
 } from "lucide-react";
 import { toast } from "sonner";
+import { QRCodeSVG } from "qrcode.react";
 import {
   Dialog,
   DialogContent,
@@ -388,6 +390,12 @@ function PaymentPanel({
   const remaining = Math.max(0, +(required - received).toFixed(8));
   const ageHrs = (Date.now() - new Date(createdAt).getTime()) / 3_600_000;
   const graceLeft = Math.max(0, 24 - ageHrs);
+  const [showQr, setShowQr] = useState(false);
+  // BIP-21 style URI so wallet apps that scan can pre-fill the amount.
+  const qrPayload =
+    remaining > 0
+      ? `texitcoin:${wallet}?amount=${remaining}`
+      : `texitcoin:${wallet}`;
 
   return (
     <div className="border border-border bg-card rounded-sm p-4 space-y-3">
@@ -436,7 +444,27 @@ function PaymentPanel({
               >
                 <Copy className="h-3.5 w-3.5" />
               </button>
+              <button
+                onClick={() => setShowQr((v) => !v)}
+                className={`transition-colors ${showQr ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
+                aria-label="Show QR code"
+              >
+                <QrCode className="h-3.5 w-3.5" />
+              </button>
             </div>
+            {showQr && (
+              <div className="mt-3 flex flex-col items-center gap-2 bg-white p-3 rounded-sm">
+                <QRCodeSVG
+                  value={qrPayload}
+                  size={180}
+                  level="M"
+                  marginSize={2}
+                />
+                <div className="font-mono text-[10px] text-black text-center break-all">
+                  {formatTxc(remaining)} → {wallet.slice(0, 12)}…{wallet.slice(-8)}
+                </div>
+              </div>
+            )}
           </div>
           <p className="text-[11px] text-muted-foreground leading-relaxed">
             Send exactly the amount above from any TXC wallet. Confirmation is
