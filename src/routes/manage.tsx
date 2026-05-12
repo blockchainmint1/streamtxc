@@ -694,10 +694,14 @@ function VerifyOwnershipDialog({
 function BulkExtendDialog({ wallet }: { wallet: string }) {
   const qc = useQueryClient();
   const buildQuote = useServerFn(buildBulkExtendQuote);
-  const markPaid = useServerFn(markBulkExtended);
+  const verifyTx = useServerFn(verifyBulkExtensionTx);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [confirming, setConfirming] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [txInput, setTxInput] = useState("");
+  const [verifyResult, setVerifyResult] = useState<Awaited<
+    ReturnType<typeof verifyBulkExtensionTx>
+  > | null>(null);
   const [quote, setQuote] = useState<Awaited<
     ReturnType<typeof buildBulkExtendQuote>
   > | null>(null);
@@ -722,18 +726,31 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
     );
   }
 
-  async function confirmPaid() {
-    setConfirming(true);
+  async function runVerify() {
+    const txHash = txInput.trim();
+    if (!/^[0-9a-fA-F]{64}$/.test(txHash)) {
+      toast.error("Paste a 64-char hex txid");
+      return;
+    }
+    setVerifying(true);
+    setVerifyResult(null);
     try {
-      const res = await markPaid({ data: { wallet, months } });
-      toast.success(`Extended ${res.extended} video${res.extended === 1 ? "" : "s"} +30 days`);
-      qc.invalidateQueries({ queryKey: ["my-videos"] });
-      setOpen(false);
-      setQuote(null);
+      const res = await verifyTx({ data: { txHash, requireConfirmed: true } });
+      setVerifyResult(res);
+      if (res.pending) {
+        toast.message("TX not confirmed yet — try again after the next block.");
+      } else if (res.matched.length === 0) {
+        toast.message("No matching video deposit addresses found in this tx.");
+      } else {
+        toast.success(
+          `Credited ${res.matched.length} video${res.matched.length === 1 ? "" : "s"}`,
+        );
+        qc.invalidateQueries({ queryKey: ["my-videos"] });
+      }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to record payment");
+      toast.error(err instanceof Error ? err.message : "Verify failed");
     } finally {
-      setConfirming(false);
+      setVerifying(false);
     }
   }
 
@@ -743,7 +760,11 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
       onOpenChange={(v) => {
         setOpen(v);
         if (v) load();
-        else setQuote(null);
+        else {
+          setQuote(null);
+          setVerifyResult(null);
+          setTxInput("");
+        }
       }}
     >
       <DialogTrigger asChild>
@@ -756,8 +777,8 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
           <DialogTitle>Bulk extend +30 days</DialogTitle>
           <DialogDescription>
             Paste this <span className="font-mono">sendmany</span> into your TXC
-            web wallet. Once it broadcasts, click "Mark as paid" to bump every
-            video's expiration.
+            web wallet, broadcast it, then paste the txid below to verify and
+            credit each video by the exact amount paid.
           </DialogDescription>
         </DialogHeader>
 
@@ -842,6 +863,75 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
               </div>
             </div>
 
+            <div className="border-t border-border pt-4 space-y-2">
+              <Label className="font-mono text-xs text-muted-foreground">
+                paste txid to verify (after broadcast + 1 confirmation)
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  value={txInput}
+                  onChange={(e) => setTxInput(e.target.value)}
+                  placeholder="64-char hex txid"
+                  className="font-mono text-xs"
+                />
+                <Button
+                  className="font-mono shrink-0"
+                  onClick={runVerify}
+                  disabled={verifying || !txInput.trim()}
+                >
+                  {verifying ? (
+                    <>
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" /> verifying…
+                    </>
+                  ) : (
+                    "verify & credit"
+                  )}
+                </Button>
+              </div>
+
+              {verifyResult && (
+                <div className="text-xs font-mono space-y-1 pt-2">
+                  {verifyResult.pending ? (
+                    <p className="text-amber-500">
+                      TX found but not yet confirmed. Wait for the next block.
+                    </p>
+                  ) : (
+                    <>
+                      {verifyResult.matched.length > 0 && (
+                        <div>
+                          <p className="text-green-500">
+                            ✓ Credited {verifyResult.matched.length} video(s):
+                          </p>
+                          <ul className="ml-4 text-muted-foreground">
+                            {verifyResult.matched.map((m) => (
+                              <li key={m.cid} className="truncate">
+                                {m.title} — +{m.daysAdded}d ({m.paidTxc.toFixed(4)} TXC)
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {verifyResult.alreadyCredited.length > 0 && (
+                        <p className="text-muted-foreground">
+                          {verifyResult.alreadyCredited.length} already credited from this tx (skipped).
+                        </p>
+                      )}
+                      {verifyResult.skippedDust.length > 0 && (
+                        <p className="text-muted-foreground">
+                          {verifyResult.skippedDust.length} dust output(s) skipped (under 1 day).
+                        </p>
+                      )}
+                      {verifyResult.unmatched.length > 0 && (
+                        <p className="text-muted-foreground">
+                          {verifyResult.unmatched.length} output(s) didn't match any video wallet.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
             <DialogFooter>
               <Button
                 variant="outline"
@@ -849,19 +939,6 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
                 onClick={() => setOpen(false)}
               >
                 close
-              </Button>
-              <Button
-                className="font-mono"
-                onClick={confirmPaid}
-                disabled={confirming}
-              >
-                {confirming ? (
-                  <>
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" /> recording…
-                  </>
-                ) : (
-                  "mark as paid (+30d)"
-                )}
               </Button>
             </DialogFooter>
           </div>
