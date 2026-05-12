@@ -7,7 +7,7 @@ import { pinFileToIPFS, createPresignedUploadUrl, pinByCid } from "./pinata.serv
 import { mockPaymentTx } from "./chain";
 import { getTxStatus, explorerTxUrl } from "./txc.server";
 import { assignVideoWallet } from "./txc-wallets.server";
-import { recordChainEvent } from "./chain-events.server";
+import { recordChainEvent, recordMetadataAnchor } from "./chain-events.server";
 import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
 
