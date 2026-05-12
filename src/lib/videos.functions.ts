@@ -321,6 +321,71 @@ export const listMyVideos = createServerFn({ method: "POST" })
     return videos ?? [];
   });
 
+// --- TXC tx confirmation polling ------------------------------------------
+
+/**
+ * Look up a video's on-chain status. If still in mempool, queries
+ * mempool.texitcoin.org and persists confirmation when it lands. Called from
+ * the watch page on a 15s interval until confirmed.
+ */
+export const pollTxStatus = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({ cid: z.string().min(1).max(200) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: video, error } = await supabaseAdmin
+      .from("videos")
+      .select("cid, status, tx_hash, block_number, block_hash, created_at")
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!video) return null;
+
+    // Already confirmed → just return current state.
+    if (video.status === "active" && video.block_number) {
+      return {
+        status: video.status,
+        txHash: video.tx_hash,
+        blockNumber: video.block_number,
+        blockHash: video.block_hash,
+      };
+    }
+
+    if (!video.tx_hash) {
+      return {
+        status: video.status,
+        txHash: null,
+        blockNumber: null,
+        blockHash: null,
+      };
+    }
+
+    const status = await getTxStatus(video.tx_hash, video.created_at);
+    if (status.confirmed && status.blockHeight !== null) {
+      await supabaseAdmin
+        .from("videos")
+        .update({
+          status: "active",
+          block_number: status.blockHeight,
+          block_hash: status.blockHash,
+        })
+        .eq("cid", data.cid);
+      return {
+        status: "active",
+        txHash: video.tx_hash,
+        blockNumber: status.blockHeight,
+        blockHash: status.blockHash,
+      };
+    }
+
+    return {
+      status: video.status,
+      txHash: video.tx_hash,
+      blockNumber: null,
+      blockHash: null,
+    };
+  });
+
 // --- View tracking (called by stream proxy) -------------------------------
 
 export async function recordView(cid: string, ipHash: string) {
