@@ -358,6 +358,23 @@ function UploadPage() {
 
           <TabsContent value="cid">
             <form onSubmit={handleCidSubmit} className="space-y-6">
+              {cidNotFound && (
+                <div className="border-2 border-destructive/60 bg-destructive/5 rounded-sm p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-mono text-xs text-destructive mb-1">
+                        [ CID NOT FOUND ON IPFS ]
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {cidNotFound} Make sure the file is pinned somewhere
+                        public (Pinata, web3.storage, your own node) and try
+                        again. Fresh CIDs can take a minute to propagate.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="cid" className="font-mono text-xs">IPFS CID</Label>
                 <Input
@@ -396,6 +413,21 @@ function UploadPage() {
                 />
               </div>
 
+              {cidStage !== "idle" && (
+                <div className="border border-primary/40 bg-primary/5 rounded-sm p-4 space-y-2">
+                  <div className="flex items-center gap-2 font-mono text-xs text-primary">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    {cidStage === "fetching"
+                      ? "Asking Pinata to fetch from IPFS…"
+                      : "Stamping on TXC…"}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Cold CIDs can take 20–30 seconds while the IPFS DHT
+                    locates a peer that has the file. Hang tight.
+                  </p>
+                </div>
+              )}
+
               <Button
                 type="submit"
                 size="lg"
@@ -410,7 +442,7 @@ function UploadPage() {
                 ) : (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Probing gateway…
+                    {cidStage === "fetching" ? "Fetching from IPFS…" : "Stamping…"}
                   </>
                 )}
               </Button>
