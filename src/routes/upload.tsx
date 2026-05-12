@@ -500,6 +500,10 @@ function UploadPage() {
             </div>
 
             {file && !tooBig && (
+              <ThumbnailPicker file={file} onChange={setThumbnailCid} />
+            )}
+
+            {file && !tooBig && (
               <div className="border border-border bg-card rounded-sm p-4 space-y-3 font-mono text-sm">
                 <div className="flex justify-between items-start gap-4">
                   <span className="text-muted-foreground shrink-0">cid</span>
