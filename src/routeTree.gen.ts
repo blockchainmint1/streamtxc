@@ -18,6 +18,7 @@ import { Route as EmbedCidRouteImport } from './routes/embed.$cid'
 import { Route as ApiStreamCidRouteImport } from './routes/api/stream.$cid'
 import { Route as ApiPublicTxcHealthRouteImport } from './routes/api/public/txc-health'
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
+import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
 
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
@@ -65,6 +66,12 @@ const ApiPublicHooksPaymentWatcherRoute =
     path: '/api/public/hooks/payment-watcher',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicAdminRetryStampsRoute =
+  ApiPublicAdminRetryStampsRouteImport.update({
+    id: '/api/public/admin/retry-stamps',
+    path: '/api/public/admin/retry-stamps',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/v/$cid': typeof VCidRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
+  '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
 }
 export interface FileRoutesByTo {
@@ -86,6 +94,7 @@ export interface FileRoutesByTo {
   '/v/$cid': typeof VCidRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
+  '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
 }
 export interface FileRoutesById {
@@ -98,6 +107,7 @@ export interface FileRoutesById {
   '/v/$cid': typeof VCidRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
+  '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
 }
 export interface FileRouteTypes {
@@ -111,6 +121,7 @@ export interface FileRouteTypes {
     | '/v/$cid'
     | '/api/public/txc-health'
     | '/api/stream/$cid'
+    | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/payment-watcher'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -122,6 +133,7 @@ export interface FileRouteTypes {
     | '/v/$cid'
     | '/api/public/txc-health'
     | '/api/stream/$cid'
+    | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/payment-watcher'
   id:
     | '__root__'
@@ -133,6 +145,7 @@ export interface FileRouteTypes {
     | '/v/$cid'
     | '/api/public/txc-health'
     | '/api/stream/$cid'
+    | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/payment-watcher'
   fileRoutesById: FileRoutesById
 }
@@ -145,6 +158,7 @@ export interface RootRouteChildren {
   VCidRoute: typeof VCidRoute
   ApiPublicTxcHealthRoute: typeof ApiPublicTxcHealthRoute
   ApiStreamCidRoute: typeof ApiStreamCidRoute
+  ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
   ApiPublicHooksPaymentWatcherRoute: typeof ApiPublicHooksPaymentWatcherRoute
 }
 
@@ -213,6 +227,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPaymentWatcherRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/admin/retry-stamps': {
+      id: '/api/public/admin/retry-stamps'
+      path: '/api/public/admin/retry-stamps'
+      fullPath: '/api/public/admin/retry-stamps'
+      preLoaderRoute: typeof ApiPublicAdminRetryStampsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -225,6 +246,7 @@ const rootRouteChildren: RootRouteChildren = {
   VCidRoute: VCidRoute,
   ApiPublicTxcHealthRoute: ApiPublicTxcHealthRoute,
   ApiStreamCidRoute: ApiStreamCidRoute,
+  ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
   ApiPublicHooksPaymentWatcherRoute: ApiPublicHooksPaymentWatcherRoute,
 }
 export const routeTree = rootRouteImport
