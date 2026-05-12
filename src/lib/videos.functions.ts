@@ -110,6 +110,8 @@ export const registerUpload = createServerFn({ method: "POST" })
       eventType: "C",
       uploaderWallet: data.wallet,
     });
+    const videoStatus = stamp.real ? "mempool" : "stamp_failed";
+    const txHash = stamp.real ? stamp.txid : null;
 
     const expires = new Date();
     expires.setMonth(expires.getMonth() + data.months);
@@ -121,8 +123,8 @@ export const registerUpload = createServerFn({ method: "POST" })
       description: data.description || null,
       size_bytes: data.sizeBytes,
       mime_type: data.mimeType,
-      status: "mempool",
-      tx_hash: stamp.txid,
+      status: videoStatus,
+      tx_hash: txHash,
       op_return_payload: stamp.payload,
       months_prepaid: data.months,
       expires_at: expires.toISOString(),
@@ -148,8 +150,9 @@ export const registerUpload = createServerFn({ method: "POST" })
 
     return {
       cid: data.cid,
-      txHash: stamp.txid,
-      explorerUrl: explorerTxUrl(stamp.txid),
+      txHash,
+      explorerUrl: txHash ? explorerTxUrl(txHash) : null,
+      chainStatus: videoStatus,
       paymentTx,
       txcAmount: fee,
     };
@@ -199,6 +202,8 @@ export const finalizeUpload = createServerFn({ method: "POST" })
       eventType: "C",
       uploaderWallet: data.wallet,
     });
+    const videoStatus = stamp.real ? "mempool" : "stamp_failed";
+    const txHash = stamp.real ? stamp.txid : null;
 
     // 3. Persist
     const expires = new Date();
@@ -213,8 +218,8 @@ export const finalizeUpload = createServerFn({ method: "POST" })
         description: data.description || null,
         size_bytes: binary.byteLength,
         mime_type: data.mimeType,
-        status: "mempool",
-        tx_hash: stamp.txid,
+        status: videoStatus,
+        tx_hash: txHash,
         op_return_payload: stamp.payload,
         months_prepaid: data.months,
         expires_at: expires.toISOString(),
@@ -238,8 +243,9 @@ export const finalizeUpload = createServerFn({ method: "POST" })
 
     return {
       cid: pin.cid,
-      txHash: stamp.txid,
-      explorerUrl: explorerTxUrl(stamp.txid),
+      txHash,
+      explorerUrl: txHash ? explorerTxUrl(txHash) : null,
+      chainStatus: videoStatus,
       paymentTx,
       txcAmount: fee,
     };
@@ -334,6 +340,8 @@ export const addByCid = createServerFn({ method: "POST" })
       eventType: "C",
       uploaderWallet: data.wallet,
     });
+    const videoStatus = stamp.real ? "mempool" : "stamp_failed";
+    const txHash = stamp.real ? stamp.txid : null;
 
     const expires = new Date();
     expires.setMonth(expires.getMonth() + data.months);
@@ -345,8 +353,8 @@ export const addByCid = createServerFn({ method: "POST" })
       description: data.description || null,
       size_bytes: sizeBytes,
       mime_type: mimeType,
-      status: "mempool",
-      tx_hash: stamp.txid,
+      status: videoStatus,
+      tx_hash: txHash,
       op_return_payload: stamp.payload,
       months_prepaid: data.months,
       expires_at: expires.toISOString(),
@@ -372,7 +380,8 @@ export const addByCid = createServerFn({ method: "POST" })
       cid: data.cid,
       sizeBytes,
       mimeType,
-      txHash: stamp.txid,
+      txHash,
+      chainStatus: videoStatus,
     };
   });
 

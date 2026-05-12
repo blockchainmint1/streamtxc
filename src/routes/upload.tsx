@@ -168,7 +168,11 @@ function UploadPage() {
             months,
           },
         });
-        toast.success("Registered from IPFS");
+        if (result.chainStatus === "stamp_failed") {
+          toast.error("Saved from IPFS, but TXC stamp failed");
+        } else {
+          toast.success("Registered from IPFS");
+        }
         navigate({ to: "/v/$cid", params: { cid: result.cid } });
         return;
       }
@@ -199,7 +203,11 @@ function UploadPage() {
         },
       });
 
-      toast.success("Pinned to IPFS");
+      if (result.chainStatus === "stamp_failed") {
+        toast.error("Pinned to IPFS, but TXC stamp failed");
+      } else {
+        toast.success("Pinned to IPFS");
+      }
       navigate({ to: "/v/$cid", params: { cid: result.cid } });
     } catch (err) {
       console.error(err);
@@ -231,7 +239,11 @@ function UploadPage() {
           months,
         },
       });
-      toast.success("CID registered");
+      if (result.chainStatus === "stamp_failed") {
+        toast.error("CID saved, but TXC stamp failed");
+      } else {
+        toast.success("CID registered");
+      }
       navigate({ to: "/v/$cid", params: { cid: result.cid } });
     } catch (err) {
       console.error(err);
