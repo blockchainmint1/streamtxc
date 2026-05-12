@@ -22,7 +22,6 @@ import {
   AlertTriangle,
   Flag,
   ShieldAlert,
-  ShieldCheck,
   QrCode,
   ChevronDown,
   Share2,
