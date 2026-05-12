@@ -57,15 +57,12 @@ const browserPinata = new PinataSDK({ pinataJwt: "" });
 async function uploadToPinata(
   url: string,
   file: File,
-  onProgress: (pct: number) => void,
+  _onProgress: (pct: number) => void,
 ): Promise<{ cid: string; size: number; id: string }> {
   const result = await browserPinata.upload.public
     .file(file)
     .url(url)
-    .cidVersion(1)
-    .events({
-      onProgress: (pct: number) => onProgress(pct),
-    });
+    .cidVersion("v1");
   return {
     cid: result.cid,
     size: result.size ?? file.size,
