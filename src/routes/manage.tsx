@@ -111,10 +111,17 @@ function ManagePageInner() {
       <Header />
       <main className="mx-auto w-full max-w-6xl px-6 py-12 flex-1">
         <div className="font-mono text-xs text-primary mb-3">[ MY VIDEOS ]</div>
-        <h1 className="text-4xl font-bold tracking-tight mb-2">Manage</h1>
-        <p className="text-muted-foreground mb-10">
-          Videos uploaded from this browser.
-        </p>
+        <div className="flex items-start justify-between gap-4 mb-10">
+          <div>
+            <h1 className="text-4xl font-bold tracking-tight mb-2">Manage</h1>
+            <p className="text-muted-foreground">
+              Videos uploaded from this browser.
+            </p>
+          </div>
+          {address && videos && videos.length > 0 && (
+            <BulkExtendDialog wallet={address} />
+          )}
+        </div>
 
         {!address || isLoading ? (
           <div className="font-mono text-muted-foreground">Loading…</div>
