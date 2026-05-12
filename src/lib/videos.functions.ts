@@ -6,7 +6,8 @@ import { mockPaymentTx } from "./chain";
 import { getTxStatus, explorerTxUrl } from "./txc.server";
 import { assignVideoWallet } from "./txc-wallets.server";
 import { recordChainEvent } from "./chain-events.server";
-import { quoteFee, MAX_UPLOAD_BYTES } from "./fees";
+import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES } from "./fees";
+import { getTxcUsdPrice } from "./txc-price.server";
 
 const walletSchema = z
   .string()
@@ -48,8 +49,13 @@ export const getQuote = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    const price = await getTxcUsdPrice();
+    const usd = quoteUsd(data.sizeBytes, data.months);
     return {
-      txcAmount: quoteFee(data.sizeBytes, data.months),
+      usdAmount: usd,
+      txcAmount: usdToTxc(usd, price.usd),
+      txcUsd: price.usd,
+      priceSource: price.source,
       months: data.months,
       sizeBytes: data.sizeBytes,
     };
