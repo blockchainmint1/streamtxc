@@ -23,6 +23,7 @@ import {
   pinThumbnail,
   getOwnershipChallenge,
   submitOwnershipProof,
+  retryOwnStamp,
 } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, shortenHash } from "@/lib/fees";
@@ -35,6 +36,7 @@ import {
   Upload as UploadIcon,
   ShieldCheck,
   ShieldAlert,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -46,6 +48,47 @@ export const Route = createFileRoute("/manage")({
 });
 
 function ManagePage() {
+  return <ManagePageInner />;
+}
+
+function RetryStampButton({ cid, wallet }: { cid: string; wallet: string }) {
+  const qc = useQueryClient();
+  const retry = useServerFn(retryOwnStamp);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="font-mono"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const res = await retry({ data: { wallet, cid } });
+          if (res.ok) {
+            toast.success("Re-broadcast to TXC");
+            qc.invalidateQueries({ queryKey: ["my-videos"] });
+          } else {
+            const err =
+              ("cStamp" in res && res.cStamp?.error) ||
+              ("tStamp" in res && res.tStamp?.error) ||
+              "Retry failed";
+            toast.error(String(err));
+          }
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Retry failed");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+      <span className="ml-1">retry stamp</span>
+    </Button>
+  );
+}
+
+function ManagePageInner() {
   const { address, connect } = useWallet();
   const fetchMine = useServerFn(listMyVideos);
 
@@ -172,6 +215,9 @@ function ManagePage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {v.status === "stamp_failed" && (
+                            <RetryStampButton cid={v.cid} wallet={address!} />
+                          )}
                           <VerifyOwnershipDialog
                             cid={v.cid}
                             verified={v.owner_proof_status === "verified"}

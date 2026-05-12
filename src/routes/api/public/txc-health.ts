@@ -50,17 +50,31 @@ export const Route = createFileRoute("/api/public/txc-health")({
         };
 
         try {
-          const [blockCount, info, balance] = await Promise.all([
+          const [blockCount, info, balance, addrs] = await Promise.all([
             call("getblockcount"),
             call("getblockchaininfo"),
             call("getbalance"),
+            call("getaddressesbylabel", ["hot-wallet-topup"]),
           ]);
+          // If we don't yet have a labelled topup address, mint one so
+          // operators always have a stable place to send funds.
+          let topupAddress: string | null = null;
+          const addrBody = addrs.body as { result?: Record<string, unknown>; error?: unknown } | string;
+          if (typeof addrBody === "object" && addrBody && "result" in addrBody && addrBody.result) {
+            topupAddress = Object.keys(addrBody.result)[0] ?? null;
+          }
+          if (!topupAddress) {
+            const fresh = await call("getnewaddress", ["hot-wallet-topup", "bech32"]);
+            const fb = fresh.body as { result?: string } | string;
+            if (typeof fb === "object" && fb && "result" in fb) topupAddress = fb.result ?? null;
+          }
           return Response.json({
             ok: true,
             url: resolvedUrl,
             blockCount,
             chain: info,
             balance,
+            topupAddress,
           });
         } catch (err) {
           return Response.json(

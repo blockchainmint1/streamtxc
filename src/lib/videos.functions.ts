@@ -14,6 +14,7 @@ import { assignVideoWallet } from "./txc-wallets.server";
 import { recordChainEvent, recordMetadataAnchor } from "./chain-events.server";
 import { recordOwnershipAnchor, recordSplitPayout } from "./chain-events.server";
 import { verifyMessage, sendToAddress } from "./txc.server";
+import { retryStuckStampForVideo } from "./stamp-retry.server";
 import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
 
@@ -784,6 +785,38 @@ export const pollTxStatus = createServerFn({ method: "POST" })
       blockNumber: null,
       blockHash: null,
     };
+  });
+
+/**
+ * Owner-triggered retry of the C/T on-chain stamps. Used when an upload
+ * landed in `stamp_failed` (e.g. the TXC hot wallet was empty). Verifies
+ * the requesting wallet owns the video before broadcasting.
+ */
+export const retryOwnStamp = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        wallet: walletSchema,
+        cid: z.string().min(1).max(200),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: v, error } = await supabaseAdmin
+      .from("videos")
+      .select("cid, owner_wallet, status")
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!v) throw new Error("Video not found");
+    if (v.owner_wallet.toLowerCase() !== data.wallet.toLowerCase()) {
+      throw new Error("Not your video");
+    }
+    if (v.status !== "stamp_failed") {
+      return { ok: true, alreadyStamped: true, status: v.status };
+    }
+    const result = await retryStuckStampForVideo(data.cid);
+    return { ok: result.cStamp.ok, ...result };
   });
 
 // --- View tracking (called by stream proxy) -------------------------------
