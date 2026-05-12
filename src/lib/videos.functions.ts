@@ -462,7 +462,7 @@ export const listRecentVideos = createServerFn({ method: "POST" })
     let query = supabaseAdmin
       .from("videos")
       .select(
-        "cid, title, owner_wallet, size_bytes, view_count, created_at, status, payment_required_txc, expires_at",
+        "cid, title, owner_wallet, size_bytes, view_count, created_at, status, payment_required_txc, expires_at, thumbnail_cid",
         { count: "exact" },
       )
       .in("status", ["active", "mempool"])
@@ -508,7 +508,7 @@ export const listRecentVideos = createServerFn({ method: "POST" })
       const { data: rows, error } = await supabaseAdmin
         .from("videos")
         .select(
-          "cid, title, owner_wallet, size_bytes, view_count, created_at, status, payment_required_txc, expires_at",
+          "cid, title, owner_wallet, size_bytes, view_count, created_at, status, payment_required_txc, expires_at, thumbnail_cid",
         )
         .in("cid", pageCids);
       if (error) throw new Error(error.message);
