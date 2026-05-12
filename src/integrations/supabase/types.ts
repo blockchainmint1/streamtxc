@@ -215,7 +215,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      next_video_wallet_index: { Args: never; Returns: number }
     }
     Enums: {
       [_ in never]: never
