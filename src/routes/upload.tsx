@@ -8,12 +8,25 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useWallet } from "@/lib/wallet";
-import { formatBytes, formatDate, MAX_UPLOAD_BYTES } from "@/lib/fees";
-import { getUploadUrl, registerUpload, addByCid } from "@/lib/videos.functions";
+import { formatBytes, formatDate, formatTxc, MAX_UPLOAD_BYTES } from "@/lib/fees";
+import {
+  getUploadUrl,
+  registerUpload,
+  addByCid,
+  getQuote,
+} from "@/lib/videos.functions";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { Upload, Loader2, FileVideo, Link2, AlertTriangle } from "lucide-react";
+import {
+  Upload,
+  Loader2,
+  FileVideo,
+  Link2,
+  AlertTriangle,
+  CheckCircle2,
+  Sparkles,
+} from "lucide-react";
 import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
 import { computeCidV1, isCidOnIpfs } from "@/lib/ipfs-cid";
 
@@ -76,6 +89,7 @@ function UploadPage() {
   const getUrl = useServerFn(getUploadUrl);
   const register = useServerFn(registerUpload);
   const addCid = useServerFn(addByCid);
+  const quoteFn = useServerFn(getQuote);
 
   // Auto-provision an anonymous owner id so uploads are free and frictionless
   // until the real TXC wallet integration lands.
@@ -85,6 +99,13 @@ function UploadPage() {
 
   const [file, setFile] = useState<File | null>(null);
   const [codecWarning, setCodecWarning] = useState<string | null>(null);
+  const [localCid, setLocalCid] = useState<string | null>(null);
+  const [cidProbe, setCidProbe] = useState<"idle" | "checking" | "on-ipfs" | "off-ipfs">("idle");
+  const [quote, setQuote] = useState<{
+    txcAmount: number;
+    usdAmount: number;
+    txcUsd: number;
+  } | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [cidInput, setCidInput] = useState("");
@@ -102,6 +123,41 @@ function UploadPage() {
   const [duplicate, setDuplicate] = useState<DuplicateCidInfo | null>(null);
 
   const tooBig = !!file && file.size > MAX_UPLOAD_BYTES;
+
+  /**
+   * When a file is selected, kick off (in parallel) the local CIDv1 hash,
+   * the IPFS gateway probe, and the live TXC quote so the user sees the
+   * real cost + a "Publish your video" affordance before clicking submit.
+   */
+  useEffect(() => {
+    if (!file || tooBig) {
+      setLocalCid(null);
+      setCidProbe("idle");
+      setQuote(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        setCidProbe("checking");
+        const [cid, q] = await Promise.all([
+          computeCidV1(file),
+          quoteFn({ data: { sizeBytes: file.size, months: 1 } }),
+        ]);
+        if (cancelled) return;
+        setLocalCid(cid);
+        setQuote({ txcAmount: q.txcAmount, usdAmount: q.usdAmount, txcUsd: q.txcUsd });
+        const onIpfs = await isCidOnIpfs(cid);
+        if (cancelled) return;
+        setCidProbe(onIpfs ? "on-ipfs" : "off-ipfs");
+      } catch (err) {
+        if (!cancelled) setCidProbe("off-ipfs");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [file, tooBig, quoteFn]);
 
   /**
    * Best-effort browser playability probe. Most browsers don't play
@@ -144,16 +200,15 @@ function UploadPage() {
     setDuplicate(null);
 
     try {
-      // 1. Hash the file locally to compute its CIDv1.
+      // 1. Reuse the CID + IPFS check computed when the file was selected.
+      //    Falls back to recomputing if the user submitted before the
+      //    background probe finished.
       setStage("hashing");
       setProgress(0);
-      const localCid = await computeCidV1(file);
-
-      // 2. Check if the file is already on the public IPFS network.
-      //    If yes, skip the upload entirely and register by CID — saves the
-      //    user from re-uploading bytes that already exist out there.
+      const cid = localCid ?? (await computeCidV1(file));
       setStage("checking");
-      const alreadyPinned = await isCidOnIpfs(localCid);
+      const alreadyPinned =
+        cidProbe === "on-ipfs" ? true : await isCidOnIpfs(cid);
       if (alreadyPinned) {
         toast("Found this file on IPFS — skipping upload", {
           description: "Registering existing CID instead.",
@@ -162,7 +217,7 @@ function UploadPage() {
         const result = await addCid({
           data: {
             wallet: address,
-            cid: localCid,
+            cid,
             title,
             description,
             months,
