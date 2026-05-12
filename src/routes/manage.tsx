@@ -89,6 +89,7 @@ function ManagePage() {
                   <th className="text-left px-4 py-3">Size</th>
                   <th className="text-left px-4 py-3">Views</th>
                   <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-left px-4 py-3">Owner</th>
                   <th className="text-left px-4 py-3">Expires</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -144,6 +145,22 @@ function ManagePage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 font-mono text-xs">
+                        {v.owner_proof_status === "verified" ? (
+                          <span className="inline-flex items-center gap-1 text-primary">
+                            <ShieldCheck className="h-3 w-3" /> verified
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-amber-500">
+                            <ShieldAlert className="h-3 w-3" /> unverified
+                          </span>
+                        )}
+                        {Number(v.escrowed_creator_txc ?? 0) > 0 && (
+                          <div className="text-[10px] text-amber-500 mt-0.5">
+                            escrow: {Number(v.escrowed_creator_txc).toFixed(4)} TXC
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs">
                         <span
                           className={
                             expiring ? "text-destructive flex items-center gap-1" : ""
@@ -155,6 +172,12 @@ function ManagePage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <VerifyOwnershipDialog
+                            cid={v.cid}
+                            verified={v.owner_proof_status === "verified"}
+                            currentWallet={v.owner_wallet}
+                            escrowed={Number(v.escrowed_creator_txc ?? 0)}
+                          />
                           <EditVideoDialog
                             cid={v.cid}
                             initialTitle={v.title}
