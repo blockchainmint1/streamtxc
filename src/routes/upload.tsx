@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, formatDate, formatTxc, MAX_UPLOAD_BYTES } from "@/lib/fees";
 import {
+  getUploadUrl,
   registerUpload,
   addByCid,
   getQuote,
@@ -28,6 +29,7 @@ import {
 } from "lucide-react";
 import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
 import { computeCids, findCidOnIpfs } from "@/lib/ipfs-cid";
+import { PinataSDK } from "pinata";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 
 export const Route = createFileRoute("/upload")({
@@ -66,49 +68,35 @@ function sanitizeFilename(name: string): string {
   return cleanBase + cleanExt;
 }
 
-async function uploadToPinata(
-  _url: string,
-  file: File,
-  onProgress: (pct: number) => void,
-): Promise<{ cid: string; size: number; id: string }> {
-  // Stream through our own server route. Avoids Pinata's tus CORS quirks
-  // (no ACAO header on error responses) and survives wallet browser
-  // extensions that intercept fetch.
-  return await new Promise((resolve, reject) => {
-    const form = new FormData();
-    form.append("file", file, file.name);
-    form.append("filename", file.name);
+/**
+ * Upload a file from the browser using a Pinata presigned URL. Pinata's
+ * v3 upload endpoint speaks TUS (resumable, HEAD+PATCH+POST). The official
+ * SDK with `.url(presignedUrl)` handles the protocol and gives us CIDv1.
+ * Direct-to-Pinata is required because our Worker proxy can't carry video-
+ * sized request bodies (CF Workers cap at ~100MB per request).
+ */
+const browserPinata = new PinataSDK({ pinataJwt: "" });
 
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/public/pinata-upload");
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
-    };
-    xhr.onload = () => {
-      try {
-        const json = JSON.parse(xhr.responseText) as {
-          cid?: string;
-          size?: number;
-          id?: string;
-          error?: string;
-        };
-        if (xhr.status >= 200 && xhr.status < 300 && json.cid) {
-          resolve({ cid: json.cid, size: json.size ?? file.size, id: json.id ?? "" });
-        } else {
-          reject(new Error(json.error || `upload failed [${xhr.status}]`));
-        }
-      } catch {
-        reject(new Error(`upload failed [${xhr.status}]`));
-      }
-    };
-    xhr.onerror = () => reject(new Error("network error during upload"));
-    xhr.send(form);
-  });
+async function uploadToPinata(
+  url: string,
+  file: File,
+  _onProgress: (pct: number) => void,
+): Promise<{ cid: string; size: number; id: string }> {
+  const result = await browserPinata.upload.public
+    .file(file)
+    .url(url)
+    .cidVersion("v1");
+  return {
+    cid: result.cid,
+    size: result.size ?? file.size,
+    id: (result as { id?: string }).id ?? "",
+  };
 }
 
 function UploadPage() {
   const navigate = useNavigate();
   const { address, connect } = useWallet();
+  const getUrl = useServerFn(getUploadUrl);
   const register = useServerFn(registerUpload);
   const addCid = useServerFn(addByCid);
   const quoteFn = useServerFn(getQuote);
@@ -261,14 +249,19 @@ function UploadPage() {
         return;
       }
 
-      // 3. Not on IPFS yet — upload through our server proxy to Pinata.
-      setStage("uploading");
+      // 3. Not on IPFS yet — get a Pinata presigned URL and upload directly.
+      setStage("signing");
       const safeName = sanitizeFilename(file.name);
+      const { url } = await getUrl({
+        data: { filename: safeName, sizeBytes: file.size },
+      });
+
+      setStage("uploading");
       const safeFile =
         safeName === file.name
           ? file
           : new File([file], safeName, { type: file.type });
-      const pinResult = await uploadToPinata("", safeFile, (pct) =>
+      const pinResult = await uploadToPinata(url, safeFile, (pct) =>
         setProgress(pct),
       );
 
