@@ -59,14 +59,23 @@ export const Route = createFileRoute("/api/public/txc-health")({
           // If we don't yet have a labelled topup address, mint one so
           // operators always have a stable place to send funds.
           let topupAddress: string | null = null;
+          let topupDebug: unknown = null;
           const addrBody = addrs.body as { result?: Record<string, unknown>; error?: unknown } | string;
           if (typeof addrBody === "object" && addrBody && "result" in addrBody && addrBody.result) {
             topupAddress = Object.keys(addrBody.result)[0] ?? null;
           }
           if (!topupAddress) {
-            const fresh = await call("getnewaddress", ["hot-wallet-topup", "bech32"]);
-            const fb = fresh.body as { result?: string } | string;
-            if (typeof fb === "object" && fb && "result" in fb) topupAddress = fb.result ?? null;
+            // Try bech32 first, fall back to legacy if the chain doesn't support it.
+            let fresh = await call("getnewaddress", ["hot-wallet-topup", "bech32"]);
+            let fb = fresh.body as { result?: string; error?: unknown } | string;
+            if (typeof fb === "object" && fb && fb.result) {
+              topupAddress = fb.result;
+            } else {
+              const legacy = await call("getnewaddress", ["hot-wallet-topup"]);
+              const lb = legacy.body as { result?: string; error?: unknown } | string;
+              if (typeof lb === "object" && lb && lb.result) topupAddress = lb.result;
+              topupDebug = { bech32: fb, legacy: lb };
+            }
           }
           return Response.json({
             ok: true,
@@ -75,6 +84,7 @@ export const Route = createFileRoute("/api/public/txc-health")({
             chain: info,
             balance,
             topupAddress,
+            topupDebug,
           });
         } catch (err) {
           return Response.json(
