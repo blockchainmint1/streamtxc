@@ -9,9 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, MAX_UPLOAD_BYTES } from "@/lib/fees";
-import { finalizeUpload } from "@/lib/videos.functions";
+import { finalizeUpload, addByCid } from "@/lib/videos.functions";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Upload, Loader2, FileVideo } from "lucide-react";
+import { Upload, Loader2, FileVideo, Link2 } from "lucide-react";
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
@@ -31,6 +32,7 @@ function UploadPage() {
   const navigate = useNavigate();
   const { address, connect } = useWallet();
   const finalize = useServerFn(finalizeUpload);
+  const addCid = useServerFn(addByCid);
 
   // Auto-provision an anonymous owner id so uploads are free and frictionless
   // until the real TXC wallet integration lands.
@@ -41,6 +43,10 @@ function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [cidInput, setCidInput] = useState("");
+  const [cidTitle, setCidTitle] = useState("");
+  const [cidDescription, setCidDescription] = useState("");
+  const [cidStage, setCidStage] = useState<"idle" | "registering">("idle");
   const months = 1;
   const [stage, setStage] = useState<
     "idle" | "paying" | "uploading" | "pinning" | "stamping"
@@ -95,6 +101,29 @@ function UploadPage() {
     }
   }
 
+  async function handleCidSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!cidInput || !cidTitle || !address) return;
+    try {
+      setCidStage("registering");
+      const result = await addCid({
+        data: {
+          wallet: address,
+          cid: cidInput.trim(),
+          title: cidTitle,
+          description: cidDescription,
+          months,
+        },
+      });
+      toast.success("CID registered");
+      navigate({ to: "/v/$cid", params: { cid: result.cid } });
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Failed to register CID");
+      setCidStage("idle");
+    }
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -108,6 +137,17 @@ function UploadPage() {
           timestamping land once the wallet integration is live.
         </p>
 
+        <Tabs defaultValue="file" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="file" className="font-mono text-xs">
+              <Upload className="mr-2 h-3 w-3" /> Upload file
+            </TabsTrigger>
+            <TabsTrigger value="cid" className="font-mono text-xs">
+              <Link2 className="mr-2 h-3 w-3" /> Add by CID
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="file">
         <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label className="font-mono text-xs">VIDEO FILE</Label>
@@ -205,6 +245,69 @@ function UploadPage() {
               )}
             </Button>
         </form>
+          </TabsContent>
+
+          <TabsContent value="cid">
+            <form onSubmit={handleCidSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="cid" className="font-mono text-xs">IPFS CID</Label>
+                <Input
+                  id="cid"
+                  value={cidInput}
+                  onChange={(e) => setCidInput(e.target.value)}
+                  placeholder="bafy… or Qm…"
+                  required
+                  className="font-mono"
+                />
+                <p className="font-mono text-xs text-muted-foreground">
+                  Already pinned somewhere? Register the CID and get a player + embed.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="cid-title" className="font-mono text-xs">TITLE</Label>
+                <Input
+                  id="cid-title"
+                  value={cidTitle}
+                  onChange={(e) => setCidTitle(e.target.value)}
+                  required
+                  maxLength={200}
+                  className="font-mono"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="cid-description" className="font-mono text-xs">DESCRIPTION (optional)</Label>
+                <Textarea
+                  id="cid-description"
+                  value={cidDescription}
+                  onChange={(e) => setCidDescription(e.target.value)}
+                  maxLength={2000}
+                  rows={3}
+                />
+              </div>
+
+              <Button
+                type="submit"
+                size="lg"
+                disabled={!cidInput || !cidTitle || cidStage !== "idle" || !address}
+                className="w-full font-mono"
+              >
+                {cidStage === "idle" ? (
+                  <>
+                    <Link2 className="mr-2 h-4 w-4" />
+                    Register CID
+                  </>
+                ) : (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Probing gateway…
+                  </>
+                )}
+              </Button>
+            </form>
+          </TabsContent>
+        </Tabs>
       </main>
       <Footer />
     </div>
