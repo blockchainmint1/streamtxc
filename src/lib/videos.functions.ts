@@ -270,7 +270,13 @@ export const addByCid = createServerFn({ method: "POST" })
     // Reject if already registered (with structured details for the UI)
     await assertCidUnclaimed(data.cid);
 
-    // Probe the gateway to learn size + mime (HEAD, then ranged GET fallback)
+    // 1) Kick off Pinata's "fetch this CID from the IPFS network" job FIRST.
+    //    Without this, the gateway HEAD probe below has nothing to serve and
+    //    will hang waiting for IPFS DHT discovery to finish.
+    await pinByCid(data.cid, data.title);
+
+    // 2) Probe the gateway to learn size + mime, with a generous timeout.
+    //    IPFS DHT lookups for fresh CIDs can take 20-30s on a cold gateway.
     const gatewayDomain = process.env.PINATA_GATEWAY_DOMAIN;
     const url = gatewayDomain
       ? `https://${gatewayDomain}/ipfs/${data.cid}`
@@ -278,19 +284,44 @@ export const addByCid = createServerFn({ method: "POST" })
 
     let sizeBytes = 0;
     let mimeType = "video/mp4";
-    try {
-      let probe = await fetch(url, { method: "HEAD" });
-      if (!probe.ok || !probe.headers.get("content-length")) {
-        probe = await fetch(url, { headers: { Range: "bytes=0-0" } });
+    let probeError: string | null = null;
+    const probe = async (init: RequestInit): Promise<Response> => {
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 30_000);
+      try {
+        return await fetch(url, { ...init, signal: ctl.signal });
+      } finally {
+        clearTimeout(t);
       }
-      sizeBytes = Number(
-        probe.headers.get("content-range")?.split("/")[1] ||
-          probe.headers.get("content-length") ||
-          0,
-      );
-      mimeType = probe.headers.get("content-type") || mimeType;
-    } catch {
-      // best-effort; continue with unknown size
+    };
+    try {
+      let res = await probe({ method: "HEAD" });
+      if (!res.ok || !res.headers.get("content-length")) {
+        res = await probe({ headers: { Range: "bytes=0-0" } });
+      }
+      if (!res.ok) {
+        probeError = `Gateway returned ${res.status}`;
+      } else {
+        sizeBytes = Number(
+          res.headers.get("content-range")?.split("/")[1] ||
+            res.headers.get("content-length") ||
+            0,
+        );
+        mimeType = res.headers.get("content-type") || mimeType;
+      }
+    } catch (err) {
+      probeError =
+        err instanceof Error && err.name === "AbortError"
+          ? "Timed out fetching CID from IPFS (30s). The file may not be available on the public IPFS network."
+          : err instanceof Error
+            ? err.message
+            : "Gateway probe failed";
+    }
+
+    // Hard fail if we got nothing back — better a clear error than a broken
+    // video row with size=0 and no mime type.
+    if (sizeBytes === 0 && probeError) {
+      throw new Error(`CID_NOT_FOUND:${probeError}`);
     }
 
     const _price = (await getTxcUsdPrice()).usd;
@@ -303,9 +334,6 @@ export const addByCid = createServerFn({ method: "POST" })
       eventType: "C",
       uploaderWallet: data.wallet,
     });
-
-    // Best-effort: pin into our own Pinata account so streaming is reliable.
-    await pinByCid(data.cid, data.title);
 
     const expires = new Date();
     expires.setMonth(expires.getMonth() + data.months);
