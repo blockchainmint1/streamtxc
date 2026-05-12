@@ -23,6 +23,7 @@ import {
   pinThumbnail,
   getOwnershipChallenge,
   submitOwnershipProof,
+  retryOwnStamp,
 } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, shortenHash } from "@/lib/fees";
@@ -35,6 +36,7 @@ import {
   Upload as UploadIcon,
   ShieldCheck,
   ShieldAlert,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -172,6 +174,9 @@ function ManagePage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {v.status === "stamp_failed" && (
+                            <RetryStampButton cid={v.cid} wallet={address!} />
+                          )}
                           <VerifyOwnershipDialog
                             cid={v.cid}
                             verified={v.owner_proof_status === "verified"}
