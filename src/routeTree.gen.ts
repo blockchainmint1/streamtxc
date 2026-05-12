@@ -17,7 +17,6 @@ import { Route as VCidRouteImport } from './routes/v.$cid'
 import { Route as EmbedCidRouteImport } from './routes/embed.$cid'
 import { Route as ApiStreamCidRouteImport } from './routes/api/stream.$cid'
 import { Route as ApiPublicTxcHealthRouteImport } from './routes/api/public/txc-health'
-import { Route as ApiPublicPinataUploadRouteImport } from './routes/api/public/pinata-upload'
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
 
@@ -61,11 +60,6 @@ const ApiPublicTxcHealthRoute = ApiPublicTxcHealthRouteImport.update({
   path: '/api/public/txc-health',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicPinataUploadRoute = ApiPublicPinataUploadRouteImport.update({
-  id: '/api/public/pinata-upload',
-  path: '/api/public/pinata-upload',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPublicHooksPaymentWatcherRoute =
   ApiPublicHooksPaymentWatcherRouteImport.update({
     id: '/api/public/hooks/payment-watcher',
@@ -86,7 +80,6 @@ export interface FileRoutesByFullPath {
   '/upload': typeof UploadRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/v/$cid': typeof VCidRoute
-  '/api/public/pinata-upload': typeof ApiPublicPinataUploadRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
@@ -99,7 +92,6 @@ export interface FileRoutesByTo {
   '/upload': typeof UploadRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/v/$cid': typeof VCidRoute
-  '/api/public/pinata-upload': typeof ApiPublicPinataUploadRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
@@ -113,7 +105,6 @@ export interface FileRoutesById {
   '/upload': typeof UploadRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/v/$cid': typeof VCidRoute
-  '/api/public/pinata-upload': typeof ApiPublicPinataUploadRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
@@ -128,7 +119,6 @@ export interface FileRouteTypes {
     | '/upload'
     | '/embed/$cid'
     | '/v/$cid'
-    | '/api/public/pinata-upload'
     | '/api/public/txc-health'
     | '/api/stream/$cid'
     | '/api/public/admin/retry-stamps'
@@ -141,7 +131,6 @@ export interface FileRouteTypes {
     | '/upload'
     | '/embed/$cid'
     | '/v/$cid'
-    | '/api/public/pinata-upload'
     | '/api/public/txc-health'
     | '/api/stream/$cid'
     | '/api/public/admin/retry-stamps'
@@ -154,7 +143,6 @@ export interface FileRouteTypes {
     | '/upload'
     | '/embed/$cid'
     | '/v/$cid'
-    | '/api/public/pinata-upload'
     | '/api/public/txc-health'
     | '/api/stream/$cid'
     | '/api/public/admin/retry-stamps'
@@ -168,7 +156,6 @@ export interface RootRouteChildren {
   UploadRoute: typeof UploadRoute
   EmbedCidRoute: typeof EmbedCidRoute
   VCidRoute: typeof VCidRoute
-  ApiPublicPinataUploadRoute: typeof ApiPublicPinataUploadRoute
   ApiPublicTxcHealthRoute: typeof ApiPublicTxcHealthRoute
   ApiStreamCidRoute: typeof ApiStreamCidRoute
   ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
@@ -233,13 +220,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTxcHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/pinata-upload': {
-      id: '/api/public/pinata-upload'
-      path: '/api/public/pinata-upload'
-      fullPath: '/api/public/pinata-upload'
-      preLoaderRoute: typeof ApiPublicPinataUploadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/hooks/payment-watcher': {
       id: '/api/public/hooks/payment-watcher'
       path: '/api/public/hooks/payment-watcher'
@@ -264,7 +244,6 @@ const rootRouteChildren: RootRouteChildren = {
   UploadRoute: UploadRoute,
   EmbedCidRoute: EmbedCidRoute,
   VCidRoute: VCidRoute,
-  ApiPublicPinataUploadRoute: ApiPublicPinataUploadRoute,
   ApiPublicTxcHealthRoute: ApiPublicTxcHealthRoute,
   ApiStreamCidRoute: ApiStreamCidRoute,
   ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
@@ -273,3 +252,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
