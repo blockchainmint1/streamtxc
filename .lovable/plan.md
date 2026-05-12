@@ -1,89 +1,68 @@
-# Wallet ownership + 90/5/5 comment payouts
+## Bulk +30-day extension — copy-pasteable `sendmany`
 
-## The problem in one paragraph
+Add a "Bulk extend +30 days" action on `/manage` that gathers every video the connected wallet owns, computes the per-video TXC fee for one extra month, and returns a ready-to-paste `sendmany` command for your web wallet. Nothing is broadcast from the server.
 
-Today `videos.owner_wallet` is just a string the uploader types — there's no proof they actually control it, so we can't safely send them 90% of comment revenue. Comment funds also currently land in a per-comment deposit wallet and never move. We need (1) hard proof of wallet control at upload time, and (2) a sweeper that splits each confirmed comment payment 90/5/5 the moment it confirms.
+### User flow
 
-## Approach
+1. On `/manage`, a new button next to "Upload your first" / table header: **`Extend all +30d`**.
+2. Click → modal opens showing:
+   - Per-video table: title · deposit address · TXC amount
+   - Total TXC + USD estimate
+   - A monospace text block with the full CLI command, plus a "Copy" button
+   - A "Mark as paid" button (optional second step — see below)
+3. Paste into TXC web wallet → broadcast → done.
 
-**Ownership = sign-a-challenge + on-chain attestation, required at upload.** The user supplies a TXC wallet, the server returns a one-time nonce, the user signs it with their wallet (browser extension or pasted signature). On valid signature we stamp a new `O` (ownership) OP_RETURN tying the CID ↔ wallet on-chain. No verified signature → no upload. This satisfies "prove immediately" without waiting for real on-chain payments and gives us a public, immutable record.
+### Server function — `buildBulkExtendQuote`
 
-**Payouts = immediate sweep on confirmation, three on-chain txs per paid comment.** When the per-comment deposit wallet's payment confirms, we send 5% → platform, 5% → hosting wallet, 90% → the verified owner wallet, in three separate TXC txs. Non-custodial, simple, matches your "sweep immediately" choice.
+New server fn in `src/lib/videos.functions.ts`:
 
-## On-chain protocol additions
+- Input: `{ wallet, months: 1 }`
+- Loads every video where `owner_wallet = wallet` and `video_wallet IS NOT NULL` (covers all your videos regardless of status, per your answer)
+- For each video, computes fee using existing `quoteUsd(size_bytes, months)` + `usdToTxc()` with current `getTxcUsdPrice()`
+- Returns:
+  ```ts
+  {
+    txcUsd: number,
+    totalTxc: number,
+    totalUsd: number,
+    items: Array<{ cid, title, depositAddress, txcAmount }>,
+    sendmanyJson: string,    // '{"addr1":1.234,"addr2":5.678}'
+    sendmanyCli: string,     // full command (see below)
+  }
+  ```
 
-Extend the OP_RETURN tag set in `src/lib/txc.server.ts`:
+### `sendmany` format
 
-```text
-O  ownership   TXCV1O|<videoCid>|<ownerWallet>|<nonce>   stamped after sig verifies
-S  split       TXCV1S|<commentCid>|<creator|hosting|platform>|<amountTxc>
-                                                          stamped on each payout leg
+Standard Bitcoin/Litecoin RPC shape (TXC inherits this):
+
+```
+texitcoin-cli sendmany "" '{"<addr1>":1.23456789,"<addr2>":0.98765432}'
 ```
 
-`C`, `T`, `M`, `B` stay as-is. Every `S` event is recorded in `chain_events` so the watch page can show the full money trail per comment.
+The first arg `""` is the "fromaccount" (legacy, empty string = default). Amounts are TXC, max 8 decimals. We round each fee to 8dp.
 
-## Database changes
+Tell me if your web wallet expects a different invocation (e.g. just the JSON object, or `sendmany` with no `""`, or comment/subtractfee args) and I'll adjust the formatter.
 
-`videos`:
-- `owner_proof_status text not null default 'unverified'` — `unverified | verified`
-- `owner_nonce text` — random nonce we issued for verification
-- `owner_signature text` — the sig the user returned
-- `owner_verified_at timestamptz`
-- `ownership_tx_hash text` — txid of the `O` stamp
+### Recording the extension
 
-`comments`:
-- `payout_status text not null default 'pending'` — `pending | swept | failed`
-- `creator_payout_tx_hash text`
-- `hosting_payout_tx_hash text`
-- `platform_payout_tx_hash text`
+Two options to discuss before I build — pick one in your next message:
 
-New secret: `TXC_HOSTING_ADDRESS` (the wallet that receives the 5% hosting share). `TXC_PLATFORM_ADDRESS` already exists.
+- **A) Server-side stamp after paste.** Add a "Mark as paid" button that, when clicked, bumps `expires_at += 30 days` for each video, inserts `payments` rows, and (optionally) records an `E` (extend) chain event per video using `recordChainEvent` so there's an on-chain audit trail. Trust-based — nothing verifies the TX actually went through.
+- **B) Watcher-driven.** Don't touch the DB on click. Let the existing `payment-watcher` route detect the new deposits at each `video_wallet`, credit them, and bump `expires_at`. Requires the watcher to know about extension semantics (currently it handles initial payment).
 
-## Upload flow (new)
+A is faster to ship; B is more correct. I'd suggest A now, B later.
 
-1. `/upload` — user enters TXC wallet → calls `getOwnershipChallenge({ wallet, cid })` → server stores nonce, returns the message to sign:
-   `texitcoin-stream ownership v1\nwallet=<wallet>\ncid=<cid>\nnonce=<nonce>\nts=<iso>`
-2. User signs (TXC wallet extension if available, else paste-signature fallback). Server verifies via standard ECDSA recovery against `wallet`.
-3. On success: server stamps `O` on chain, then proceeds with the existing `C` + `T` stamps and inserts the `videos` row with `owner_proof_status='verified'`.
+### UI changes
 
-If signature fails or the user cancels, the upload is rejected — no row, no IPFS pin promotion.
+- `src/routes/manage.tsx`: add `BulkExtendDialog` component with table, total, copy button, and (if A) confirm button calling `markBulkExtended` server fn.
+- New action button in the page header above the videos table.
 
-## Comment payout sweeper
+### Files to add / edit
 
-Add a `sweepCommentPayout(commentId)` server fn called from the existing comment-confirmation poller (the same place `status` flips to `active`):
+- `src/lib/videos.functions.ts` — add `buildBulkExtendQuote` (and `markBulkExtended` if A)
+- `src/routes/manage.tsx` — add button + dialog
 
-```text
-amount = comment.payment_received_txc
-creator  = round(amount * 0.90, 4)   → owner_wallet
-hosting  = round(amount * 0.05, 4)   → TXC_HOSTING_ADDRESS
-platform = amount - creator - hosting → TXC_PLATFORM_ADDRESS  (absorbs rounding dust)
-```
+### Open questions
 
-For each leg: build + broadcast tx from the per-comment deposit wallet, store the txid on the `comments` row, write an `S` `chain_events` row. If any leg fails, mark `payout_status='failed'` and surface in /manage; a retry button re-sweeps only the missing legs.
-
-If `owner_proof_status != 'verified'` (which shouldn't happen for new uploads, but might for the 11 legacy rows): the sweeper rejects the comment intent before payment is taken.
-
-## Backfill for the 11 existing videos
-
-One-time `/manage` banner: "Verify wallet ownership to keep accepting comments." Same sign-a-nonce flow, same `O` stamp. Until verified, `createCommentIntent` returns a friendly "creator hasn't verified ownership yet" error.
-
-## UI changes
-
-- `/upload`: wallet field becomes required + a "Verify wallet" step (button → modal with the message + signature input or auto-sign via wallet extension) before the file actually starts uploading to Pinata.
-- `/manage`: badge per video — green "Verified owner" or amber "Unverified — verify now". Show payout history per comment with explorer links to all 4 txs (initial + 3 splits).
-- Watch page (`/v/$cid`): a small "Verified creator" check next to the wallet, plus a "Where the money went" expandable on each paid comment showing the three split txids.
-
-## Implementation order
-
-1. **Migration** — add the new columns + chain-event `O` and `S` types are just new strings, no schema change there.
-2. **`txc.server.ts`** — add `stampOwnership()` and `stampSplit()` helpers; add a `verifySignature(message, signature, wallet)` helper using ECDSA recovery.
-3. **`videos.functions.ts`** — `getOwnershipChallenge`, modify `registerUpload` to require + verify signature and stamp `O` before insert.
-4. **`comments.functions.ts`** — block intent creation when owner unverified; add `sweepCommentPayout` and call it from the confirmation path.
-5. **Upload UI** — wallet + verify step.
-6. **Manage UI** — verification banner + payout history.
-7. **Backfill prompt** for the 11 legacy videos.
-
-## Open questions for you
-
-- **Hosting wallet**: do you want a fresh TXC address generated and stored as `TXC_HOSTING_ADDRESS`, or should the 5% hosting share just be added to `videos.hosting_credit_txc` (kept in the per-video wallet) and only swept out when the video renews? The second is cheaper (1 fewer tx per comment) but means hosting funds stay tied to each video instead of pooling.
-- **Signature method**: do TXC wallets have an injected browser provider (like MetaMask's `window.ethereum`) we can call for `personal_sign`, or do we need to ship a paste-the-signature fallback only? This decides how friendly the verify step looks.
+1. Confirm the `sendmany` syntax above matches your web wallet, or paste the exact format.
+2. A or B for recording the extension?
