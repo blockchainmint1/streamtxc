@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useWallet } from "@/lib/wallet";
-import { quoteFee, formatTxc, formatBytes, MAX_UPLOAD_BYTES } from "@/lib/fees";
+import { formatBytes, MAX_UPLOAD_BYTES } from "@/lib/fees";
 import { finalizeUpload } from "@/lib/videos.functions";
 import { toast } from "sonner";
-import { Upload, Loader2, Wallet, FileVideo } from "lucide-react";
+import { Upload, Loader2, FileVideo } from "lucide-react";
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
@@ -32,15 +32,20 @@ function UploadPage() {
   const { address, connect } = useWallet();
   const finalize = useServerFn(finalizeUpload);
 
+  // Auto-provision an anonymous owner id so uploads are free and frictionless
+  // until the real TXC wallet integration lands.
+  useEffect(() => {
+    if (!address) connect();
+  }, [address, connect]);
+
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [months, setMonths] = useState(1);
+  const months = 1;
   const [stage, setStage] = useState<
     "idle" | "paying" | "uploading" | "pinning" | "stamping"
   >("idle");
 
-  const fee = file ? quoteFee(file.size, months) : 0;
   const tooBig = !!file && file.size > MAX_UPLOAD_BYTES;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -52,11 +57,7 @@ function UploadPage() {
     }
 
     try {
-      // 1. Mock payment confirmation
-      setStage("paying");
-      await new Promise((r) => setTimeout(r, 800));
-
-      // 2. Encode file to base64
+      // Encode file to base64
       setStage("uploading");
       const buffer = await file.arrayBuffer();
       let binary = "";
@@ -85,7 +86,7 @@ function UploadPage() {
       });
 
       setStage("stamping");
-      toast.success("Pinned and timestamped on-chain");
+      toast.success("Pinned to IPFS");
       navigate({ to: "/v/$cid", params: { cid: result.cid } });
     } catch (err) {
       console.error(err);
@@ -99,26 +100,15 @@ function UploadPage() {
       <Header />
       <main className="mx-auto w-full max-w-3xl px-6 py-12 flex-1">
         <div className="font-mono text-xs text-primary mb-3">
-          [ STEP 1 OF 1 · NO ACCOUNT REQUIRED ]
+          [ FREE WHILE IN BETA · NO ACCOUNT REQUIRED ]
         </div>
         <h1 className="text-4xl font-bold tracking-tight mb-2">Upload video</h1>
         <p className="text-muted-foreground mb-10">
-          Pin to IPFS. Pay in TXC. Timestamp on-chain. Get an embeddable player.
+          Pin to IPFS. Get an embeddable player. TXC payment + on-chain
+          timestamping land once the wallet integration is live.
         </p>
 
-        {!address ? (
-          <div className="border border-border bg-card rounded-sm p-12 text-center">
-            <Wallet className="h-8 w-8 text-primary mx-auto mb-4" />
-            <h2 className="font-bold mb-2">Connect a wallet to continue</h2>
-            <p className="text-sm text-muted-foreground mb-6 font-mono">
-              No signup. Just sign with your wallet.
-            </p>
-            <Button onClick={connect} className="font-mono">
-              Connect Wallet
-            </Button>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label className="font-mono text-xs">VIDEO FILE</Label>
               <label className="block border-2 border-dashed border-border hover:border-primary rounded-sm p-8 cursor-pointer transition-colors bg-card">
@@ -186,70 +176,35 @@ function UploadPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label className="font-mono text-xs">MONTHS PREPAID</Label>
-              <div className="flex gap-2">
-                {[1, 3, 6, 12].map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setMonths(m)}
-                    className={`flex-1 py-2 border rounded-sm font-mono text-sm transition-colors ${
-                      months === m
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border hover:border-primary"
-                    }`}
-                  >
-                    {m}mo
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Quote */}
             {file && !tooBig && (
-              <div className="border border-border bg-card rounded-sm p-4 font-mono text-sm space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">size</span>
-                  <span>{formatBytes(file.size)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">months</span>
-                  <span>{months}</span>
-                </div>
-                <div className="flex justify-between border-t border-border pt-2 mt-2">
-                  <span className="text-muted-foreground">total</span>
-                  <span className="text-primary font-bold">
-                    {formatTxc(fee)}
-                  </span>
-                </div>
+              <div className="border border-border bg-card rounded-sm p-4 font-mono text-sm flex justify-between">
+                <span className="text-muted-foreground">cost</span>
+                <span className="text-primary font-bold">FREE (beta)</span>
               </div>
             )}
 
             <Button
               type="submit"
               size="lg"
-              disabled={!file || !title || tooBig || stage !== "idle"}
+              disabled={!file || !title || tooBig || stage !== "idle" || !address}
               className="w-full font-mono"
             >
               {stage === "idle" && (
                 <>
                   <Upload className="mr-2 h-4 w-4" />
-                  Pay {file ? formatTxc(fee) : ""} & upload
+                  Upload to IPFS
                 </>
               )}
               {stage !== "idle" && (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {stage === "paying" && "Confirming payment…"}
                   {stage === "uploading" && "Encoding…"}
                   {stage === "pinning" && "Pinning to IPFS…"}
-                  {stage === "stamping" && "Timestamping on TXC…"}
+                  {stage === "stamping" && "Finalizing…"}
                 </>
               )}
             </Button>
-          </form>
-        )}
+        </form>
       </main>
       <Footer />
     </div>
