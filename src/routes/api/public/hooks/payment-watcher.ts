@@ -20,6 +20,7 @@ import { getAddressReceived, stampCommentCid } from "@/lib/txc.server";
 import { recordChainEvent } from "@/lib/chain-events.server";
 import { unpinByCid, pinJsonToIPFS } from "@/lib/pinata.server";
 import { PAYMENT_GRACE_HOURS } from "@/lib/fees";
+import { sweepCommentPayout } from "@/lib/videos.functions";
 
 export const Route = createFileRoute("/api/public/hooks/payment-watcher")({
   server: {
