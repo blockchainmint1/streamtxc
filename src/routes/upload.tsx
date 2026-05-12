@@ -84,6 +84,7 @@ function UploadPage() {
   }, [address, connect]);
 
   const [file, setFile] = useState<File | null>(null);
+  const [codecWarning, setCodecWarning] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [cidInput, setCidInput] = useState("");
@@ -101,6 +102,37 @@ function UploadPage() {
   const [duplicate, setDuplicate] = useState<DuplicateCidInfo | null>(null);
 
   const tooBig = !!file && file.size > MAX_UPLOAD_BYTES;
+
+  /**
+   * Best-effort browser playability probe. Most browsers don't play
+   * .mov containers (ProRes/HEVC), and even some .mp4 files use codecs
+   * (HEVC, AV1 in older browsers) that won't decode. We can't peek inside
+   * the file from JS without parsing it, so we use the loose extension +
+   * MIME signal plus `canPlayType` as a heuristic and recommend H.264 MP4.
+   */
+  function checkCodec(f: File): string | null {
+    const name = f.name.toLowerCase();
+    const type = (f.type || "").toLowerCase();
+    const v = document.createElement("video");
+    // .mov is the most common offender — almost always ProRes or HEVC from
+    // a phone/camera, neither plays in Chrome/Firefox.
+    if (name.endsWith(".mov") || type === "video/quicktime") {
+      return ".mov files often use ProRes or HEVC — most browsers can't play them. Convert to MP4 (H.264 + AAC) before uploading for the best playback experience.";
+    }
+    // HEVC / H.265 in an mp4 container — Safari plays it, Chrome/Firefox don't.
+    if (
+      type === "video/mp4" &&
+      v.canPlayType('video/mp4; codecs="hvc1"') === "" &&
+      v.canPlayType('video/mp4; codecs="hev1"') === ""
+    ) {
+      // We can't tell from MIME alone whether the file is H.264 or HEVC,
+      // so we don't warn here — just trust the container.
+    }
+    if (!type.startsWith("video/")) {
+      return "This doesn't look like a video file. Pick an .mp4 (H.264 + AAC) for the best results.";
+    }
+    return null;
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -289,6 +321,7 @@ function UploadPage() {
                     const f = e.target.files?.[0];
                     if (f) {
                       setFile(f);
+                      setCodecWarning(checkCodec(f));
                       if (!title) setTitle(f.name.replace(/\.[^.]+$/, ""));
                     }
                   }}
@@ -321,6 +354,36 @@ function UploadPage() {
                 )}
               </label>
             </div>
+
+            {codecWarning && (
+              <div className="border-2 border-amber-500/60 bg-amber-500/5 rounded-sm p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="font-mono text-xs text-amber-500">
+                      [ MAY NOT PLAY IN BROWSERS ]
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {codecWarning}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-mono text-foreground">Heads up:</span>{" "}
+                      converting changes the file's CID. If you want the on-chain
+                      CID to match your original master file, upload the original
+                      and accept that browsers may not decode it. Otherwise,
+                      convert to MP4/H.264 first — the new MP4 gets its own CID
+                      that everyone can play.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Quick convert (FFmpeg):{" "}
+                      <code className="font-mono text-foreground bg-card px-1 py-0.5 rounded">
+                        ffmpeg -i input.mov -c:v libx264 -crf 20 -c:a aac output.mp4
+                      </code>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="title" className="font-mono text-xs">TITLE</Label>
