@@ -689,3 +689,183 @@ function VerifyOwnershipDialog({
     </Dialog>
   );
 }
+
+function BulkExtendDialog({ wallet }: { wallet: string }) {
+  const qc = useQueryClient();
+  const buildQuote = useServerFn(buildBulkExtendQuote);
+  const markPaid = useServerFn(markBulkExtended);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [quote, setQuote] = useState<Awaited<
+    ReturnType<typeof buildBulkExtendQuote>
+  > | null>(null);
+  const months = 1;
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await buildQuote({ data: { wallet, months } });
+      setQuote(res);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to build quote");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function copy(text: string) {
+    navigator.clipboard.writeText(text).then(
+      () => toast.success("Copied to clipboard"),
+      () => toast.error("Copy failed"),
+    );
+  }
+
+  async function confirmPaid() {
+    setConfirming(true);
+    try {
+      const res = await markPaid({ data: { wallet, months } });
+      toast.success(`Extended ${res.extended} video${res.extended === 1 ? "" : "s"} +30 days`);
+      qc.invalidateQueries({ queryKey: ["my-videos"] });
+      setOpen(false);
+      setQuote(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to record payment");
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (v) load();
+        else setQuote(null);
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button className="font-mono shrink-0" variant="outline">
+          <CalendarPlus className="mr-2 h-4 w-4" /> extend all +30d
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Bulk extend +30 days</DialogTitle>
+          <DialogDescription>
+            Paste this <span className="font-mono">sendmany</span> into your TXC
+            web wallet. Once it broadcasts, click "Mark as paid" to bump every
+            video's expiration.
+          </DialogDescription>
+        </DialogHeader>
+
+        {loading ? (
+          <div className="py-8 text-center font-mono text-muted-foreground">
+            <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
+            building quote…
+          </div>
+        ) : !quote ? null : quote.items.length === 0 ? (
+          <p className="font-mono text-muted-foreground py-6">
+            No videos with deposit addresses to extend.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            <div className="border border-border rounded-sm overflow-hidden max-h-64 overflow-y-auto">
+              <table className="w-full text-xs font-mono">
+                <thead className="bg-card text-muted-foreground sticky top-0">
+                  <tr>
+                    <th className="text-left px-3 py-2">Title</th>
+                    <th className="text-left px-3 py-2">Address</th>
+                    <th className="text-right px-3 py-2">TXC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {quote.items.map((it) => (
+                    <tr key={it.cid} className="border-t border-border">
+                      <td className="px-3 py-2 truncate max-w-[200px]">{it.title}</td>
+                      <td className="px-3 py-2 truncate max-w-[220px]">
+                        {it.depositAddress}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {it.txcAmount.toFixed(8)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-border bg-card">
+                    <td className="px-3 py-2 font-bold" colSpan={2}>
+                      Total ({quote.items.length} videos)
+                    </td>
+                    <td className="px-3 py-2 text-right font-bold">
+                      {quote.totalTxc.toFixed(8)} TXC
+                      <div className="text-[10px] text-muted-foreground font-normal">
+                        ≈ ${quote.totalUsd.toFixed(2)} @ ${quote.txcUsd.toFixed(4)}/TXC
+                      </div>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div>
+              <Label className="font-mono text-xs text-muted-foreground">
+                sendmany command
+              </Label>
+              <div className="mt-1 relative">
+                <Textarea
+                  readOnly
+                  value={quote.sendmanyCli}
+                  className="font-mono text-xs h-32 resize-none pr-10"
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="absolute top-2 right-2"
+                  onClick={() => copy(quote.sendmanyCli)}
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+              <div className="mt-2 flex gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="font-mono text-xs"
+                  onClick={() => copy(quote.sendmanyJson)}
+                >
+                  <Copy className="h-3 w-3 mr-1" /> copy JSON only
+                </Button>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                className="font-mono"
+                onClick={() => setOpen(false)}
+              >
+                close
+              </Button>
+              <Button
+                className="font-mono"
+                onClick={confirmPaid}
+                disabled={confirming}
+              >
+                {confirming ? (
+                  <>
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" /> recording…
+                  </>
+                ) : (
+                  "mark as paid (+30d)"
+                )}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
