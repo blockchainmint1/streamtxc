@@ -28,7 +28,7 @@
 // mempool polling UI) works end-to-end. The adapter is the ONLY place that
 // needs to change when real RPC creds land.
 
-import { createHash } from "crypto";
+import { createHash } from "node:crypto";
 
 export const TXC_PROTO_TAG = "TXCV1";
 

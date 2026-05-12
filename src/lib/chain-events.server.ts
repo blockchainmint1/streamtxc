@@ -12,7 +12,7 @@ import {
   type StampResult,
 } from "./txc.server";
 import { pinJsonToIPFS } from "./pinata.server";
-import { createHash } from "crypto";
+import { createHash } from "node:crypto";
 
 export interface RecordChainEventInput {
   cid: string;
