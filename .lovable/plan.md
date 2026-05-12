@@ -1,61 +1,51 @@
-## Duplicate CID Detection
+## Bug fixes & small features
 
-Since CIDs are content-addressed, the same video file always produces the same CID — which makes duplicate detection trivial and bulletproof. We just check the DB before stamping/pinning.
+### 1. Fix price copy on upload page
 
-### Where duplicates can enter
+Two stale `$0.01 / MB / month` strings — current rate is `$0.001`.
 
-1. **`/upload` direct file upload** — user uploads a file we've seen before (post-Pinata, we know the CID).
-2. **"Add by CID"** flow — user pastes a CID claiming ownership of someone else's already-stamped video.
-3. **Race condition** — two users uploading the same file simultaneously.
+- `src/lib/fees.ts` line 2 — comment header.
+- `src/routes/upload.tsx` line ~518 — visible "what you'll pay" blurb.
 
-### Detection logic
+Both → `$0.001 / MB / month`. (Verified against `RATE_USD_PER_MB_PER_MONTH = 0.001` in `fees.ts`.)
 
-Before calling `stampCid` + inserting into `videos`, run:
-```sql
-SELECT cid, owner_wallet, title, created_at, tx_hash
-FROM videos WHERE cid = $1 LIMIT 1;
-```
+### 2. Homepage: 9 videos, sort + load more
 
-If a row exists → block with a friendly error showing:
-- Original uploader wallet (truncated)
-- Original upload date
-- Link to existing `/v/{cid}` page
-- TXC tx hash as proof of prior claim
+Update `listRecentVideos` in `src/lib/videos.functions.ts` to accept `{ sort, limit, offset }` and return `{ items, total }`:
 
-### UX per flow
+- `newest` → `order created_at desc` (current default)
+- `expensive` → `order payment_required_txc desc nulls last`
+- `comments` → join/aggregate comment count per video (one extra query: `from('comments').select('video_cid', { count: 'exact', head: false })` grouped, or a small RPC; simpler: select all active comment `video_cid`s and tally in JS — fine at current scale)
+- `leaving-soon` → `order expires_at asc` (active only)
 
-**Direct upload (`/upload`)**:
-After Pinata returns the CID but **before** we call `registerUpload`, check duplicates. If found, show a toast: *"This video was already published on stream by `tx1q3k...8z` on May 8, 2026. [View original →]"* — and skip stamping (no chain spam, no second pin from us).
+Update `src/routes/index.tsx`:
 
-**Add by CID**:
-Same check inside `addByCid` server fn. Throw a structured error the client renders inline: *"Nice try 😏 — this CID is already claimed."* with link to the original.
+- Default page size 9, default sort `newest`.
+- Sort tabs/segmented control above the grid: **Newest · Most expensive · Most comments · Leaving soon** (font-mono, matches header style).
+- "Load more" button below the grid that increments offset by 9 and appends results (use `useState` for accumulated list + `useQuery` keyed by sort, reset on sort change). Hide button when `items.length >= total`.
 
-**Race condition**:
-Add a `UNIQUE` constraint on `videos.cid` (DB migration). Even if two requests pass the duplicate check simultaneously, the second `INSERT` fails. Catch the unique-violation error and return the same friendly response.
+### 3. New `/about` explainer page
 
-### Pinata-side dedup (bonus)
+Create `src/routes/about.tsx` with its own `head()` (unique title/description/og). Add an "about" link in `src/components/Header.tsx` next to upload/manage.
 
-Pinata itself dedups pins by CID across our account, so re-pinning costs nothing storage-wise. But we still want to reject early so:
-- We don't spam OP_RETURN txs for already-stamped CIDs
-- We don't double-charge in the future payment flow
-- The DB stays clean (one row per CID)
+Content sections (full-transparency, blockchain-proof angle):
 
-### Optional: "claim" vs "republish"
+1. **Hero** — "Video you actually own" + one-line pitch.
+2. **What it is** — upload → IPFS pin → CID → on-chain TXC stamp → stream by hash forever.
+3. **Why it's built this way** — 4 cards:
+   - *Immutable filenames* — the CID is the file; if bytes change, the address changes. No silent re-edits.
+   - *On-chain receipts* — every payment, comment, and boost is an OP_RETURN on TXC. Public, permanent, auditable.
+   - *No platform middleman* — no account, no algorithm, no takedown. You pay the network for storage; the network keeps it.
+   - *Pay what it costs* — $0.001/MB/month in TXC. Views earn the creator credits; popular videos pay for their own pinning.
+4. **How a video flows** — short numbered diagram (upload → CID → pay → stamp → stream / embed).
+5. **What's verifiable** — list with explorer + IPFS gateway links (using existing helpers `explorerTxUrl`, Pinata gateway domain).
+6. **FAQ** — 4–5 short Qs: *Who hosts it? What if I stop paying? Can I delete it? Is this censorship-resistant? Why TXC?*
+7. CTA strip → Upload / Browse.
 
-Edge case — what if user A uploaded a video, then user B legitimately uploads the *same* file (e.g. a public domain clip)? Two reasonable policies:
+Style: re-use the existing aesthetic from `index.tsx` (mono labels, `var(--gradient-primary)` accents, bordered grid cards). No new dependencies.
 
-- **Strict (recommended for MVP)**: First wallet to stamp wins. Period. Matches "proof of first publication" semantics that the on-chain stamp implies.
-- **Permissive**: Allow multiple `videos` rows per CID with different wallets, show all claimants on the `/v/{cid}` page sorted by stamp time.
+### Out of scope
 
-I'd ship **strict** for now — it's simpler, matches the on-chain story, and prevents drive-by claim-jacking. We can relax later if needed.
-
-### Files to touch
-
-- **Migration**: `ALTER TABLE videos ADD CONSTRAINT videos_cid_unique UNIQUE (cid);`
-- **`src/lib/videos.functions.ts`**: add duplicate check at top of `registerUpload` and `addByCid`; catch unique-violation on insert.
-- **`src/routes/upload.tsx`**: handle the new `DUPLICATE_CID` error response — show a clean inline message with the original uploader info and a link to `/v/{cid}` instead of erroring out.
-- **(optional)** `src/components/DuplicateNotice.tsx`: small reusable component for the "already exists" panel.
-
-### What ships
-
-Try to upload or claim a CID that's already on the platform → instant friendly rejection with proof of who got there first. No wasted on-chain stamps, no duplicate DB rows, no claim-jacking.
+- No DB schema changes.
+- No changes to upload pricing logic itself (already correct, just the label is wrong).
+- No new comment-count column — computed at query time for now.
