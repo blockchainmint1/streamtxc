@@ -755,6 +755,226 @@ export const markBulkExtended = createServerFn({ method: "POST" })
     return { extended: updated.length, cids: updated };
   });
 
+/**
+ * Verify a real on-chain `sendmany` TX and credit each matching video by the
+ * exact amount paid to its deposit address. Per-output proration:
+ *   days_added = (paidTxc / monthlyFeeTxc) * 30  (floored to whole days)
+ * Idempotent: re-pasting the same txid is a no-op (uniqueness on
+ * payments.mock_tx_hash + video_cid). Credits ANY matching video_wallet
+ * regardless of caller — ownership is not enforced here.
+ */
+export const verifyBulkExtensionTx = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        txHash: z
+          .string()
+          .trim()
+          .regex(/^[0-9a-fA-F]{64}$/, "Expected a 64-char hex txid"),
+        requireConfirmed: z.boolean().default(true),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const base = process.env.TXC_MEMPOOL_URL || "https://mempool.texitcoin.org";
+
+    // 1. Fetch the tx from the mempool/esplora API.
+    let tx: {
+      txid: string;
+      vin: Array<{ prevout?: { scriptpubkey_address?: string } }>;
+      vout: Array<{ scriptpubkey_address?: string; value: number }>;
+      status?: {
+        confirmed?: boolean;
+        block_height?: number;
+        block_hash?: string;
+      };
+    };
+    try {
+      const res = await fetch(`${base}/api/tx/${data.txHash}`);
+      if (res.status === 404) {
+        throw new Error("TX not found yet — give the network ~30s and retry.");
+      }
+      if (!res.ok) {
+        throw new Error(`Mempool API returned ${res.status}`);
+      }
+      tx = await res.json();
+    } catch (err) {
+      if (err instanceof Error) throw err;
+      throw new Error("Failed to fetch tx");
+    }
+
+    const confirmed = !!tx.status?.confirmed;
+    if (data.requireConfirmed && !confirmed) {
+      return {
+        pending: true,
+        confirmed: false,
+        txHash: data.txHash,
+        matched: [] as Array<{
+          cid: string;
+          title: string;
+          address: string;
+          paidTxc: number;
+          monthlyFeeTxc: number;
+          daysAdded: number;
+          newExpiresAt: string;
+        }>,
+        unmatched: [] as Array<{ address: string; paidTxc: number }>,
+        skippedDust: [] as Array<{
+          cid: string;
+          address: string;
+          paidTxc: number;
+        }>,
+        alreadyCredited: [] as Array<{ cid: string; address: string }>,
+      };
+    }
+
+    // 2. Collapse outputs by address (sendmany should already have unique
+    //    addresses, but a hand-built tx might have duplicates).
+    const paidByAddr = new Map<string, number>();
+    for (const o of tx.vout) {
+      const addr = o.scriptpubkey_address;
+      if (!addr) continue;
+      // Esplora returns `value` in satoshis.
+      const txc = o.value / 1e8;
+      paidByAddr.set(addr, (paidByAddr.get(addr) ?? 0) + txc);
+    }
+
+    // 3. Look up videos for these addresses.
+    const addresses = Array.from(paidByAddr.keys());
+    const { data: vids, error: vErr } = await supabaseAdmin
+      .from("videos")
+      .select("cid, title, video_wallet, size_bytes, expires_at, months_prepaid")
+      .in("video_wallet", addresses);
+    if (vErr) throw new Error(vErr.message);
+
+    const matchedAddrs = new Set((vids ?? []).map((v) => v.video_wallet!));
+    const price = await getTxcUsdPrice();
+
+    // 4. Idempotency check — find which (txHash, cid) pairs are already
+    //    credited from a previous paste.
+    const { data: existingPays } = await supabaseAdmin
+      .from("payments")
+      .select("video_cid")
+      .eq("mock_tx_hash", data.txHash);
+    const alreadyCreditedCids = new Set(
+      (existingPays ?? []).map((p) => p.video_cid),
+    );
+
+    const payerWallet =
+      tx.vin[0]?.prevout?.scriptpubkey_address ?? "external";
+
+    const matched: Array<{
+      cid: string;
+      title: string;
+      address: string;
+      paidTxc: number;
+      monthlyFeeTxc: number;
+      daysAdded: number;
+      newExpiresAt: string;
+    }> = [];
+    const skippedDust: Array<{ cid: string; address: string; paidTxc: number }> = [];
+    const alreadyCredited: Array<{ cid: string; address: string }> = [];
+
+    for (const v of vids ?? []) {
+      const addr = v.video_wallet!;
+      const paidTxc = paidByAddr.get(addr) ?? 0;
+      if (paidTxc <= 0) continue;
+
+      if (alreadyCreditedCids.has(v.cid)) {
+        alreadyCredited.push({ cid: v.cid, address: addr });
+        continue;
+      }
+
+      const monthlyUsd = quoteUsd(v.size_bytes, 1);
+      const monthlyFeeTxc = Math.round(usdToTxc(monthlyUsd, price.usd) * 1e8) / 1e8;
+      if (monthlyFeeTxc <= 0) {
+        skippedDust.push({ cid: v.cid, address: addr, paidTxc });
+        continue;
+      }
+
+      const monthsPaid = paidTxc / monthlyFeeTxc;
+      const daysAdded = Math.floor(monthsPaid * 30);
+      if (daysAdded < 1) {
+        skippedDust.push({ cid: v.cid, address: addr, paidTxc });
+        continue;
+      }
+
+      const base = new Date(
+        Math.max(new Date(v.expires_at).getTime(), Date.now()),
+      );
+      base.setDate(base.getDate() + daysAdded);
+      const newExpiresAt = base.toISOString();
+
+      const { error: uErr } = await supabaseAdmin
+        .from("videos")
+        .update({
+          expires_at: newExpiresAt,
+          months_prepaid: (v.months_prepaid ?? 0) + Math.floor(monthsPaid),
+        })
+        .eq("cid", v.cid);
+      if (uErr) continue;
+
+      await supabaseAdmin.from("payments").insert({
+        video_cid: v.cid,
+        wallet: payerWallet,
+        txc_amount: Math.round(paidTxc * 1e8) / 1e8,
+        months_prepaid: Math.floor(monthsPaid),
+        mock_tx_hash: data.txHash,
+      });
+
+      // Audit trail — "R" (renewal) chain event.
+      await supabaseAdmin.from("chain_events").insert({
+        video_cid: v.cid,
+        video_wallet: addr,
+        event_type: "R",
+        tx_hash: data.txHash,
+        op_return_payload: `sendmany|${paidTxc.toFixed(8)}|${daysAdded}d`,
+        from_wallet: payerWallet,
+        to_wallet: addr,
+        status: confirmed ? "confirmed" : "mempool",
+        block_hash: tx.status?.block_hash ?? null,
+        block_number: tx.status?.block_height ?? null,
+        metadata: {
+          source: "bulk-extend",
+          paid_txc: paidTxc,
+          monthly_fee_txc: monthlyFeeTxc,
+          days_added: daysAdded,
+        } as never,
+      });
+
+      matched.push({
+        cid: v.cid,
+        title: v.title,
+        address: addr,
+        paidTxc: Math.round(paidTxc * 1e8) / 1e8,
+        monthlyFeeTxc,
+        daysAdded,
+        newExpiresAt,
+      });
+    }
+
+    // 5. Outputs that didn't match any video deposit address.
+    const unmatched: Array<{ address: string; paidTxc: number }> = [];
+    for (const [addr, paidTxc] of paidByAddr.entries()) {
+      if (!matchedAddrs.has(addr)) {
+        unmatched.push({
+          address: addr,
+          paidTxc: Math.round(paidTxc * 1e8) / 1e8,
+        });
+      }
+    }
+
+    return {
+      pending: false,
+      confirmed,
+      txHash: data.txHash,
+      matched,
+      unmatched,
+      skippedDust,
+      alreadyCredited,
+    };
+  });
+
 // --- Content reports / takedowns -----------------------------------------
 
 const REPORT_REASONS = [
