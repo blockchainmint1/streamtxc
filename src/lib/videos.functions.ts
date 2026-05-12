@@ -7,7 +7,7 @@ import { pinFileToIPFS, createPresignedUploadUrl, pinByCid } from "./pinata.serv
 import { mockPaymentTx } from "./chain";
 import { getTxStatus, explorerTxUrl } from "./txc.server";
 import { assignVideoWallet } from "./txc-wallets.server";
-import { recordChainEvent } from "./chain-events.server";
+import { recordChainEvent, recordMetadataAnchor } from "./chain-events.server";
 import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
 
@@ -115,6 +115,16 @@ export const registerUpload = createServerFn({ method: "POST" })
     const videoStatus = stamp.real ? "mempool" : "stamp_failed";
     const txHash = stamp.real ? stamp.txid : null;
 
+    // Anchor title/description on IPFS + chain ("T" stamp). Best-effort —
+    // a failure here doesn't block the upload, the row just lacks metadata_cid.
+    const meta = await recordMetadataAnchor({
+      videoCid: data.cid,
+      videoWallet: videoWallet.address,
+      uploaderWallet: data.wallet,
+      title: data.title,
+      description: data.description ?? "",
+    });
+
     const expires = new Date();
     expires.setMonth(expires.getMonth() + data.months);
 
@@ -133,6 +143,7 @@ export const registerUpload = createServerFn({ method: "POST" })
       video_wallet: videoWallet.address,
       derivation_index: videoWallet.derivationIndex,
       payment_required_txc: fee,
+      metadata_cid: meta?.metaCid ?? null,
     });
     if (vErr) {
       // Race condition: someone registered the same CID between our check
@@ -207,6 +218,14 @@ export const finalizeUpload = createServerFn({ method: "POST" })
     const videoStatus = stamp.real ? "mempool" : "stamp_failed";
     const txHash = stamp.real ? stamp.txid : null;
 
+    const meta = await recordMetadataAnchor({
+      videoCid: pin.cid,
+      videoWallet: videoWallet.address,
+      uploaderWallet: data.wallet,
+      title: data.title,
+      description: data.description ?? "",
+    });
+
     // 3. Persist
     const expires = new Date();
     expires.setMonth(expires.getMonth() + data.months);
@@ -228,6 +247,7 @@ export const finalizeUpload = createServerFn({ method: "POST" })
         video_wallet: videoWallet.address,
         derivation_index: videoWallet.derivationIndex,
         payment_required_txc: fee,
+        metadata_cid: meta?.metaCid ?? null,
       });
     if (vErr) {
       if (vErr.code === "23505") await assertCidUnclaimed(pin.cid);
@@ -351,6 +371,14 @@ export const addByCid = createServerFn({ method: "POST" })
     const videoStatus = stamp.real ? "mempool" : "stamp_failed";
     const txHash = stamp.real ? stamp.txid : null;
 
+    const meta = await recordMetadataAnchor({
+      videoCid: data.cid,
+      videoWallet: videoWallet.address,
+      uploaderWallet: data.wallet,
+      title: data.title,
+      description: data.description ?? "",
+    });
+
     const expires = new Date();
     expires.setMonth(expires.getMonth() + data.months);
 
@@ -369,6 +397,7 @@ export const addByCid = createServerFn({ method: "POST" })
       video_wallet: videoWallet.address,
       derivation_index: videoWallet.derivationIndex,
       payment_required_txc: fee,
+      metadata_cid: meta?.metaCid ?? null,
     });
     if (vErr) {
       if (vErr.code === "23505") await assertCidUnclaimed(data.cid);
@@ -490,6 +519,77 @@ export const getVideo = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     return video;
+  });
+
+/**
+ * Backfill metadata anchors for older videos that pre-date the "T" stamp.
+ * Idempotent — only touches rows where metadata_cid is null. Pass a `cids`
+ * array to limit scope (useful for one-off targeted backfills); leave
+ * empty for "all".
+ */
+export const backfillMetadataAnchors = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        cids: z.array(z.string().min(1).max(120)).max(50).optional(),
+        limit: z.number().int().min(1).max(50).default(10),
+      })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data }) => {
+    let q = supabaseAdmin
+      .from("videos")
+      .select("cid, video_wallet, owner_wallet, title, description")
+      .is("metadata_cid", null)
+      .not("video_wallet", "is", null)
+      .order("created_at", { ascending: true })
+      .limit(data.limit);
+    if (data.cids && data.cids.length > 0) q = q.in("cid", data.cids);
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    const results: Array<{
+      cid: string;
+      metaCid: string | null;
+      txid: string | null;
+      ok: boolean;
+      error?: string;
+    }> = [];
+
+    for (const v of rows ?? []) {
+      try {
+        const meta = await recordMetadataAnchor({
+          videoCid: v.cid,
+          videoWallet: v.video_wallet!,
+          uploaderWallet: v.owner_wallet,
+          title: v.title,
+          description: v.description ?? "",
+        });
+        if (!meta) {
+          results.push({ cid: v.cid, metaCid: null, txid: null, ok: false, error: "pin failed" });
+          continue;
+        }
+        await supabaseAdmin
+          .from("videos")
+          .update({ metadata_cid: meta.metaCid })
+          .eq("cid", v.cid);
+        results.push({
+          cid: v.cid,
+          metaCid: meta.metaCid,
+          txid: meta.stamp.real ? meta.stamp.txid : null,
+          ok: meta.stamp.real,
+        });
+      } catch (err) {
+        results.push({
+          cid: v.cid,
+          metaCid: null,
+          txid: null,
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    return { processed: results.length, results };
   });
 
 export const listMyVideos = createServerFn({ method: "POST" })
