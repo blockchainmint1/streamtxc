@@ -18,7 +18,7 @@ import { Upload, Loader2, FileVideo, Link2 } from "lucide-react";
 export const Route = createFileRoute("/upload")({
   head: () => ({
     meta: [
-      { title: "Upload — video.texitcoin" },
+      { title: "Upload — stream.texitcoin" },
       {
         name: "description",
         content:

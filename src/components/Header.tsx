@@ -14,7 +14,7 @@ export function Header() {
             <Play className="h-4 w-4 fill-background text-background" />
           </div>
           <span className="font-mono text-sm font-bold tracking-tight">
-            video<span className="text-primary">.</span>texitcoin
+            stream<span className="text-primary">.</span>texitcoin
           </span>
         </Link>
 
