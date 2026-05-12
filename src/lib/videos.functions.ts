@@ -847,7 +847,8 @@ export const verifyBulkExtensionTx = createServerFn({ method: "POST" })
           .string()
           .trim()
           .regex(/^[0-9a-fA-F]{64}$/, "Expected a 64-char hex txid"),
-        requireConfirmed: z.boolean().default(true),
+        // Mempool is fine — we trust the sender. Set true to require ≥1 conf.
+        requireConfirmed: z.boolean().default(false),
       })
       .parse(input),
   )
