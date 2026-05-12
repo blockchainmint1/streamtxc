@@ -329,6 +329,8 @@ export type Database = {
           duration_s: number | null
           escrowed_creator_txc: number
           expires_at: string
+          flagged_at: string | null
+          flagged_reason: string | null
           hidden_at: string | null
           hidden_reason: string | null
           hosting_credit_txc: number
@@ -366,6 +368,8 @@ export type Database = {
           duration_s?: number | null
           escrowed_creator_txc?: number
           expires_at?: string
+          flagged_at?: string | null
+          flagged_reason?: string | null
           hidden_at?: string | null
           hidden_reason?: string | null
           hosting_credit_txc?: number
@@ -403,6 +407,8 @@ export type Database = {
           duration_s?: number | null
           escrowed_creator_txc?: number
           expires_at?: string
+          flagged_at?: string | null
+          flagged_reason?: string | null
           hidden_at?: string | null
           hidden_reason?: string | null
           hosting_credit_txc?: number
