@@ -38,7 +38,7 @@ function IndexPage() {
           </span>
           .
           <br />
-          Proved on{" "}
+          Proved up on{" "}
           <span
             className="bg-clip-text text-transparent"
             style={{ backgroundImage: "var(--gradient-primary)" }}
