@@ -35,7 +35,7 @@ export async function recordChainEvent(
     from_wallet: input.fromWallet ?? null,
     to_wallet: input.videoWallet,
     status: "mempool",
-    metadata: input.metadata ?? null,
+    metadata: (input.metadata ?? null) as never,
   });
   if (error) {
     // Don't fail the whole flow if the log write hiccups — the OP_RETURN is
