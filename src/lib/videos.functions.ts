@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { pinFileToIPFS } from "./pinata.server";
+import { pinFileToIPFS, createPresignedUploadUrl, pinByCid } from "./pinata.server";
 import { timestampCid, mockPaymentTx } from "./chain";
 import { quoteFee, MAX_UPLOAD_BYTES } from "./fees";
 
@@ -25,6 +25,85 @@ export const getQuote = createServerFn({ method: "POST" })
       txcAmount: quoteFee(data.sizeBytes, data.months),
       months: data.months,
       sizeBytes: data.sizeBytes,
+    };
+  });
+
+// --- Direct browser → Pinata upload ---------------------------------------
+
+/** Step 1: get a presigned URL the browser can POST the file to. */
+export const getUploadUrl = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        filename: z.string().min(1).max(255),
+        sizeBytes: z.number().int().positive().max(MAX_UPLOAD_BYTES),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    return await createPresignedUploadUrl({ filename: data.filename });
+  });
+
+/** Step 2: after the browser uploads, persist metadata + mock payment. */
+export const registerUpload = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        wallet: walletSchema,
+        cid: z
+          .string()
+          .trim()
+          .regex(
+            /^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[A-Za-z2-7]{50,})$/,
+            "Invalid CID",
+          ),
+        title: z.string().min(1).max(200),
+        description: z.string().max(2000).optional().default(""),
+        sizeBytes: z.number().int().positive().max(MAX_UPLOAD_BYTES),
+        mimeType: z.string().min(1).max(100),
+        months: z.number().int().min(1).max(12).default(1),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const fee = quoteFee(data.sizeBytes, data.months);
+    const paymentTx = mockPaymentTx(data.wallet, fee);
+    const stamp = timestampCid(data.cid, data.wallet, data.sizeBytes);
+
+    const expires = new Date();
+    expires.setMonth(expires.getMonth() + data.months);
+
+    const { error: vErr } = await supabaseAdmin.from("videos").upsert({
+      cid: data.cid,
+      owner_wallet: data.wallet,
+      title: data.title,
+      description: data.description || null,
+      size_bytes: data.sizeBytes,
+      mime_type: data.mimeType,
+      status: "active",
+      mock_tx_hash: stamp.txHash,
+      mock_block_number: stamp.blockNumber,
+      months_prepaid: data.months,
+      expires_at: expires.toISOString(),
+    });
+    if (vErr) throw new Error(`Failed to save video: ${vErr.message}`);
+
+    const { error: pErr } = await supabaseAdmin.from("payments").insert({
+      video_cid: data.cid,
+      wallet: data.wallet,
+      txc_amount: fee,
+      months_prepaid: data.months,
+      mock_tx_hash: paymentTx,
+    });
+    if (pErr) throw new Error(`Failed to save payment: ${pErr.message}`);
+
+    return {
+      cid: data.cid,
+      txHash: stamp.txHash,
+      blockNumber: stamp.blockNumber,
+      explorerUrl: stamp.explorerUrl,
+      paymentTx,
+      txcAmount: fee,
     };
   });
 
@@ -159,6 +238,9 @@ export const addByCid = createServerFn({ method: "POST" })
     const fee = quoteFee(Math.max(sizeBytes, 1), data.months);
     const paymentTx = mockPaymentTx(data.wallet, fee);
     const stamp = timestampCid(data.cid, data.wallet, sizeBytes);
+
+    // Best-effort: pin into our own Pinata account so streaming is reliable.
+    await pinByCid(data.cid, data.title);
 
     const expires = new Date();
     expires.setMonth(expires.getMonth() + data.months);
