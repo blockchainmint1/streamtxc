@@ -29,7 +29,6 @@ import {
 } from "lucide-react";
 import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
 import { computeCids, findCidOnIpfs } from "@/lib/ipfs-cid";
-import { PinataSDK } from "pinata";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 
 export const Route = createFileRoute("/upload")({
@@ -45,15 +44,6 @@ export const Route = createFileRoute("/upload")({
   }),
   component: UploadPage,
 });
-
-/**
- * Upload a file from the browser using a Pinata presigned URL. Pinata's
- * v3 upload endpoint speaks TUS (resumable, HEAD+PATCH+POST) and only
- * advertises CORS for the SDK's client — a plain XHR POST is rejected by
- * the browser preflight. Using the official SDK with `.url(presignedUrl)`
- * routes through the supported path and gives us CIDv1 + progress events.
- */
-const browserPinata = new PinataSDK({ pinataJwt: "" });
 
 /**
  * Pinata's TUS upload encodes the filename into a base64 metadata header
@@ -78,19 +68,43 @@ function sanitizeFilename(name: string): string {
 }
 
 async function uploadToPinata(
-  url: string,
+  _url: string,
   file: File,
-  _onProgress: (pct: number) => void,
+  onProgress: (pct: number) => void,
 ): Promise<{ cid: string; size: number; id: string }> {
-  const result = await browserPinata.upload.public
-    .file(file)
-    .url(url)
-    .cidVersion("v1");
-  return {
-    cid: result.cid,
-    size: result.size ?? file.size,
-    id: (result as { id?: string }).id ?? "",
-  };
+  // Stream through our own server route. Avoids Pinata's tus CORS quirks
+  // (no ACAO header on error responses) and survives wallet browser
+  // extensions that intercept fetch.
+  return await new Promise((resolve, reject) => {
+    const form = new FormData();
+    form.append("file", file, file.name);
+    form.append("filename", file.name);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/public/pinata-upload");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      try {
+        const json = JSON.parse(xhr.responseText) as {
+          cid?: string;
+          size?: number;
+          id?: string;
+          error?: string;
+        };
+        if (xhr.status >= 200 && xhr.status < 300 && json.cid) {
+          resolve({ cid: json.cid, size: json.size ?? file.size, id: json.id ?? "" });
+        } else {
+          reject(new Error(json.error || `upload failed [${xhr.status}]`));
+        }
+      } catch {
+        reject(new Error(`upload failed [${xhr.status}]`));
+      }
+    };
+    xhr.onerror = () => reject(new Error("network error during upload"));
+    xhr.send(form);
+  });
 }
 
 function UploadPage() {
