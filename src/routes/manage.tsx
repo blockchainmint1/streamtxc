@@ -26,6 +26,7 @@ import {
   retryOwnStamp,
   buildBulkExtendQuote,
   verifyBulkExtensionTx,
+  setVideoVisibility,
 } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, shortenHash } from "@/lib/fees";
@@ -41,6 +42,8 @@ import {
   RefreshCw,
   CalendarPlus,
   Copy,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -88,6 +91,50 @@ function RetryStampButton({ cid, wallet }: { cid: string; wallet: string }) {
     >
       {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
       <span className="ml-1">retry stamp</span>
+    </Button>
+  );
+}
+
+function ToggleVisibilityButton({
+  cid,
+  wallet,
+  hidden,
+}: {
+  cid: string;
+  wallet: string;
+  hidden: boolean;
+}) {
+  const qc = useQueryClient();
+  const toggle = useServerFn(setVideoVisibility);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="font-mono"
+      disabled={busy}
+      title={hidden ? "Show this video publicly" : "Hide from public listings"}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await toggle({ data: { wallet, cid, hidden: !hidden } });
+          toast.success(hidden ? "Video shown" : "Video hidden");
+          qc.invalidateQueries({ queryKey: ["my-videos"] });
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Failed");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? (
+        <Loader2 className="h-3 w-3 animate-spin" />
+      ) : hidden ? (
+        <EyeOff className="h-3 w-3" />
+      ) : (
+        <Eye className="h-3 w-3" />
+      )}
+      <span className="ml-1">{hidden ? "show" : "hide"}</span>
     </Button>
   );
 }
@@ -157,7 +204,10 @@ function ManagePageInner() {
                   return (
                     <tr
                       key={v.cid}
-                      className="border-t border-border hover:bg-card/50"
+                      className={
+                        "border-t border-border hover:bg-card/50 " +
+                        (v.hidden_at ? "opacity-50" : "")
+                      }
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -212,6 +262,11 @@ function ManagePageInner() {
                           {v.status === "stamp_failed" && (
                             <RetryStampButton cid={v.cid} wallet={address!} />
                           )}
+                          <ToggleVisibilityButton
+                            cid={v.cid}
+                            wallet={address!}
+                            hidden={!!v.hidden_at}
+                          />
                           <EditVideoDialog
                             cid={v.cid}
                             initialTitle={v.title}

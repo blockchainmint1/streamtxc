@@ -632,6 +632,44 @@ export const listMyVideos = createServerFn({ method: "POST" })
     return videos ?? [];
   });
 
+/**
+ * Owner-only show/hide toggle. Hidden videos are filtered out of all public
+ * listings (listRecentVideos already does `is hidden_at null`) but remain in
+ * the owner's /manage view so they can be unhidden.
+ */
+export const setVideoVisibility = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        wallet: walletSchema,
+        cid: cidStringSchema,
+        hidden: z.boolean(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: row, error: rErr } = await supabaseAdmin
+      .from("videos")
+      .select("cid, owner_wallet")
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (rErr) throw new Error(rErr.message);
+    if (!row) throw new Error("Video not found");
+    if (row.owner_wallet.toLowerCase() !== data.wallet.toLowerCase()) {
+      throw new Error("Not the owner of this video");
+    }
+
+    const { error } = await supabaseAdmin
+      .from("videos")
+      .update({
+        hidden_at: data.hidden ? new Date().toISOString() : null,
+        hidden_reason: data.hidden ? "owner-hidden" : null,
+      })
+      .eq("cid", data.cid);
+    if (error) throw new Error(error.message);
+    return { cid: data.cid, hidden: data.hidden };
+  });
+
 // --- Bulk extend (sendmany helper) ----------------------------------------
 
 /**
