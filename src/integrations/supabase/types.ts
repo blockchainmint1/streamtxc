@@ -133,11 +133,13 @@ export type Database = {
           comment_cid: string | null
           commenter_wallet: string | null
           created_at: string
+          creator_payout_tx_hash: string | null
           creator_share_txc: number
           deposit_wallet: string | null
           derivation_index: number | null
           hidden_at: string | null
           hidden_reason: string | null
+          hosting_payout_tx_hash: string | null
           hosting_share_txc: number
           id: string
           initial_payment_txc: number
@@ -147,7 +149,10 @@ export type Database = {
           paid_at: string | null
           payment_received_txc: number
           payment_required_txc: number | null
+          payout_attempted_at: string | null
+          payout_status: string
           pending_expires_at: string | null
+          platform_payout_tx_hash: string | null
           platform_share_txc: number
           status: string
           tx_hash: string | null
@@ -161,11 +166,13 @@ export type Database = {
           comment_cid?: string | null
           commenter_wallet?: string | null
           created_at?: string
+          creator_payout_tx_hash?: string | null
           creator_share_txc?: number
           deposit_wallet?: string | null
           derivation_index?: number | null
           hidden_at?: string | null
           hidden_reason?: string | null
+          hosting_payout_tx_hash?: string | null
           hosting_share_txc?: number
           id?: string
           initial_payment_txc: number
@@ -175,7 +182,10 @@ export type Database = {
           paid_at?: string | null
           payment_received_txc?: number
           payment_required_txc?: number | null
+          payout_attempted_at?: string | null
+          payout_status?: string
           pending_expires_at?: string | null
+          platform_payout_tx_hash?: string | null
           platform_share_txc?: number
           status?: string
           tx_hash?: string | null
@@ -189,11 +199,13 @@ export type Database = {
           comment_cid?: string | null
           commenter_wallet?: string | null
           created_at?: string
+          creator_payout_tx_hash?: string | null
           creator_share_txc?: number
           deposit_wallet?: string | null
           derivation_index?: number | null
           hidden_at?: string | null
           hidden_reason?: string | null
+          hosting_payout_tx_hash?: string | null
           hosting_share_txc?: number
           id?: string
           initial_payment_txc?: number
@@ -203,7 +215,10 @@ export type Database = {
           paid_at?: string | null
           payment_received_txc?: number
           payment_required_txc?: number | null
+          payout_attempted_at?: string | null
+          payout_status?: string
           pending_expires_at?: string | null
+          platform_payout_tx_hash?: string | null
           platform_share_txc?: number
           status?: string
           tx_hash?: string | null
@@ -312,6 +327,7 @@ export type Database = {
           derivation_index: number | null
           description: string | null
           duration_s: number | null
+          escrowed_creator_txc: number
           expires_at: string
           hidden_at: string | null
           hidden_reason: string | null
@@ -320,7 +336,12 @@ export type Database = {
           mime_type: string | null
           months_prepaid: number
           op_return_payload: string | null
+          owner_nonce: string | null
+          owner_proof_status: string
+          owner_signature: string | null
+          owner_verified_at: string | null
           owner_wallet: string
+          ownership_tx_hash: string | null
           paid_at: string | null
           payment_received_txc: number
           payment_required_txc: number | null
@@ -343,6 +364,7 @@ export type Database = {
           derivation_index?: number | null
           description?: string | null
           duration_s?: number | null
+          escrowed_creator_txc?: number
           expires_at?: string
           hidden_at?: string | null
           hidden_reason?: string | null
@@ -351,7 +373,12 @@ export type Database = {
           mime_type?: string | null
           months_prepaid?: number
           op_return_payload?: string | null
+          owner_nonce?: string | null
+          owner_proof_status?: string
+          owner_signature?: string | null
+          owner_verified_at?: string | null
           owner_wallet: string
+          ownership_tx_hash?: string | null
           paid_at?: string | null
           payment_received_txc?: number
           payment_required_txc?: number | null
@@ -374,6 +401,7 @@ export type Database = {
           derivation_index?: number | null
           description?: string | null
           duration_s?: number | null
+          escrowed_creator_txc?: number
           expires_at?: string
           hidden_at?: string | null
           hidden_reason?: string | null
@@ -382,7 +410,12 @@ export type Database = {
           mime_type?: string | null
           months_prepaid?: number
           op_return_payload?: string | null
+          owner_nonce?: string | null
+          owner_proof_status?: string
+          owner_signature?: string | null
+          owner_verified_at?: string | null
           owner_wallet?: string
+          ownership_tx_hash?: string | null
           paid_at?: string | null
           payment_received_txc?: number
           payment_required_txc?: number | null
