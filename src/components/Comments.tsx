@@ -455,7 +455,6 @@ function CommentItem({
   const [boostId, setBoostId] = useState<string | null>(null);
 
   const isHot = rank === 0 && Number(c.boost_total_txc) >= 0.1;
-  const chunkCount = c.chunk_tx_hashes?.length ?? 0;
 
   return (
     <li className="border border-border rounded-md p-4 bg-card/40">
@@ -484,8 +483,18 @@ function CommentItem({
               rel="noreferrer"
               className="text-primary hover:underline flex items-center gap-1"
             >
-              chain ({chunkCount} {chunkCount === 1 ? "chunk" : "chunks"}){" "}
-              <ExternalLink className="h-3 w-3" />
+              chain <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+          {c.ipfsUrl && (
+            <a
+              href={c.ipfsUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary hover:underline flex items-center gap-1"
+              title="Pinned comment JSON on IPFS"
+            >
+              ipfs <ExternalLink className="h-3 w-3" />
             </a>
           )}
         </div>
