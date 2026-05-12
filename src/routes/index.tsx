@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { listRecentVideos } from "@/lib/videos.functions";
 import { formatBytes, shortenHash } from "@/lib/fees";
 import { ArrowUpRight, Upload, Database, Coins, Eye, Play } from "lucide-react";
+import { ipfsThumbUrl } from "@/lib/ipfs-gateway";
 
 type SortKey = "newest" | "most-viewed" | "expensive" | "comments" | "leaving-soon";
 const PAGE = 9;
@@ -161,13 +162,22 @@ function IndexPage() {
                 className="group block bg-card border border-border rounded-sm overflow-hidden hover:border-primary transition-colors"
               >
                 <div className="relative aspect-video bg-secondary overflow-hidden">
-                  <video
-                    src={`/api/stream/${v.cid}#t=0.5`}
-                    preload="metadata"
-                    muted
-                    playsInline
-                    className="absolute inset-0 h-full w-full object-cover"
-                  />
+                  {v.thumbnail_cid ? (
+                    <img
+                      src={ipfsThumbUrl(v.thumbnail_cid)}
+                      alt={v.title}
+                      loading="lazy"
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  ) : (
+                    <video
+                      src={`/api/stream/${v.cid}#t=0.5`}
+                      preload="metadata"
+                      muted
+                      playsInline
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  )}
                   <div className="absolute inset-0 flex items-center justify-center bg-background/0 group-hover:bg-background/30 transition-colors">
                     <Play className="h-10 w-10 text-background opacity-0 group-hover:opacity-100 fill-background transition-opacity" />
                   </div>

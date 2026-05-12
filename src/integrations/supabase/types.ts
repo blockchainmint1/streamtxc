@@ -328,6 +328,7 @@ export type Database = {
           report_count: number
           size_bytes: number
           status: string
+          thumbnail_cid: string | null
           title: string
           tx_hash: string | null
           unpinned_at: string | null
@@ -358,6 +359,7 @@ export type Database = {
           report_count?: number
           size_bytes: number
           status?: string
+          thumbnail_cid?: string | null
           title: string
           tx_hash?: string | null
           unpinned_at?: string | null
@@ -388,6 +390,7 @@ export type Database = {
           report_count?: number
           size_bytes?: number
           status?: string
+          thumbnail_cid?: string | null
           title?: string
           tx_hash?: string | null
           unpinned_at?: string | null
