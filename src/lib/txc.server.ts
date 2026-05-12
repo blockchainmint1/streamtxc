@@ -102,7 +102,7 @@ function rpcConfigured(): boolean {
  * same hot wallet that signs OP_RETURN txs, so a single topup lasts
  * thousands of stamps.
  */
-async function getOrCreateLabeledAddress(label: string): Promise<string> {
+export async function getOrCreateLabeledAddress(label: string): Promise<string> {
   try {
     const labeled = await rpc<Record<string, unknown>>("getaddressesbylabel", [
       label,
@@ -114,6 +114,26 @@ async function getOrCreateLabeledAddress(label: string): Promise<string> {
   }
 
   return await rpc<string>("getnewaddress", [label, "bech32"]);
+}
+
+/**
+ * Mint a brand-new wallet-owned address with the given label. Always
+ * fresh — does NOT reuse an existing labeled address. Use this for
+ * per-video / per-comment deposit wallets where reuse would cross
+ * accounting streams.
+ */
+export async function getNewLabeledAddress(label: string): Promise<string> {
+  return await rpc<string>("getnewaddress", [label, "bech32"]);
+}
+
+/**
+ * Resolve the platform's 5%-fee receiving address. Always a wallet-owned
+ * bech32 address labeled `platform`, minted on first use. Replaces the
+ * old `TXC_PLATFORM_ADDRESS` env var (which pointed to an external,
+ * unowned address that was draining the hot wallet).
+ */
+export async function getPlatformAddress(): Promise<string> {
+  return await getOrCreateLabeledAddress("platform");
 }
 
 async function getHotWalletChangeAddress(): Promise<string> {
