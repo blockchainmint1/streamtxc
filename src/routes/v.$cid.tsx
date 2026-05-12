@@ -57,6 +57,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Comments } from "@/components/Comments";
+import { ipfsThumbUrl } from "@/lib/ipfs-gateway";
 
 export const Route = createFileRoute("/v/$cid")({
   component: WatchPage,
@@ -145,7 +146,10 @@ function WatchPage() {
           {/* Player + meta */}
           <div className="lg:col-span-2 space-y-4">
             <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden">
-              <VideoPlayer src={streamUrl} />
+              <VideoPlayer
+                src={streamUrl}
+                poster={ipfsThumbUrl(video.thumbnail_cid)}
+              />
             </div>
             <h1 className="text-2xl font-bold tracking-tight">{video.title}</h1>
             {video.description && (
