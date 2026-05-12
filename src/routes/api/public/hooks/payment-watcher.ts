@@ -285,6 +285,25 @@ async function processPendingComments() {
           comment_cid: pinned.cid,
           tx: stamp.txid,
         });
+
+        // Best-effort: sweep the 90/5/5 split immediately. If RPC is down
+        // we'll have a row with payout_status='partial' and the owner can
+        // hit "Retry payout" from /manage.
+        try {
+          const sweep = await sweepCommentPayout(c.id);
+          results.push({
+            comment_id: c.id,
+            action: "sweep",
+            sweep_status: sweep.status,
+            sweep_details: sweep.details,
+          });
+        } catch (err) {
+          results.push({
+            comment_id: c.id,
+            action: "sweep_failed",
+            error: String(err),
+          });
+        }
       } catch (err) {
         results.push({
           comment_id: c.id,
