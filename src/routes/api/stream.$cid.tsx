@@ -31,33 +31,19 @@ export const Route = createFileRoute("/api/stream/$cid")({
           console.error("view tracking failed", e),
         );
 
-        // Proxy from Pinata gateway with Range support.
-        const upstream = gatewayUrl(cid);
-        const range = request.headers.get("range");
-        const upstreamRes = await fetch(upstream, {
-          headers: range ? { Range: range } : {},
-        });
-
-        // Pass through status, content-type, content-length, accept-ranges, content-range.
-        const headers = new Headers();
-        const passthrough = [
-          "content-type",
-          "content-length",
-          "content-range",
-          "accept-ranges",
-          "etag",
-          "last-modified",
-        ];
-        for (const h of passthrough) {
-          const v = upstreamRes.headers.get(h);
-          if (v) headers.set(h, v);
-        }
-        headers.set("cache-control", "public, max-age=31536000, immutable");
-        headers.set("access-control-allow-origin", "*");
-
-        return new Response(upstreamRes.body, {
-          status: upstreamRes.status,
-          headers,
+        // Redirect the browser straight to our dedicated Pinata gateway.
+        // Streaming through the Worker added a hop and CPU/subrequest cost;
+        // a 302 lets the player do native HTTP Range requests against Pinata
+        // directly, which is dramatically faster on a paid dedicated gateway.
+        // The redirect itself is cached at the edge for a day so repeat
+        // viewers don't even hit the Worker.
+        return new Response(null, {
+          status: 302,
+          headers: {
+            location: gatewayUrl(cid),
+            "cache-control": "public, max-age=86400",
+            "access-control-allow-origin": "*",
+          },
         });
       },
     },
