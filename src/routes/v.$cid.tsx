@@ -22,7 +22,6 @@ import {
   AlertTriangle,
   Flag,
   ShieldAlert,
-  ShieldCheck,
   QrCode,
   ChevronDown,
   Share2,
@@ -185,14 +184,6 @@ function WatchPage() {
               <span>{formatBytes(video.size_bytes)}</span>
               <span className="flex items-center gap-1">
                 uploader: {shortenHash(video.owner_wallet)}
-                {video.owner_proof_status === "verified" && (
-                  <span
-                    title="Wallet ownership proven on chain"
-                    className="inline-flex items-center text-primary"
-                  >
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                  </span>
-                )}
               </span>
               <ReportButton cid={video.cid} />
             </div>
