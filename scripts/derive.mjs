@@ -1,7 +1,7 @@
 import { HDKey } from "@scure/bip32";
 import { base58check } from "@scure/base";
-import { sha256 } from "@noble/hashes/sha2";
-import { ripemd160 } from "@noble/hashes/legacy";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { ripemd160 } from "@noble/hashes/legacy.js";
 
 const xpub = process.env.TXC_XPUB;
 if (!xpub) { console.error("no TXC_XPUB"); process.exit(1); }
