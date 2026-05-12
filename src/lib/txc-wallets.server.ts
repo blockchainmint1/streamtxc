@@ -75,19 +75,11 @@ export interface VideoWalletAssignment {
  * address. Returns both so the caller can persist them on the video row.
  */
 export async function assignVideoWallet(): Promise<VideoWalletAssignment> {
-  const { data, error } = await supabaseAdmin.rpc("nextval", {} as never).single();
-  // Supabase doesn't expose nextval() via PostgREST RPC by default, so use
-  // a raw select instead. Fall back to a SELECT through .from() trick.
-  if (error || !data) {
-    const { data: row, error: e2 } = await supabaseAdmin
-      .from("videos")
-      .select("derivation_index")
-      .order("derivation_index", { ascending: false, nullsFirst: false })
-      .limit(1)
-      .maybeSingle();
-    if (e2) throw new Error(`assignVideoWallet failed: ${e2.message}`);
-    const next = (row?.derivation_index ?? 0) + 1;
-    return { address: deriveAddressStub(next), derivationIndex: next };
+  const { data, error } = await supabaseAdmin.rpc("next_video_wallet_index");
+  if (error || data == null) {
+    throw new Error(
+      `assignVideoWallet failed: ${error?.message ?? "no value returned"}`,
+    );
   }
   const next = Number(data);
   return { address: deriveAddressStub(next), derivationIndex: next };
