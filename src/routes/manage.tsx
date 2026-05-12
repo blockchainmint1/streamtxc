@@ -208,7 +208,8 @@ function ManagePageInner() {
                       key={v.cid}
                       className={
                         "border-t border-border hover:bg-card/50 " +
-                        (v.hidden_at ? "opacity-50" : "")
+                        (v.hidden_at ? "opacity-50 " : "") +
+                        (v.flagged_at ? "bg-amber-500/5" : "")
                       }
                     >
                       <td className="px-4 py-3">
@@ -264,6 +265,11 @@ function ManagePageInner() {
                           {v.status === "stamp_failed" && (
                             <RetryStampButton cid={v.cid} wallet={address!} />
                           )}
+                          <ToggleFlagButton
+                            cid={v.cid}
+                            wallet={address!}
+                            flagged={!!v.flagged_at}
+                          />
                           <ToggleVisibilityButton
                             cid={v.cid}
                             wallet={address!}
