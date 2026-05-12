@@ -20,6 +20,7 @@ import { Route as ApiPublicTxcHealthRouteImport } from './routes/api/public/txc-
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
 import { Route as ApiPublicAdminRetryNowRouteImport } from './routes/api/public/admin/retry-now'
+import { Route as ApiPublicAdminMintPlatformAddrRouteImport } from './routes/api/public/admin/mint-platform-addr'
 
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
@@ -78,6 +79,12 @@ const ApiPublicAdminRetryNowRoute = ApiPublicAdminRetryNowRouteImport.update({
   path: '/api/public/admin/retry-now',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAdminMintPlatformAddrRoute =
+  ApiPublicAdminMintPlatformAddrRouteImport.update({
+    id: '/api/public/admin/mint-platform-addr',
+    path: '/api/public/admin/mint-platform-addr',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/v/$cid': typeof VCidRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
+  '/api/public/admin/mint-platform-addr': typeof ApiPublicAdminMintPlatformAddrRoute
   '/api/public/admin/retry-now': typeof ApiPublicAdminRetryNowRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
@@ -101,6 +109,7 @@ export interface FileRoutesByTo {
   '/v/$cid': typeof VCidRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
+  '/api/public/admin/mint-platform-addr': typeof ApiPublicAdminMintPlatformAddrRoute
   '/api/public/admin/retry-now': typeof ApiPublicAdminRetryNowRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
@@ -115,6 +124,7 @@ export interface FileRoutesById {
   '/v/$cid': typeof VCidRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
+  '/api/public/admin/mint-platform-addr': typeof ApiPublicAdminMintPlatformAddrRoute
   '/api/public/admin/retry-now': typeof ApiPublicAdminRetryNowRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
@@ -130,6 +140,7 @@ export interface FileRouteTypes {
     | '/v/$cid'
     | '/api/public/txc-health'
     | '/api/stream/$cid'
+    | '/api/public/admin/mint-platform-addr'
     | '/api/public/admin/retry-now'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/payment-watcher'
@@ -143,6 +154,7 @@ export interface FileRouteTypes {
     | '/v/$cid'
     | '/api/public/txc-health'
     | '/api/stream/$cid'
+    | '/api/public/admin/mint-platform-addr'
     | '/api/public/admin/retry-now'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/payment-watcher'
@@ -156,6 +168,7 @@ export interface FileRouteTypes {
     | '/v/$cid'
     | '/api/public/txc-health'
     | '/api/stream/$cid'
+    | '/api/public/admin/mint-platform-addr'
     | '/api/public/admin/retry-now'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/payment-watcher'
@@ -170,6 +183,7 @@ export interface RootRouteChildren {
   VCidRoute: typeof VCidRoute
   ApiPublicTxcHealthRoute: typeof ApiPublicTxcHealthRoute
   ApiStreamCidRoute: typeof ApiStreamCidRoute
+  ApiPublicAdminMintPlatformAddrRoute: typeof ApiPublicAdminMintPlatformAddrRoute
   ApiPublicAdminRetryNowRoute: typeof ApiPublicAdminRetryNowRoute
   ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
   ApiPublicHooksPaymentWatcherRoute: typeof ApiPublicHooksPaymentWatcherRoute
@@ -254,6 +268,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAdminRetryNowRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/admin/mint-platform-addr': {
+      id: '/api/public/admin/mint-platform-addr'
+      path: '/api/public/admin/mint-platform-addr'
+      fullPath: '/api/public/admin/mint-platform-addr'
+      preLoaderRoute: typeof ApiPublicAdminMintPlatformAddrRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -266,6 +287,7 @@ const rootRouteChildren: RootRouteChildren = {
   VCidRoute: VCidRoute,
   ApiPublicTxcHealthRoute: ApiPublicTxcHealthRoute,
   ApiStreamCidRoute: ApiStreamCidRoute,
+  ApiPublicAdminMintPlatformAddrRoute: ApiPublicAdminMintPlatformAddrRoute,
   ApiPublicAdminRetryNowRoute: ApiPublicAdminRetryNowRoute,
   ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
   ApiPublicHooksPaymentWatcherRoute: ApiPublicHooksPaymentWatcherRoute,
