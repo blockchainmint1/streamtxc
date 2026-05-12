@@ -12,7 +12,21 @@ import {
   type StampResult,
 } from "./txc.server";
 import { pinJsonToIPFS } from "./pinata.server";
-import { createHash } from "node:crypto";
+
+// Non-crypto stub-id helper. Used only when no real RPC is configured
+// (local dev / tests). Must NOT pull in node:crypto — this file ends up
+// in the client bundle via the createServerFn import graph.
+function stubHex(seed: string): string {
+  let h = 0;
+  const data = `${seed}:${Date.now()}:${Math.random()}`;
+  for (let i = 0; i < data.length; i++) h = ((h << 5) - h + data.charCodeAt(i)) | 0;
+  let out = "";
+  for (let i = 0; i < 8; i++) {
+    h = (h * 1103515245 + 12345) | 0;
+    out += ((h >>> 0).toString(16)).padStart(8, "0");
+  }
+  return out;
+}
 
 export interface RecordChainEventInput {
   cid: string;
