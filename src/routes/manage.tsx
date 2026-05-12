@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Header } from "@/components/Header";
@@ -6,8 +7,8 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { listMyVideos } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
-import { formatBytes, shortenHash, formatTxc } from "@/lib/fees";
-import { Wallet, ArrowUpRight, AlertTriangle } from "lucide-react";
+import { formatBytes, shortenHash } from "@/lib/fees";
+import { ArrowUpRight, AlertTriangle } from "lucide-react";
 
 export const Route = createFileRoute("/manage")({
   head: () => ({
@@ -19,6 +20,10 @@ export const Route = createFileRoute("/manage")({
 function ManagePage() {
   const { address, connect } = useWallet();
   const fetchMine = useServerFn(listMyVideos);
+
+  useEffect(() => {
+    if (!address) connect();
+  }, [address, connect]);
 
   const { data: videos, isLoading } = useQuery({
     queryKey: ["my-videos", address],
@@ -33,21 +38,10 @@ function ManagePage() {
         <div className="font-mono text-xs text-primary mb-3">[ MY VIDEOS ]</div>
         <h1 className="text-4xl font-bold tracking-tight mb-2">Manage</h1>
         <p className="text-muted-foreground mb-10">
-          Videos owned by your connected wallet.
+          Videos uploaded from this browser.
         </p>
 
-        {!address ? (
-          <div className="border border-border bg-card rounded-sm p-12 text-center">
-            <Wallet className="h-8 w-8 text-primary mx-auto mb-4" />
-            <h2 className="font-bold mb-2">Connect a wallet</h2>
-            <p className="text-sm text-muted-foreground mb-6 font-mono">
-              We look up videos by wallet address — no login.
-            </p>
-            <Button onClick={connect} className="font-mono">
-              Connect Wallet
-            </Button>
-          </div>
-        ) : isLoading ? (
+        {!address || isLoading ? (
           <div className="font-mono text-muted-foreground">Loading…</div>
         ) : !videos || videos.length === 0 ? (
           <div className="border border-dashed border-border rounded-sm p-12 text-center">
