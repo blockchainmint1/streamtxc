@@ -14,55 +14,76 @@
 // mempool.texitcoin.org/address/<addr> shows the video's complete public
 // history. Inspired by bevis.sg's per-asset wallet model.
 //
-// CURRENT MODE: stub. Until the platform xpub is provided, we generate a
-// deterministic fake address from the index. The shape of the address is a
-// best-effort guess at TXC P2PKH (starts with 'T'). When the real xpub
-// lands, swap `deriveAddressStub()` for a real BIP32 derivation and
-// everything downstream keeps working.
+// MODE: real BIP32 derivation when TXC_XPUB is configured; otherwise a
+// deterministic stub for local dev. The xpub never needs the corresponding
+// xprv on the server — public derivation along the m/0/<i> external chain
+// is enough to generate receiving addresses. Spending from these addresses
+// requires the xprv on a separate signer.
 
 import { createHash } from "crypto";
+import { HDKey } from "@scure/bip32";
+import { base58check } from "@scure/base";
+import { sha256 } from "@noble/hashes/sha2";
+import { ripemd160 } from "@noble/hashes/legacy";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-/** Base58 alphabet (Bitcoin/Litecoin/TXC). */
-const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+// TXC P2PKH version byte. 0x41 yields a base58check string starting with
+// 'T' for a 20-byte hash160 payload, matching what we see on
+// mempool.texitcoin.org. Override via TXC_P2PKH_VERSION if the chain ever
+// changes its prefix.
+const TXC_P2PKH_VERSION = process.env.TXC_P2PKH_VERSION
+  ? Number(process.env.TXC_P2PKH_VERSION)
+  : 0x41;
 
-function base58Encode(bytes: Uint8Array): string {
-  // Tiny base58 encoder. Fine for short payloads (<= 32 bytes).
-  let n = 0n;
-  for (const b of bytes) n = (n << 8n) | BigInt(b);
-  let out = "";
-  while (n > 0n) {
-    const r = Number(n % 58n);
-    n /= 58n;
-    out = B58[r] + out;
-  }
-  // Leading zero bytes → '1' chars.
-  for (const b of bytes) {
-    if (b === 0) out = "1" + out;
-    else break;
-  }
-  return out;
+const b58c = base58check(sha256);
+
+function hash160(pub: Uint8Array): Uint8Array {
+  return ripemd160(sha256(pub));
 }
 
-/**
- * STUB derivation. Produces a deterministic ~34-char base58 string that
- * looks like a P2PKH address (TXC P2PKH addresses start with 'T'). Replace
- * with real BIP32 derivation against the platform xpub when available.
- */
+function pubkeyToAddress(pub: Uint8Array): string {
+  const h = hash160(pub);
+  const payload = new Uint8Array(1 + h.length);
+  payload[0] = TXC_P2PKH_VERSION & 0xff;
+  payload.set(h, 1);
+  return b58c.encode(payload);
+}
+
+let cachedExternal: HDKey | null = null;
+function externalChain(): HDKey | null {
+  if (cachedExternal) return cachedExternal;
+  const xpub = process.env.TXC_XPUB;
+  if (!xpub) return null;
+  // The xpub the user provides is expected to be an account-level key
+  // (m/44'/<coin>'/0'). We derive the external receive chain (/0) from it.
+  // If the xpub is already at the external-chain level, m/0 is still safe
+  // because the chain index becomes the leaf — addresses would then live at
+  // /0/<i>. For account-level (the common case) we get standard /0/<i>.
+  const account = HDKey.fromExtendedKey(xpub);
+  cachedExternal = account.deriveChild(0);
+  return cachedExternal;
+}
+
+function deriveAddressReal(index: number): string {
+  const ext = externalChain()!;
+  const child = ext.deriveChild(index);
+  if (!child.publicKey) throw new Error("BIP32 child has no public key");
+  return pubkeyToAddress(child.publicKey);
+}
+
+/** Stub fallback when no xpub is configured (local dev only). */
 function deriveAddressStub(index: number): string {
   const h = createHash("sha256")
     .update(`txc-video-wallet-stub:${index}`)
     .digest();
-  // Take 20 bytes (P2PKH hash160 size), prefix with TXC version byte guess.
-  // Real version byte is whatever the TXC chain params say (probably 0x41
-  // for 'T' prefix on mainnet; we'll confirm by probing mempool API).
-  const versioned = new Uint8Array(21);
-  versioned[0] = 0x41; // 'T'-yielding version byte (placeholder)
-  versioned.set(h.subarray(0, 20), 1);
-  // Skip checksum in stub mode — we just want a plausible-looking string.
-  const addr = base58Encode(versioned);
-  // Pad to 34 chars if short, truncate if long. Stub-only.
-  return addr.length >= 34 ? addr.slice(0, 34) : addr.padEnd(34, "1");
+  const payload = new Uint8Array(21);
+  payload[0] = TXC_P2PKH_VERSION & 0xff;
+  payload.set(h.subarray(0, 20), 1);
+  return b58c.encode(payload);
+}
+
+function deriveAddress(index: number): string {
+  return process.env.TXC_XPUB ? deriveAddressReal(index) : deriveAddressStub(index);
 }
 
 export interface VideoWalletAssignment {
@@ -82,7 +103,7 @@ export async function assignVideoWallet(): Promise<VideoWalletAssignment> {
     );
   }
   const next = Number(data);
-  return { address: deriveAddressStub(next), derivationIndex: next };
+  return { address: deriveAddress(next), derivationIndex: next };
 }
 
 /** Mempool address page — public lifecycle history of a video. */
