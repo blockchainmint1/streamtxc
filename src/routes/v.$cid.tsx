@@ -7,7 +7,7 @@ import { Footer } from "@/components/Footer";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { Button } from "@/components/ui/button";
 import { getVideo, pollTxStatus } from "@/lib/videos.functions";
-import { formatBytes, shortenHash, formatTxc } from "@/lib/fees";
+import { formatBytes, shortenHash, formatTxc, formatDate } from "@/lib/fees";
 import {
   Copy,
   ExternalLink,
@@ -121,7 +121,7 @@ function WatchPage() {
               </span>
               <span className="flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5" />
-                {new Date(video.created_at).toLocaleDateString()}
+                {formatDate(video.created_at)}
               </span>
               <span>{formatBytes(video.size_bytes)}</span>
               <span>uploader: {shortenHash(video.owner_wallet)}</span>
@@ -171,7 +171,7 @@ function WatchPage() {
               )}
               <Field
                 label="Expires"
-                value={new Date(video.expires_at).toLocaleDateString()}
+                value={formatDate(video.expires_at)}
                 mono
               />
             </div>
