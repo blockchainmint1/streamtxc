@@ -32,6 +32,13 @@ export function Header() {
           >
             manage
           </Link>
+          <Link
+            to="/about"
+            className="px-3 py-1.5 hover:text-primary transition-colors"
+            activeProps={{ className: "px-3 py-1.5 text-primary" }}
+          >
+            about
+          </Link>
           <a
             href="https://swap.texitcoin.org"
             target="_blank"
