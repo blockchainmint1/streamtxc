@@ -6,7 +6,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { Button } from "@/components/ui/button";
-import { getVideo, pollTxStatus } from "@/lib/videos.functions";
+import { getVideo, pollTxStatus, reportVideo } from "@/lib/videos.functions";
 import { formatBytes, shortenHash, formatTxc, formatDate } from "@/lib/fees";
 import {
   Copy,
@@ -20,8 +20,28 @@ import {
   CheckCircle2,
   Wallet,
   AlertTriangle,
+  Flag,
+  ShieldAlert,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/v/$cid")({
   component: WatchPage,
@@ -118,6 +138,22 @@ function WatchPage() {
                 {video.description}
               </p>
             )}
+            {video.hidden_at && (
+              <div className="border-2 border-amber-500/60 bg-amber-500/5 rounded-sm p-4 flex items-start gap-3">
+                <ShieldAlert className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="font-mono text-xs text-amber-500">
+                    [ UNDER REVIEW · HIDDEN FROM HOMEPAGE ]
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    This video has been reported and is hidden from public
+                    listings while a moderator reviews it. The file remains on
+                    IPFS — direct links still work — but it won't appear on the
+                    homepage or search until the report is resolved.
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap gap-4 font-mono text-xs text-muted-foreground border-t border-border pt-4">
               <span className="flex items-center gap-1.5">
                 <Eye className="h-3.5 w-3.5" /> {video.view_count} views
@@ -128,6 +164,7 @@ function WatchPage() {
               </span>
               <span>{formatBytes(video.size_bytes)}</span>
               <span>uploader: {shortenHash(video.owner_wallet)}</span>
+              <ReportButton cid={video.cid} />
             </div>
           </div>
 
