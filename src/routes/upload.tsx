@@ -472,7 +472,7 @@ function UploadPage() {
                 <div className="flex justify-between items-start gap-4">
                   <span className="text-muted-foreground shrink-0">cid</span>
                   <span className="text-foreground text-xs break-all text-right">
-                    {localCid ?? (
+                    {matchedCid ?? localCids?.v1 ?? (
                       <span className="text-muted-foreground inline-flex items-center gap-1.5">
                         <Loader2 className="h-3 w-3 animate-spin" />
                         hashing…
