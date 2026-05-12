@@ -326,10 +326,16 @@ export const addByCid = createServerFn({ method: "POST" })
             : "Gateway probe failed";
     }
 
-    // Hard fail if we got nothing back — better a clear error than a broken
-    // video row with size=0 and no mime type.
-    if (sizeBytes === 0 && probeError) {
-      throw new Error(`CID_NOT_FOUND:${probeError}`);
+    // Hard fail if we got nothing back OR if the gateway responded but the
+    // size is still unknown — better a clear error than a video row with
+    // size=0 (which would skip the real hosting fee).
+    if (sizeBytes <= 0) {
+      throw new Error(
+        `CID_NOT_FOUND:${
+          probeError ??
+          "Gateway returned no content-length yet. The CID is being pinned — try again in 30-60s."
+        }`,
+      );
     }
 
     const _price = (await getTxcUsdPrice()).usd;

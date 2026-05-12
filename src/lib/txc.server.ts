@@ -70,6 +70,19 @@ function rpcConfigured(): boolean {
 }
 
 /**
+ * fundrawtransaction options. Pinning the change address to a single
+ * platform wallet is CRITICAL — without it, the TXC node picks a change
+ * address from its keypool, which is derived from the SAME xpub on the
+ * SAME `m/0/i` external chain we use for per-video deposit wallets.
+ * That means change from our OP_RETURN stamps would land on future
+ * videos' deposit addresses and silently "pay" them.
+ */
+function fundOptions(): Record<string, unknown> {
+  const changeAddress = process.env.TXC_PLATFORM_ADDRESS;
+  return changeAddress ? { changeAddress } : {};
+}
+
+/**
  * Build the full RPC URL from env. Accepts either a complete URL
  * (`http://host:port`) or a bare host/IP plus optional `TXC_RPC_PORT`.
  */
@@ -166,7 +179,10 @@ export async function stampRawPayload(opts: {
     [],
     [{ data: dataHex }, { [toAddress]: 0.0001 }],
   ]);
-  const funded = await rpc<{ hex: string }>("fundrawtransaction", [rawTx]);
+  const funded = await rpc<{ hex: string }>("fundrawtransaction", [
+    rawTx,
+    fundOptions(),
+  ]);
   const signed = await rpc<{ hex: string; complete: boolean }>(
     "signrawtransactionwithwallet",
     [funded.hex],
@@ -224,7 +240,10 @@ export async function stampEvent(opts: {
     [],
     [{ data: dataHex }, { [recipient]: 0.0001 }],
   ]);
-  const funded = await rpc<{ hex: string }>("fundrawtransaction", [rawTx]);
+  const funded = await rpc<{ hex: string }>("fundrawtransaction", [
+    rawTx,
+    fundOptions(),
+  ]);
   const signed = await rpc<{ hex: string; complete: boolean }>(
     "signrawtransactionwithwallet",
     [funded.hex],
