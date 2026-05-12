@@ -54,13 +54,40 @@ export const Route = createFileRoute("/upload")({
  */
 const browserPinata = new PinataSDK({ pinataJwt: "" });
 
+/**
+ * Pinata's TUS upload encodes the filename into a base64 metadata header
+ * via `btoa`, which throws on any character outside Latin1 (emoji, smart
+ * quotes, accented chars in some encodings, etc.). Strip the file name
+ * down to ASCII before handing it to the SDK.
+ */
+function sanitizeFilename(name: string): string {
+  const dot = name.lastIndexOf(".");
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot) : "";
+  const cleanBase =
+    base
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "") // strip diacritics
+      .replace(/[^\x20-\x7E]/g, "") // drop anything non-ASCII (emoji etc.)
+      .replace(/[^A-Za-z0-9._\-]+/g, "_") // safe chars only
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 120) || "video";
+  const cleanExt = ext.replace(/[^A-Za-z0-9.]/g, "").slice(0, 10);
+  return cleanBase + cleanExt;
+}
+
 async function uploadToPinata(
   url: string,
   file: File,
   _onProgress: (pct: number) => void,
 ): Promise<{ cid: string; size: number; id: string }> {
+  const safeName = sanitizeFilename(file.name);
+  const safeFile =
+    safeName === file.name
+      ? file
+      : new File([file], safeName, { type: file.type });
   const result = await browserPinata.upload.public
-    .file(file)
+    .file(safeFile)
     .url(url)
     .cidVersion("v1");
   return {
