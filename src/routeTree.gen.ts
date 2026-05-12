@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as ManageRouteImport } from './routes/manage'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VCidRouteImport } from './routes/v.$cid'
 import { Route as EmbedCidRouteImport } from './routes/embed.$cid'
@@ -26,6 +27,11 @@ const UploadRoute = UploadRouteImport.update({
 const ManageRoute = ManageRouteImport.update({
   id: '/manage',
   path: '/manage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -62,6 +68,7 @@ const ApiPublicHooksPaymentWatcherRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/manage': typeof ManageRoute
   '/upload': typeof UploadRoute
   '/embed/$cid': typeof EmbedCidRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/manage': typeof ManageRoute
   '/upload': typeof UploadRoute
   '/embed/$cid': typeof EmbedCidRoute
@@ -83,6 +91,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/manage': typeof ManageRoute
   '/upload': typeof UploadRoute
   '/embed/$cid': typeof EmbedCidRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
     | '/manage'
     | '/upload'
     | '/embed/$cid'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
     | '/manage'
     | '/upload'
     | '/embed/$cid'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/about'
     | '/manage'
     | '/upload'
     | '/embed/$cid'
@@ -126,6 +138,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
   ManageRoute: typeof ManageRoute
   UploadRoute: typeof UploadRoute
   EmbedCidRoute: typeof EmbedCidRoute
@@ -149,6 +162,13 @@ declare module '@tanstack/react-router' {
       path: '/manage'
       fullPath: '/manage'
       preLoaderRoute: typeof ManageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -198,6 +218,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
   ManageRoute: ManageRoute,
   UploadRoute: UploadRoute,
   EmbedCidRoute: EmbedCidRoute,

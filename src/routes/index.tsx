@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -8,16 +9,44 @@ import { listRecentVideos } from "@/lib/videos.functions";
 import { formatBytes, shortenHash } from "@/lib/fees";
 import { ArrowUpRight, Upload, Database, Coins, Eye, Play } from "lucide-react";
 
+type SortKey = "newest" | "expensive" | "comments" | "leaving-soon";
+const PAGE = 9;
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: "newest", label: "newest" },
+  { key: "expensive", label: "most expensive" },
+  { key: "comments", label: "most comments" },
+  { key: "leaving-soon", label: "leaving soon" },
+];
+
 export const Route = createFileRoute("/")({
   component: IndexPage,
 });
 
 function IndexPage() {
   const fetchRecent = useServerFn(listRecentVideos);
-  const { data: videos } = useQuery({
-    queryKey: ["recent-videos"],
-    queryFn: () => fetchRecent(),
+  const [sort, setSort] = useState<SortKey>("newest");
+  const [offset, setOffset] = useState(0);
+  const [accum, setAccum] = useState<
+    Awaited<ReturnType<typeof listRecentVideos>>["items"]
+  >([]);
+
+  const { data, isFetching } = useQuery({
+    queryKey: ["recent-videos", sort, offset],
+    queryFn: () => fetchRecent({ data: { sort, limit: PAGE, offset } }),
   });
+
+  useEffect(() => {
+    if (!data) return;
+    setAccum((prev) => (offset === 0 ? data.items : [...prev, ...data.items]));
+  }, [data, offset]);
+
+  useEffect(() => {
+    setOffset(0);
+    setAccum([]);
+  }, [sort]);
+
+  const total = data?.total ?? 0;
+  const hasMore = accum.length < total;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -95,19 +124,35 @@ function IndexPage() {
 
       {/* Recent videos */}
       <section className="mx-auto w-full max-w-7xl px-6 pb-24">
-        <div className="flex items-baseline justify-between mb-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-4 mb-6">
           <h2 className="text-2xl font-bold tracking-tight">Recent uploads</h2>
           <span className="font-mono text-xs text-muted-foreground">
-            {videos?.length ?? 0} active
+            {total} active
           </span>
         </div>
-        {!videos || videos.length === 0 ? (
+        <div className="mb-6 flex flex-wrap gap-1 border-b border-border">
+          {SORTS.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setSort(s.key)}
+              className={`px-3 py-2 font-mono text-xs transition-colors border-b-2 -mb-px ${
+                sort === s.key
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+        {accum.length === 0 && !isFetching ? (
           <div className="border border-dashed border-border rounded-sm p-12 text-center font-mono text-sm text-muted-foreground">
             No videos yet. Be the first.
           </div>
         ) : (
+          <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {videos.map((v) => (
+            {accum.map((v) => (
               <Link
                 key={v.cid}
                 to="/v/$cid"
@@ -141,6 +186,19 @@ function IndexPage() {
               </Link>
             ))}
           </div>
+          {hasMore && (
+            <div className="mt-8 flex justify-center">
+              <Button
+                variant="outline"
+                className="font-mono"
+                disabled={isFetching}
+                onClick={() => setOffset((o) => o + PAGE)}
+              >
+                {isFetching ? "loading…" : "load more"}
+              </Button>
+            </div>
+          )}
+          </>
         )}
       </section>
 

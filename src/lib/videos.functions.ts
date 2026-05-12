@@ -395,21 +395,88 @@ export const addByCid = createServerFn({ method: "POST" })
 
 // --- Listings --------------------------------------------------------------
 
-export const listRecentVideos = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const { data, error } = await supabaseAdmin
+export const listRecentVideos = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        sort: z
+          .enum(["newest", "expensive", "comments", "leaving-soon"])
+          .default("newest"),
+        limit: z.number().int().min(1).max(48).default(9),
+        offset: z.number().int().min(0).default(0),
+      })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data }) => {
+    const { sort, limit, offset } = data;
+    let query = supabaseAdmin
       .from("videos")
       .select(
-        "cid, title, owner_wallet, size_bytes, view_count, created_at, status",
+        "cid, title, owner_wallet, size_bytes, view_count, created_at, status, payment_required_txc, expires_at",
+        { count: "exact" },
       )
       .in("status", ["active", "mempool"])
-      .is("hidden_at", null)
-      .order("created_at", { ascending: false })
-      .limit(24);
+      .is("hidden_at", null);
+
+    if (sort === "expensive") {
+      query = query.order("payment_required_txc", {
+        ascending: false,
+        nullsFirst: false,
+      });
+    } else if (sort === "leaving-soon") {
+      query = query.order("expires_at", { ascending: true });
+    } else {
+      // newest + comments both start from newest; we re-sort comments below
+      query = query.order("created_at", { ascending: false });
+    }
+
+    // For comment sort we need to rank by comment count across the whole
+    // active set, so fetch counts first and sort cids before paginating.
+    if (sort === "comments") {
+      const { data: allRows } = await supabaseAdmin
+        .from("videos")
+        .select("cid")
+        .in("status", ["active", "mempool"])
+        .is("hidden_at", null);
+      const cids = (allRows ?? []).map((r) => r.cid);
+      const { data: cmts } = await supabaseAdmin
+        .from("comments")
+        .select("video_cid")
+        .eq("status", "active")
+        .is("hidden_at", null)
+        .in("video_cid", cids);
+      const counts = new Map<string, number>();
+      for (const c of cmts ?? []) {
+        counts.set(c.video_cid, (counts.get(c.video_cid) ?? 0) + 1);
+      }
+      const sortedCids = cids
+        .slice()
+        .sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0));
+      const pageCids = sortedCids.slice(offset, offset + limit);
+      const { data: rows, error } = await supabaseAdmin
+        .from("videos")
+        .select(
+          "cid, title, owner_wallet, size_bytes, view_count, created_at, status, payment_required_txc, expires_at",
+        )
+        .in("cid", pageCids);
+      if (error) throw new Error(error.message);
+      const ordered = pageCids
+        .map((cid) => rows?.find((r) => r.cid === cid))
+        .filter((r): r is NonNullable<typeof r> => !!r)
+        .map((r) => ({ ...r, comment_count: counts.get(r.cid) ?? 0 }));
+      return { items: ordered, total: cids.length };
+    }
+
+    const { data: rows, error, count } = await query.range(
+      offset,
+      offset + limit - 1,
+    );
     if (error) throw new Error(error.message);
-    return data ?? [];
-  },
-);
+    return {
+      items: (rows ?? []).map((r) => ({ ...r, comment_count: 0 })),
+      total: count ?? rows?.length ?? 0,
+    };
+  });
 
 export const getVideo = createServerFn({ method: "POST" })
   .inputValidator((input) =>
