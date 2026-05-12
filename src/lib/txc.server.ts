@@ -77,7 +77,8 @@ function rpcUrl(): string {
   if (!/^https?:\/\//.test(u)) u = "http://" + u;
   const hostPart = u.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   const hasPort = /:\d+$/.test(hostPart);
-  if (!hasPort) {
+  const isHttps = /^https:\/\//.test(u);
+  if (!hasPort && !isHttps) {
     const port = process.env.TXC_RPC_PORT || "15739";
     u = u.replace(/\/?$/, "") + ":" + port;
   }
@@ -100,7 +101,13 @@ async function rpc<T = unknown>(method: string, params: unknown[]): Promise<T> {
   });
 
   if (!res.ok) {
-    throw new Error(`TXC RPC ${method} failed [${res.status}]: ${await res.text()}`);
+    const text = await res.text();
+    if (text.includes("error code: 1003")) {
+      throw new Error(
+        `TXC RPC ${method} failed [${res.status}]: the published app cannot reach a direct-IP or custom-port RPC endpoint. Point TXC_RPC_URL at an HTTPS hostname on port 443 instead.`,
+      );
+    }
+    throw new Error(`TXC RPC ${method} failed [${res.status}]: ${text}`);
   }
   const json = (await res.json()) as { result: T; error: { message: string } | null };
   if (json.error) throw new Error(`TXC RPC ${method} error: ${json.error.message}`);
