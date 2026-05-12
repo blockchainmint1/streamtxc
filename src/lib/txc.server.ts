@@ -42,8 +42,10 @@ export const TXC_PROTO_TAG = "TXCV1";
  *   D  dmca        — DMCA / abuse complaint logged
  *   M  message     — pay-to-comment posted
  *   B  boost       — comment boost top-up
+ *   T  title/meta  — anchored IPFS CID of a metadata JSON blob
+ *                    (title, description, uploader, timestamp)
  */
-export type TxcEventType = "C" | "P" | "R" | "X" | "D" | "M" | "B";
+export type TxcEventType = "C" | "P" | "R" | "X" | "D" | "M" | "B" | "T";
 
 /** ≤80 bytes per the Bitcoin OP_RETURN standard data carrier limit. */
 export function buildOpReturnPayload(
