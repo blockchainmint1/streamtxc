@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { WalletButton } from "./WalletButton";
 import { Play } from "lucide-react";
 
 export function Header() {
@@ -18,7 +17,7 @@ export function Header() {
           </span>
         </Link>
 
-        <nav className="flex items-center gap-2 text-sm font-mono">
+        <nav className="ml-auto flex items-center gap-2 text-sm font-mono">
           <Link
             to="/upload"
             className="px-3 py-1.5 hover:text-primary transition-colors"
@@ -33,9 +32,6 @@ export function Header() {
           >
             manage
           </Link>
-          <div className="ml-2">
-            <WalletButton />
-          </div>
         </nav>
       </div>
     </header>
