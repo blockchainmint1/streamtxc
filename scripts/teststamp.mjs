@@ -30,7 +30,7 @@ const dataHex = Buffer.from(payload, "utf8").toString("hex");
 console.log("Payload:", payload, `(${Buffer.byteLength(payload)} bytes)`);
 
 // createraw → fund → sign → send
-const rawTx = await rpc("createrawtransaction", [[], [{ data: dataHex }, { [videoAddr]: 0.00001 }]]);
+const rawTx = await rpc("createrawtransaction", [[], [{ data: dataHex }, { [videoAddr]: 0.0001 }]]);
 console.log("raw built");
 const funded = await rpc("fundrawtransaction", [rawTx]);
 console.log("funded, fee:", funded.fee);
