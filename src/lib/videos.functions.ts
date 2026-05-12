@@ -128,6 +128,7 @@ export const registerUpload = createServerFn({ method: "POST" })
       expires_at: expires.toISOString(),
       video_wallet: videoWallet.address,
       derivation_index: videoWallet.derivationIndex,
+      payment_required_txc: fee,
     });
     if (vErr) {
       // Race condition: someone registered the same CID between our check
@@ -219,6 +220,7 @@ export const finalizeUpload = createServerFn({ method: "POST" })
         expires_at: expires.toISOString(),
         video_wallet: videoWallet.address,
         derivation_index: videoWallet.derivationIndex,
+        payment_required_txc: fee,
       });
     if (vErr) {
       if (vErr.code === "23505") await assertCidUnclaimed(pin.cid);
@@ -322,6 +324,7 @@ export const addByCid = createServerFn({ method: "POST" })
       expires_at: expires.toISOString(),
       video_wallet: videoWallet.address,
       derivation_index: videoWallet.derivationIndex,
+      payment_required_txc: fee,
     });
     if (vErr) {
       if (vErr.code === "23505") await assertCidUnclaimed(data.cid);
