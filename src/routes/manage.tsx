@@ -26,6 +26,7 @@ import {
   retryOwnStamp,
   buildBulkExtendQuote,
   verifyBulkExtensionTx,
+  setVideoVisibility,
 } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, shortenHash } from "@/lib/fees";
@@ -41,6 +42,8 @@ import {
   RefreshCw,
   CalendarPlus,
   Copy,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -157,7 +160,10 @@ function ManagePageInner() {
                   return (
                     <tr
                       key={v.cid}
-                      className="border-t border-border hover:bg-card/50"
+                      className={
+                        "border-t border-border hover:bg-card/50 " +
+                        (v.hidden_at ? "opacity-50" : "")
+                      }
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -212,6 +218,11 @@ function ManagePageInner() {
                           {v.status === "stamp_failed" && (
                             <RetryStampButton cid={v.cid} wallet={address!} />
                           )}
+                          <ToggleVisibilityButton
+                            cid={v.cid}
+                            wallet={address!}
+                            hidden={!!v.hidden_at}
+                          />
                           <EditVideoDialog
                             cid={v.cid}
                             initialTitle={v.title}
