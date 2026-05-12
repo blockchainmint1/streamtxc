@@ -6,7 +6,8 @@ import { mockPaymentTx } from "./chain";
 import { getTxStatus, explorerTxUrl } from "./txc.server";
 import { assignVideoWallet } from "./txc-wallets.server";
 import { recordChainEvent } from "./chain-events.server";
-import { quoteFee, MAX_UPLOAD_BYTES } from "./fees";
+import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES } from "./fees";
+import { getTxcUsdPrice } from "./txc-price.server";
 
 const walletSchema = z
   .string()
@@ -48,8 +49,13 @@ export const getQuote = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    const price = await getTxcUsdPrice();
+    const usd = quoteUsd(data.sizeBytes, data.months);
     return {
-      txcAmount: quoteFee(data.sizeBytes, data.months),
+      usdAmount: usd,
+      txcAmount: usdToTxc(usd, price.usd),
+      txcUsd: price.usd,
+      priceSource: price.source,
       months: data.months,
       sizeBytes: data.sizeBytes,
     };
@@ -94,7 +100,8 @@ export const registerUpload = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     await assertCidUnclaimed(data.cid);
-    const fee = quoteFee(data.sizeBytes, data.months);
+    const _price = (await getTxcUsdPrice()).usd;
+    const fee = usdToTxc(quoteUsd(data.sizeBytes, data.months), _price);
     const paymentTx = mockPaymentTx(data.wallet, fee);
     const videoWallet = await assignVideoWallet();
     const stamp = await recordChainEvent({
@@ -181,7 +188,8 @@ export const finalizeUpload = createServerFn({ method: "POST" })
     await assertCidUnclaimed(pin.cid);
 
     // 2. Mock payment + real on-chain stamp
-    const fee = quoteFee(binary.byteLength, data.months);
+    const _price = (await getTxcUsdPrice()).usd;
+    const fee = usdToTxc(quoteUsd(binary.byteLength, data.months), _price);
     const paymentTx = mockPaymentTx(data.wallet, fee);
     const videoWallet = await assignVideoWallet();
     const stamp = await recordChainEvent({
@@ -283,7 +291,8 @@ export const addByCid = createServerFn({ method: "POST" })
       // best-effort; continue with unknown size
     }
 
-    const fee = quoteFee(Math.max(sizeBytes, 1), data.months);
+    const _price = (await getTxcUsdPrice()).usd;
+    const fee = usdToTxc(quoteUsd(Math.max(sizeBytes, 1), data.months), _price);
     const paymentTx = mockPaymentTx(data.wallet, fee);
     const videoWallet = await assignVideoWallet();
     const stamp = await recordChainEvent({
