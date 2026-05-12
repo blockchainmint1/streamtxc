@@ -309,6 +309,7 @@ export const addByCid = createServerFn({ method: "POST" })
         title: z.string().min(1).max(200),
         description: z.string().max(2000).optional().default(""),
         months: z.number().int().min(1).max(12).default(1),
+        thumbnailCid: cidStringSchema.optional(),
       })
       .parse(input),
   )
@@ -395,6 +396,7 @@ export const addByCid = createServerFn({ method: "POST" })
       uploaderWallet: data.wallet,
       title: data.title,
       description: data.description ?? "",
+      thumbnailCid: data.thumbnailCid ?? null,
     });
 
     const expires = new Date();
@@ -416,6 +418,7 @@ export const addByCid = createServerFn({ method: "POST" })
       derivation_index: videoWallet.derivationIndex,
       payment_required_txc: fee,
       metadata_cid: meta?.metaCid ?? null,
+      thumbnail_cid: data.thumbnailCid ?? null,
     });
     if (vErr) {
       if (vErr.code === "23505") await assertCidUnclaimed(data.cid);
