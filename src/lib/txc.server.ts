@@ -102,8 +102,36 @@ function rpcConfigured(): boolean {
  * same hot wallet that signs OP_RETURN txs, so a single topup lasts
  * thousands of stamps.
  */
-function fundOptions(): Record<string, unknown> {
-  return {};
+async function getOrCreateLabeledAddress(label: string): Promise<string> {
+  try {
+    const labeled = await rpc<Record<string, unknown>>("getaddressesbylabel", [
+      label,
+    ]);
+    const existing = Object.keys(labeled ?? {})[0];
+    if (existing) return existing;
+  } catch {
+    // Missing labels can error on this node version — fall through and mint one.
+  }
+
+  return await rpc<string>("getnewaddress", [label, "bech32"]);
+}
+
+async function getHotWalletChangeAddress(): Promise<string> {
+  const explicit = process.env.TXC_HOT_WALLET_CHANGE_ADDRESS?.trim();
+  if (explicit) return explicit;
+  return await getOrCreateLabeledAddress("hot-wallet-change");
+}
+
+async function getHotWalletEventAddress(): Promise<string> {
+  const explicit = process.env.TXC_HOT_WALLET_EVENT_ADDRESS?.trim();
+  if (explicit) return explicit;
+  return await getOrCreateLabeledAddress("hot-wallet-events");
+}
+
+async function fundOptions(): Promise<Record<string, unknown>> {
+  return {
+    changeAddress: await getHotWalletChangeAddress(),
+  };
 }
 
 /**
@@ -205,7 +233,7 @@ export async function stampRawPayload(opts: {
   ]);
   const funded = await rpc<{ hex: string }>("fundrawtransaction", [
     rawTx,
-    fundOptions(),
+    await fundOptions(),
   ]);
   const signed = await rpc<{ hex: string; complete: boolean }>(
     "signrawtransactionwithwallet",
@@ -247,10 +275,7 @@ export async function stampEvent(opts: {
   // change address from the node's own wallet.
   let recipient = toAddress;
   if (!recipient) {
-    recipient = process.env.TXC_PLATFORM_ADDRESS;
-  }
-  if (!recipient) {
-    recipient = await rpc<string>("getrawchangeaddress", []);
+    recipient = await getHotWalletEventAddress();
   }
 
   // OP_RETURN data must be hex-encoded.
@@ -266,7 +291,7 @@ export async function stampEvent(opts: {
   ]);
   const funded = await rpc<{ hex: string }>("fundrawtransaction", [
     rawTx,
-    fundOptions(),
+    await fundOptions(),
   ]);
   const signed = await rpc<{ hex: string; complete: boolean }>(
     "signrawtransactionwithwallet",
