@@ -27,6 +27,7 @@ import {
   buildBulkExtendQuote,
   verifyBulkExtensionTx,
   setVideoVisibility,
+  setVideoFlagged,
 } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, shortenHash } from "@/lib/fees";
@@ -44,6 +45,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Flag,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -139,6 +141,48 @@ function ToggleVisibilityButton({
   );
 }
 
+function ToggleFlagButton({
+  cid,
+  wallet,
+  flagged,
+}: {
+  cid: string;
+  wallet: string;
+  flagged: boolean;
+}) {
+  const qc = useQueryClient();
+  const toggle = useServerFn(setVideoFlagged);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      size="sm"
+      variant={flagged ? "default" : "outline"}
+      className="font-mono"
+      disabled={busy}
+      title={flagged ? "Clear flag" : "Flag for follow-up (owner-only)"}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await toggle({ data: { wallet, cid, flagged: !flagged } });
+          toast.success(flagged ? "Flag cleared" : "Video flagged");
+          qc.invalidateQueries({ queryKey: ["my-videos"] });
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Failed");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? (
+        <Loader2 className="h-3 w-3 animate-spin" />
+      ) : (
+        <Flag className={"h-3 w-3 " + (flagged ? "fill-current" : "")} />
+      )}
+      <span className="ml-1">{flagged ? "flagged" : "flag"}</span>
+    </Button>
+  );
+}
+
 function ManagePageInner() {
   const { address, connect } = useWallet();
   const fetchMine = useServerFn(listMyVideos);
@@ -206,7 +250,8 @@ function ManagePageInner() {
                       key={v.cid}
                       className={
                         "border-t border-border hover:bg-card/50 " +
-                        (v.hidden_at ? "opacity-50" : "")
+                        (v.hidden_at ? "opacity-50 " : "") +
+                        (v.flagged_at ? "bg-amber-500/5" : "")
                       }
                     >
                       <td className="px-4 py-3">
@@ -262,6 +307,11 @@ function ManagePageInner() {
                           {v.status === "stamp_failed" && (
                             <RetryStampButton cid={v.cid} wallet={address!} />
                           )}
+                          <ToggleFlagButton
+                            cid={v.cid}
+                            wallet={address!}
+                            flagged={!!v.flagged_at}
+                          />
                           <ToggleVisibilityButton
                             cid={v.cid}
                             wallet={address!}
@@ -789,7 +839,8 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
     setVerifying(true);
     setVerifyResult(null);
     try {
-      const res = await verifyTx({ data: { txHash, requireConfirmed: true } });
+      // Mempool-OK: don't make the user wait for a block. We trust the txid.
+      const res = await verifyTx({ data: { txHash, requireConfirmed: false } });
       setVerifyResult(res);
       if (res.pending) {
         toast.message("TX not confirmed yet — try again after the next block.");
@@ -919,7 +970,7 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
 
             <div className="border-t border-border pt-4 space-y-2">
               <Label className="font-mono text-xs text-muted-foreground">
-                paste txid to verify (after broadcast + 1 confirmation)
+                paste txid to verify (mempool is fine — no need to wait for a block)
               </Label>
               <div className="flex gap-2">
                 <Input
