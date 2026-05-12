@@ -180,17 +180,24 @@ function WatchPage() {
           {/* Sidebar: chain info + embed */}
           <div className="space-y-4">
             {video.video_wallet && video.payment_required_txc != null && (
-              <PaymentPanel
-                required={Number(video.payment_required_txc)}
-                received={Number(video.payment_received_txc ?? 0)}
-                wallet={video.video_wallet}
-                paidAt={video.paid_at ?? null}
-                createdAt={video.created_at}
-                onCopy={copy}
-              />
+              <CollapsibleSection
+                title="[ HOSTING PAYMENT ]"
+                icon={<Wallet className="h-3.5 w-3.5" />}
+                defaultOpen={!video.paid_at}
+              >
+                <PaymentPanel
+                  required={Number(video.payment_required_txc)}
+                  received={Number(video.payment_received_txc ?? 0)}
+                  wallet={video.video_wallet}
+                  paidAt={video.paid_at ?? null}
+                  createdAt={video.created_at}
+                  expiresAt={video.expires_at}
+                  monthsPrepaid={video.months_prepaid ?? 1}
+                  onCopy={copy}
+                />
+              </CollapsibleSection>
             )}
-            <div className="border border-border bg-card rounded-sm p-4 space-y-3">
-              <h2 className="font-mono text-xs text-primary">[ ON-CHAIN PROOF ]</h2>
+            <CollapsibleSection title="[ ON-CHAIN PROOF ]" defaultOpen={false}>
               <Field label="IPFS CID" value={video.cid} onCopy={copy} mono />
               {video.video_wallet && (
                 <Field
@@ -246,12 +253,13 @@ function WatchPage() {
                 value={formatDate(video.expires_at)}
                 mono
               />
-            </div>
+            </CollapsibleSection>
 
-            <div className="border border-border bg-card rounded-sm p-4 space-y-3">
-              <h2 className="font-mono text-xs text-primary flex items-center gap-1.5">
-                <Code2 className="h-3.5 w-3.5" /> [ EMBED ]
-              </h2>
+            <CollapsibleSection
+              title="[ EMBED ]"
+              icon={<Code2 className="h-3.5 w-3.5" />}
+              defaultOpen={false}
+            >
               <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                 <label className="flex items-center gap-2">
                   <input
@@ -318,7 +326,7 @@ function WatchPage() {
                   </>
                 )}
               </Button>
-            </div>
+            </CollapsibleSection>
           </div>
         </div>
         <Comments cid={video.cid} />
