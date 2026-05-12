@@ -515,7 +515,7 @@ function UploadPage() {
                   )}
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  $0.01 / MB / month, paid in TXC. After publishing you'll get a
+                  $0.001 / MB / month, paid in TXC. After publishing you'll get a
                   per-video TXC address — send the amount above within 24h or
                   the file is unpinned.
                 </p>

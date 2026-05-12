@@ -1,5 +1,5 @@
 // TXC pricing for video hosting.
-// Quote in USD ($0.01/MB/month) → converted to TXC at the live spot price.
+// Quote in USD ($0.001/MB/month) → converted to TXC at the live spot price.
 
 export const RATE_USD_PER_MB_PER_MONTH = 0.001; // USD
 export const FALLBACK_TXC_USD = 0.10; // used only if the price feed is down
