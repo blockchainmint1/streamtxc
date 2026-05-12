@@ -72,51 +72,57 @@ export type Database = {
       }
       videos: {
         Row: {
+          block_hash: string | null
+          block_number: number | null
           cid: string
           created_at: string
           description: string | null
           duration_s: number | null
           expires_at: string
           mime_type: string | null
-          mock_block_number: number | null
-          mock_tx_hash: string | null
           months_prepaid: number
+          op_return_payload: string | null
           owner_wallet: string
           size_bytes: number
           status: string
           title: string
+          tx_hash: string | null
           view_count: number
         }
         Insert: {
+          block_hash?: string | null
+          block_number?: number | null
           cid: string
           created_at?: string
           description?: string | null
           duration_s?: number | null
           expires_at?: string
           mime_type?: string | null
-          mock_block_number?: number | null
-          mock_tx_hash?: string | null
           months_prepaid?: number
+          op_return_payload?: string | null
           owner_wallet: string
           size_bytes: number
           status?: string
           title: string
+          tx_hash?: string | null
           view_count?: number
         }
         Update: {
+          block_hash?: string | null
+          block_number?: number | null
           cid?: string
           created_at?: string
           description?: string | null
           duration_s?: number | null
           expires_at?: string
           mime_type?: string | null
-          mock_block_number?: number | null
-          mock_tx_hash?: string | null
           months_prepaid?: number
+          op_return_payload?: string | null
           owner_wallet?: string
           size_bytes?: number
           status?: string
           title?: string
+          tx_hash?: string | null
           view_count?: number
         }
         Relationships: []

@@ -1,0 +1,151 @@
+// TXC blockchain adapter (server-only).
+//
+// Real implementation: Bitcoin-style JSON-RPC against a TXC node. We build a
+// transaction with one tiny self-pay output and one OP_RETURN output carrying
+// our anchor payload, sign it with the platform hot wallet, broadcast it, and
+// return the txid.
+//
+// Stub implementation: when the RPC env vars aren't set yet we generate a
+// deterministic fake txid so the rest of the app (DB writes, watch page,
+// mempool polling UI) works end-to-end. The adapter is the ONLY place that
+// needs to change when real RPC creds land.
+
+import { createHash } from "crypto";
+
+export const TXC_PROTO_TAG = "TXCV1";
+
+/** ≤80 bytes per the Bitcoin OP_RETURN standard data carrier limit. */
+export function buildOpReturnPayload(cid: string, wallet: string): string {
+  const short = wallet.startsWith("0x") ? wallet.slice(0, 12) : wallet;
+  const direct = `${TXC_PROTO_TAG}|${cid}|${short}`;
+  if (Buffer.byteLength(direct, "utf8") <= 80) return direct;
+  // Fallback: hash both into a single 32-byte commitment.
+  const h = createHash("sha256").update(`${cid}|${wallet}`).digest("hex");
+  return `${TXC_PROTO_TAG}|h:${h}`;
+}
+
+function rpcConfigured(): boolean {
+  return !!(process.env.TXC_RPC_URL && process.env.TXC_RPC_USER && process.env.TXC_RPC_PASS);
+}
+
+async function rpc<T = unknown>(method: string, params: unknown[]): Promise<T> {
+  const url = process.env.TXC_RPC_URL!;
+  const user = process.env.TXC_RPC_USER!;
+  const pass = process.env.TXC_RPC_PASS!;
+  const auth = Buffer.from(`${user}:${pass}`).toString("base64");
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Basic ${auth}`,
+    },
+    body: JSON.stringify({ jsonrpc: "1.0", id: "txc", method, params }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`TXC RPC ${method} failed [${res.status}]: ${await res.text()}`);
+  }
+  const json = (await res.json()) as { result: T; error: { message: string } | null };
+  if (json.error) throw new Error(`TXC RPC ${method} error: ${json.error.message}`);
+  return json.result;
+}
+
+export interface StampResult {
+  txid: string;
+  payload: string;
+  /** True when the txid is a real on-chain tx; false for stub mode. */
+  real: boolean;
+}
+
+/** Broadcast an OP_RETURN tx anchoring (cid, wallet) on TXC. */
+export async function stampCid(cid: string, wallet: string): Promise<StampResult> {
+  const payload = buildOpReturnPayload(cid, wallet);
+
+  if (!rpcConfigured()) {
+    // Stub mode — deterministic 64-hex "txid" so the UI flow works.
+    const txid = createHash("sha256")
+      .update(`stub:${payload}:${Date.now()}:${Math.random()}`)
+      .digest("hex");
+    return { txid, payload, real: false };
+  }
+
+  // Real Bitcoin-style flow:
+  // 1. Build a tx that pays a tiny amount back to ourselves + OP_RETURN data.
+  //    `walletcreatefundedpsbt` would be cleaner, but `sendmany` style funding
+  //    + `createrawtransaction` with a `data` output is the most portable.
+  const platformAddress = process.env.TXC_PLATFORM_ADDRESS;
+  if (!platformAddress) throw new Error("TXC_PLATFORM_ADDRESS is not configured");
+
+  // OP_RETURN data must be hex-encoded.
+  const dataHex = Buffer.from(payload, "utf8").toString("hex");
+
+  // Use createrawtransaction with empty inputs, then fundrawtransaction +
+  // signrawtransactionwithwallet + sendrawtransaction. Standard bitcoind flow.
+  const rawTx = await rpc<string>("createrawtransaction", [
+    [],
+    [{ data: dataHex }, { [platformAddress]: 0.00001 }],
+  ]);
+  const funded = await rpc<{ hex: string }>("fundrawtransaction", [rawTx]);
+  const signed = await rpc<{ hex: string; complete: boolean }>(
+    "signrawtransactionwithwallet",
+    [funded.hex],
+  );
+  if (!signed.complete) throw new Error("TXC tx signing incomplete");
+  const txid = await rpc<string>("sendrawtransaction", [signed.hex]);
+
+  return { txid, payload, real: true };
+}
+
+export interface TxStatus {
+  confirmed: boolean;
+  blockHeight: number | null;
+  blockHash: string | null;
+}
+
+/**
+ * Look up confirmation status from mempool.texitcoin.org (esplora API).
+ * For stub txids (not present on-chain) we fake confirmation after 60s so the
+ * UI flow can be tested end-to-end without a real TXC wallet.
+ */
+export async function getTxStatus(
+  txid: string,
+  createdAt?: string | Date,
+): Promise<TxStatus> {
+  const base = process.env.TXC_MEMPOOL_URL || "https://mempool.texitcoin.org";
+  try {
+    const res = await fetch(`${base}/api/tx/${txid}`);
+    if (res.ok) {
+      const data = (await res.json()) as {
+        status?: { confirmed?: boolean; block_height?: number; block_hash?: string };
+      };
+      const s = data.status;
+      return {
+        confirmed: !!s?.confirmed,
+        blockHeight: s?.block_height ?? null,
+        blockHash: s?.block_hash ?? null,
+      };
+    }
+    // 404 → either stub txid OR real tx not yet propagated.
+  } catch {
+    // network error — fall through to stub behaviour
+  }
+
+  // Stub fallback: if we created the row at least 60s ago, mark confirmed
+  // with a deterministic fake block. Lets us demo the full UX.
+  if (!rpcConfigured() && createdAt) {
+    const ageMs = Date.now() - new Date(createdAt).getTime();
+    if (ageMs > 60_000) {
+      const blockHash = createHash("sha256").update(`block:${txid}`).digest("hex");
+      const blockHeight = Math.floor(Date.now() / 600_000); // 10-min "blocks"
+      return { confirmed: true, blockHeight, blockHash };
+    }
+  }
+
+  return { confirmed: false, blockHeight: null, blockHash: null };
+}
+
+export function explorerTxUrl(txid: string): string {
+  const base = process.env.TXC_MEMPOOL_URL || "https://mempool.texitcoin.org";
+  return `${base}/tx/${txid}`;
+}

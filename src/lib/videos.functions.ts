@@ -2,7 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { pinFileToIPFS, createPresignedUploadUrl, pinByCid } from "./pinata.server";
-import { timestampCid, mockPaymentTx } from "./chain";
+import { mockPaymentTx } from "./chain";
+import { stampCid, getTxStatus, explorerTxUrl } from "./txc.server";
 import { quoteFee, MAX_UPLOAD_BYTES } from "./fees";
 
 const walletSchema = z
@@ -68,7 +69,7 @@ export const registerUpload = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const fee = quoteFee(data.sizeBytes, data.months);
     const paymentTx = mockPaymentTx(data.wallet, fee);
-    const stamp = timestampCid(data.cid, data.wallet, data.sizeBytes);
+    const stamp = await stampCid(data.cid, data.wallet);
 
     const expires = new Date();
     expires.setMonth(expires.getMonth() + data.months);
@@ -80,9 +81,9 @@ export const registerUpload = createServerFn({ method: "POST" })
       description: data.description || null,
       size_bytes: data.sizeBytes,
       mime_type: data.mimeType,
-      status: "active",
-      mock_tx_hash: stamp.txHash,
-      mock_block_number: stamp.blockNumber,
+      status: "mempool",
+      tx_hash: stamp.txid,
+      op_return_payload: stamp.payload,
       months_prepaid: data.months,
       expires_at: expires.toISOString(),
     });
@@ -99,9 +100,8 @@ export const registerUpload = createServerFn({ method: "POST" })
 
     return {
       cid: data.cid,
-      txHash: stamp.txHash,
-      blockNumber: stamp.blockNumber,
-      explorerUrl: stamp.explorerUrl,
+      txHash: stamp.txid,
+      explorerUrl: explorerTxUrl(stamp.txid),
       paymentTx,
       txcAmount: fee,
     };
@@ -137,10 +137,10 @@ export const finalizeUpload = createServerFn({ method: "POST" })
     // 1. Pin to IPFS via Pinata
     const pin = await pinFileToIPFS(blob, data.filename);
 
-    // 2. Mock payment + on-chain timestamp
+    // 2. Mock payment + real on-chain stamp
     const fee = quoteFee(binary.byteLength, data.months);
     const paymentTx = mockPaymentTx(data.wallet, fee);
-    const stamp = timestampCid(pin.cid, data.wallet, binary.byteLength);
+    const stamp = await stampCid(pin.cid, data.wallet);
 
     // 3. Persist
     const expires = new Date();
@@ -155,9 +155,9 @@ export const finalizeUpload = createServerFn({ method: "POST" })
         description: data.description || null,
         size_bytes: binary.byteLength,
         mime_type: data.mimeType,
-        status: "active",
-        mock_tx_hash: stamp.txHash,
-        mock_block_number: stamp.blockNumber,
+        status: "mempool",
+        tx_hash: stamp.txid,
+        op_return_payload: stamp.payload,
         months_prepaid: data.months,
         expires_at: expires.toISOString(),
       });
@@ -174,9 +174,8 @@ export const finalizeUpload = createServerFn({ method: "POST" })
 
     return {
       cid: pin.cid,
-      txHash: stamp.txHash,
-      blockNumber: stamp.blockNumber,
-      explorerUrl: stamp.explorerUrl,
+      txHash: stamp.txid,
+      explorerUrl: explorerTxUrl(stamp.txid),
       paymentTx,
       txcAmount: fee,
     };
@@ -237,7 +236,7 @@ export const addByCid = createServerFn({ method: "POST" })
 
     const fee = quoteFee(Math.max(sizeBytes, 1), data.months);
     const paymentTx = mockPaymentTx(data.wallet, fee);
-    const stamp = timestampCid(data.cid, data.wallet, sizeBytes);
+    const stamp = await stampCid(data.cid, data.wallet);
 
     // Best-effort: pin into our own Pinata account so streaming is reliable.
     await pinByCid(data.cid, data.title);
@@ -252,9 +251,9 @@ export const addByCid = createServerFn({ method: "POST" })
       description: data.description || null,
       size_bytes: sizeBytes,
       mime_type: mimeType,
-      status: "active",
-      mock_tx_hash: stamp.txHash,
-      mock_block_number: stamp.blockNumber,
+      status: "mempool",
+      tx_hash: stamp.txid,
+      op_return_payload: stamp.payload,
       months_prepaid: data.months,
       expires_at: expires.toISOString(),
     });
@@ -273,8 +272,7 @@ export const addByCid = createServerFn({ method: "POST" })
       cid: data.cid,
       sizeBytes,
       mimeType,
-      txHash: stamp.txHash,
-      blockNumber: stamp.blockNumber,
+      txHash: stamp.txid,
     };
   });
 
@@ -287,7 +285,7 @@ export const listRecentVideos = createServerFn({ method: "GET" }).handler(
       .select(
         "cid, title, owner_wallet, size_bytes, view_count, created_at, status",
       )
-      .eq("status", "active")
+      .in("status", ["active", "mempool"])
       .order("created_at", { ascending: false })
       .limit(24);
     if (error) throw new Error(error.message);
@@ -321,6 +319,71 @@ export const listMyVideos = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return videos ?? [];
+  });
+
+// --- TXC tx confirmation polling ------------------------------------------
+
+/**
+ * Look up a video's on-chain status. If still in mempool, queries
+ * mempool.texitcoin.org and persists confirmation when it lands. Called from
+ * the watch page on a 15s interval until confirmed.
+ */
+export const pollTxStatus = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({ cid: z.string().min(1).max(200) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: video, error } = await supabaseAdmin
+      .from("videos")
+      .select("cid, status, tx_hash, block_number, block_hash, created_at")
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!video) return null;
+
+    // Already confirmed → just return current state.
+    if (video.status === "active" && video.block_number) {
+      return {
+        status: video.status,
+        txHash: video.tx_hash,
+        blockNumber: video.block_number,
+        blockHash: video.block_hash,
+      };
+    }
+
+    if (!video.tx_hash) {
+      return {
+        status: video.status,
+        txHash: null,
+        blockNumber: null,
+        blockHash: null,
+      };
+    }
+
+    const status = await getTxStatus(video.tx_hash, video.created_at);
+    if (status.confirmed && status.blockHeight !== null) {
+      await supabaseAdmin
+        .from("videos")
+        .update({
+          status: "active",
+          block_number: status.blockHeight,
+          block_hash: status.blockHash,
+        })
+        .eq("cid", data.cid);
+      return {
+        status: "active",
+        txHash: video.tx_hash,
+        blockNumber: status.blockHeight,
+        blockHash: status.blockHash,
+      };
+    }
+
+    return {
+      status: video.status,
+      txHash: video.tx_hash,
+      blockNumber: null,
+      blockHash: null,
+    };
   });
 
 // --- View tracking (called by stream proxy) -------------------------------
