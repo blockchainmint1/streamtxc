@@ -1,47 +1,50 @@
-## Root cause (confirmed)
+## Confirming your memory
 
-`src/lib/ipfs-cid.ts` `isCidOnIpfs()` does `fetch('/api/stream/<cid>', { method: 'HEAD' })` and trusts `res.ok`.
+You're right. The chat history (msgs #16–#18, #105, #251–#254) shows we deliberately switched to direct browser→Pinata TUS uploads to escape Cloudflare Worker's ~100 MB request-body cap, knowing the trade-off was Pinata's CORS allowlist. Every new custom domain (`stream.texitcoin.org`, `streamtxc.com`, `www.streamtxc.com`, plus Lovable preview hosts) re-triggers the allowlist problem.
 
-`/api/stream/:cid` (in `src/routes/api/stream.$cid.tsx`) **always** returns a `302` redirect to the gateway, without checking existence. On the production host that redirect lands on `https://streamtxc.com/api/stream/<cid>`, which returns **`200 text/html`** (the SPA shell). `fetch` follows the redirect, sees `200`, and reports the CID as "on IPFS" — for *every* CID.
+Both diagnoses from earlier are true at the same time:
+- **Immediate cause** of today's error: `streamtxc.com` is not in the Pinata API key's CORS allowlist.
+- **Root cause** of why we're exposed to that allowlist at all: we route uploads direct-to-Pinata to dodge the Worker body cap.
 
-Verified with `curl -IL` against the live `bafybeie2pykofxtopbc4pzz7nqohxrvld5spcgt3ltsar63zd6ves5b3dy`: final response is `HTTP/2 200, content-type: text/html`.
+The pragmatic fix: take Pinata CORS off the critical path. Cap uploads at 100 MB so they fit through our Worker, and route larger files through the existing **Add by CID** flow (which doesn't transfer bytes through us).
 
-After the false positive, `handleSubmit` calls `addByCid`, which calls `pinByCid()` (no-op for an unknown CID) and then probes the Pinata gateway for up to 30 s for a `content-length`. That's the "not doing anything" — it's hung on the probe, eventually throwing `CID_NOT_FOUND`.
+## Plan
 
-## Fix
+### 1. Lower the cap to 100 MB
+- `src/lib/fees.ts`: change `MAX_UPLOAD_BYTES` from `1024 * 1024 * 1024` to `100 * 1024 * 1024`.
+- All server-fn validators (`getUploadUrl`, `registerUpload`, `finalizeUpload`) already reference this constant, so they update automatically.
+- All UI copy that uses `formatBytes(MAX_UPLOAD_BYTES)` ("max 100.0 MB") updates automatically too.
 
-Replace the unreliable redirect-follow probe with a true "is this in our Pinata account?" check. That's the only case where skipping the upload is actually safe.
+### 2. Replace the direct-to-Pinata browser flow with a Worker-proxied multipart upload
+- **New server route**: `src/routes/api/public/upload.ts`
+  - `POST` handler reads `request.formData()`, pulls the `file` field (a `File`/`Blob`), enforces `≤ MAX_UPLOAD_BYTES`, calls existing `pinFileToIPFS(blob, filename)` from `src/lib/pinata.server.ts`, and returns `{ cid, size }` as JSON.
+  - Same-origin call from the SPA, so no CORS headers needed; basic input validation (filename length, size cap) inline.
+- **`src/routes/upload.tsx`**:
+  - Drop `PinataSDK`, `browserPinata`, `uploadToPinata`, `sanitizeFilename`'s base64-presign concerns, and the `getUploadUrl` server-fn call.
+  - New `uploadViaWorker(file, onProgress)` helper: builds a `FormData`, POSTs to `/api/public/upload` via `XMLHttpRequest` so we still get progress events (fetch can't stream upload progress in browsers yet). Returns `{ cid, size }`.
+  - `handleSubmit` flow becomes: hashing → `lookupPinnedCid` → if hit, `addByCid`; else `uploadViaWorker` → `registerUpload`.
+  - Keep `sanitizeFilename` (Pinata still rejects non-Latin1) — but we no longer have the presign/sanitize mismatch problem.
+- **Deprecate but don't delete** `getUploadUrl` server fn — leave a comment that it's unused; can be removed in a later cleanup pass once we're sure we're not reverting.
 
-### Changes
+### 3. UX for files >100 MB
+- In `upload.tsx`, when the picked file's size exceeds `MAX_UPLOAD_BYTES`, show a clear inline panel (replacing the current bare red "TOO LARGE" pill):
+  - Headline: "File is over 100 MB — direct upload not supported"
+  - Body: "Pin the file to IPFS yourself first, then paste the CID below. We recommend [pinata.cloud](https://pinata.cloud) (free tier covers most uploads)."
+  - CTA button: "Switch to Add by CID" — programmatically switches the `Tabs` to the `cid` tab and pre-fills `cidTitle` from the file name.
+- Helper text under the file picker (always visible, not just on overflow): "Max 100 MB. Larger files? Pin to IPFS first (e.g. [pinata.cloud](https://pinata.cloud)) and use the **Add by CID** tab."
 
-1. **New server fn `lookupPinnedCid`** in `src/lib/videos.functions.ts`
-   - Input (Zod-validated): `{ cidV1: string, cidV0: string }` using existing `cidStringSchema`.
-   - For each CID, in parallel, `GET https://api.pinata.cloud/v3/files/public?cid=<cid>` with `Authorization: Bearer ${process.env.PINATA_JWT}`.
-   - Treat as a hit only when the response is `200` and `data.files` is a non-empty array.
-   - Return `{ cid: string, version: 0 | 1 } | null`. Prefer v1 on tie.
+### 4. No DB / schema / payment changes
+The server route just calls `pinFileToIPFS` and returns the CID. `registerUpload` stays exactly as is.
 
-2. **`src/routes/upload.tsx`** — swap the two callers of `findCidOnIpfs`:
-   - In the file-selected `useEffect`: call `lookupPinnedCid({ data: { cidV1: cids.v1, cidV0: cids.v0 } })` via `useServerFn`.
-   - In `handleSubmit`: same swap; keep the existing UX (toast, `addByCid`, navigate).
-   - Drop the `findCidOnIpfs` import. `computeCids` stays.
+## Technical details
 
-3. **`src/lib/ipfs-cid.ts`** — delete `isCidOnIpfs` and `findCidOnIpfs` (only used by upload). Keep `computeCids` / `computeCidV0` / `computeCidV1`. Quick `rg` first to confirm no other callers; if any exist, leave the helpers but mark them with a comment saying they're unreliable for existence checks.
-
-4. **No change to `/api/stream/:cid`** — its redirect behavior is correct for playback. The bug was using it as an existence probe.
-
-5. **Optional nicety in `addByCid` (`src/lib/videos.functions.ts`)**: if a future caller still hits the 30 s probe, surface a clearer toast — but that's not needed once the upload flow stops sending phantom CIDs into it.
-
-### Why not "probe the public IPFS DHT"
-
-Even a correct gateway check (no SPA fallthrough) only tells us whether *some* peer on IPFS has the bytes — not whether Pinata has them, which is what we actually need for reliable playback. Pinning happens on Pinata; checking Pinata's own pinset is the correct signal. If a user genuinely wants to register a foreign CID, the **Add by CID** tab already exists for that.
-
-### Technical details
-
-- Pinata endpoint shape: `GET /v3/files/public?cid=<cid>` → `{ data: { files: [{ id, cid, ... }], ... } }`. Empty `files` ⇒ not in our account.
-- `lookupPinnedCid` runs server-side so the JWT never reaches the browser.
-- No DB migration, no schema change, no UI redesign — pure plumbing swap.
+- Cloudflare Workers cap request bodies around 100 MB. A 100 MB file in multipart form-data is ~100 MB + a few hundred bytes of boundary overhead — within margin. If we ever hit edge-case rejections we can drop the cap to 95 MB; not worth pre-optimizing.
+- `XMLHttpRequest` is the right choice for the upload because `fetch()` doesn't expose upload progress events in any current browser. We already use `XHR` style progress in the existing code path.
+- `request.formData()` in the server route streams parsing — it doesn't double-buffer the body in Worker memory.
+- The new server route lives under `/api/public/*` so it's reachable without auth (matches our other public endpoints). It's not a webhook, so no signature verification — but it's rate-limited implicitly by Pinata's own quotas and by the size cap. We can layer in a per-IP token-bucket later if abuse appears.
 
 ## Out of scope
 
-- Adding a `HEAD` mode to `/api/stream/:cid` that returns `404` for unknown CIDs (would need to authenticate to Pinata first; not worth it just to keep the current probe alive).
-- Re-enabling cross-account "found on public IPFS, skip upload" — see above; if you want it back, it should live behind the explicit Add-by-CID flow.
+- Re-adding direct-to-Pinata TUS as a "large files" path. If we want browser→Pinata back later, it should be gated on the user explicitly granting permission and we should add domains to Pinata's CORS allowlist proactively.
+- Streaming/resumable uploads through our Worker (would need TUS-on-Workers or similar). For 100 MB files a single shot is fine.
+- Touching the `addByCid` server fn — its 30 s gateway probe behavior is unchanged.
