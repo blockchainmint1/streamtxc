@@ -30,6 +30,7 @@ import {
   setVideoVisibility,
 } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
+import { isValidTxcAddress } from "@/lib/wallet";
 import { listAnonUploads, removeAnonUpload, useAnonUploadsSubscription } from "@/lib/anon-uploads";
 import { formatBytes, shortenHash } from "@/lib/fees";
 import { ipfsThumbUrl } from "@/lib/ipfs-gateway";
