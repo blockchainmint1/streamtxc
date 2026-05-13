@@ -3,6 +3,7 @@ import { getRequestIP, getRequestHeader } from "@tanstack/react-start/server";
 import { createHash } from "crypto";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { requireWalletSession } from "./wallet-auth.functions";
 import {
   pinFileToIPFS,
   createPresignedUploadUrl,
