@@ -259,7 +259,18 @@ function ManagePageInner() {
           </div>
         )}
 
-        {!address || isLoading ? (
+        {!address ? (
+          unclaimedAnon.length > 0 ? null : (
+            <div className="border border-dashed border-border rounded-sm p-12 text-center">
+              <p className="font-mono text-sm text-muted-foreground mb-4">
+                Connect your TXC wallet to see videos you've uploaded, or upload a new one.
+              </p>
+              <Link to="/upload">
+                <Button className="font-mono">Upload a video</Button>
+              </Link>
+            </div>
+          )
+        ) : isLoading ? (
           <div className="font-mono text-muted-foreground">Loading…</div>
         ) : !videos || videos.length === 0 ? (
           <div className="border border-dashed border-border rounded-sm p-12 text-center">
