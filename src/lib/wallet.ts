@@ -125,7 +125,6 @@ export function useWallet() {
     },
     [],
   );
-  }, []);
 
   const disconnect = useCallback(() => {
     disconnectWallet();
