@@ -1,44 +1,76 @@
-// Mock wallet for the MVP. Generates a persistent fake EVM-style address
-// stored in localStorage so the rest of the app can treat it like a real wallet.
-// Swap in wagmi + injected provider when TXC chain is live.
+// TXC wallet client (LTC clone — no browser-injected wallet exists yet).
+// The user's "wallet" is a TXC base58 address they paste in after signing
+// a challenge in their TXC Core / mobile wallet. No address is invented:
+// `address` is null until the user explicitly connects.
 
 import { useEffect, useState, useCallback } from "react";
 
-const STORAGE_KEY = "txc:mockwallet";
+const STORAGE_KEY = "txc:wallet";
 
-function randomAddress(): string {
-  const hex = "0123456789abcdef";
-  let out = "0x";
-  for (let i = 0; i < 40; i++) out += hex[Math.floor(Math.random() * 16)];
-  return out;
+/**
+ * TXC follows Litecoin's address format: legacy base58 (L…/M…/3…/T…),
+ * base58 P2SH, or bech32 (`txc1…` / `ltc1…`). We accept any reasonable
+ * 20–90 char alnum-ish string — the real validation happens server-side
+ * via the node's `verifymessage` RPC during signature verification.
+ * Legacy 0x… mock addresses from earlier builds are also accepted so
+ * existing localStorage entries don't break.
+ */
+export function isValidTxcAddress(addr: string): boolean {
+  const s = addr.trim();
+  if (/^0x[a-fA-F0-9]{40}$/.test(s)) return true;
+  return /^[a-zA-Z0-9]{20,90}$/.test(s);
+}
+
+interface StoredWallet {
+  address: string;
+  signature?: string;
+}
+
+function read(): StoredWallet | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as StoredWallet;
+    if (parsed && typeof parsed.address === "string") return parsed;
+    return null;
+  } catch {
+    // Backwards-compat: old builds stored the bare address string.
+    return { address: raw };
+  }
+}
+
+function write(next: StoredWallet | null) {
+  if (typeof window === "undefined") return;
+  if (next) {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  } else {
+    window.localStorage.removeItem(STORAGE_KEY);
+  }
+  window.dispatchEvent(new Event("txc:wallet-changed"));
 }
 
 export function getWallet(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(STORAGE_KEY);
+  return read()?.address ?? null;
 }
 
-export function connectWallet(): string {
-  const existing = getWallet();
-  if (existing) return existing;
-  const addr = randomAddress();
-  window.localStorage.setItem(STORAGE_KEY, addr);
-  window.dispatchEvent(new Event("txc:wallet-changed"));
-  return addr;
+export function setVerifiedWallet(address: string, signature?: string) {
+  if (!isValidTxcAddress(address)) {
+    throw new Error("That doesn't look like a valid TXC address");
+  }
+  write({ address: address.trim(), signature });
 }
 
 export function disconnectWallet() {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(STORAGE_KEY);
-  window.dispatchEvent(new Event("txc:wallet-changed"));
+  write(null);
 }
 
 export function useWallet() {
-  const [address, setAddress] = useState<string | null>(null);
+  const [stored, setStored] = useState<StoredWallet | null>(null);
 
   useEffect(() => {
-    setAddress(getWallet());
-    const handler = () => setAddress(getWallet());
+    setStored(read());
+    const handler = () => setStored(read());
     window.addEventListener("txc:wallet-changed", handler);
     window.addEventListener("storage", handler);
     return () => {
@@ -47,16 +79,26 @@ export function useWallet() {
     };
   }, []);
 
-  const connect = useCallback(() => {
-    const a = connectWallet();
-    setAddress(a);
-    return a;
+  const connect = useCallback((address: string, signature?: string) => {
+    setVerifiedWallet(address, signature);
+    setStored({ address: address.trim(), signature });
   }, []);
 
   const disconnect = useCallback(() => {
     disconnectWallet();
-    setAddress(null);
+    setStored(null);
   }, []);
 
-  return { address, connect, disconnect };
+  return {
+    address: stored?.address ?? null,
+    signature: stored?.signature ?? null,
+    connect,
+    disconnect,
+  };
+}
+
+/** Header chip helper: drop the leading prefix char and take 6 of the rest. */
+export function shortWalletId(address: string): string {
+  const stripped = address.startsWith("0x") ? address.slice(2) : address.slice(1);
+  return stripped.slice(0, 6);
 }
