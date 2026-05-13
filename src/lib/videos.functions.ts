@@ -664,6 +664,29 @@ export const listMyVideos = createServerFn({ method: "POST" })
   });
 
 /**
+ * Fetch a batch of videos by CID. Used by /manage to surface anonymous
+ * uploads tracked in the browser's localStorage so the user can later
+ * claim ownership of them.
+ */
+export const listVideosByCids = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        cids: z.array(cidStringSchema).min(1).max(100),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: videos, error } = await supabaseAdmin
+      .from("videos")
+      .select("*")
+      .in("cid", data.cids)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return videos ?? [];
+  });
+
+/**
  * Owner-only show/hide toggle. Hidden videos are filtered out of all public
  * listings (listRecentVideos already does `is hidden_at null`) but remain in
  * the owner's /manage view so they can be unhidden.
