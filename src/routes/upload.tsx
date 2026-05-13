@@ -374,7 +374,11 @@ function UploadPage() {
           timestamp receipt.
         </p>
 
-        <Tabs defaultValue="file" className="w-full">
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as "file" | "cid")}
+          className="w-full"
+        >
           {duplicate && (
             <div className="mb-6 border-2 border-destructive/60 bg-destructive/5 rounded-sm p-5">
               <div className="flex items-start gap-3">
@@ -448,7 +452,7 @@ function UploadPage() {
                     </div>
                     {tooBig && (
                       <span className="font-mono text-xs text-destructive">
-                        TOO LARGE
+                        OVER 100 MB
                       </span>
                     )}
                   </div>
@@ -462,7 +466,60 @@ function UploadPage() {
                   </div>
                 )}
               </label>
+              <p className="font-mono text-[11px] text-muted-foreground">
+                Larger files? Pin to IPFS first (e.g.{" "}
+                <a
+                  href="https://pinata.cloud"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  pinata.cloud
+                </a>
+                ) and use the <span className="text-foreground">Add by CID</span> tab.
+              </p>
             </div>
+
+            {tooBig && (
+              <div className="border-2 border-destructive/60 bg-destructive/5 rounded-sm p-5">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0 space-y-3">
+                    <div className="font-mono text-xs text-destructive">
+                      [ FILE OVER 100 MB — DIRECT UPLOAD NOT SUPPORTED ]
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Pin your file to IPFS first, then paste its CID into{" "}
+                      <span className="text-foreground">Add by CID</span> below.
+                      We recommend{" "}
+                      <a
+                        href="https://pinata.cloud"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        pinata.cloud
+                      </a>{" "}
+                      — their free tier covers most uploads.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="font-mono"
+                      onClick={() => {
+                        if (file && !cidTitle) {
+                          setCidTitle(file.name.replace(/\.[^.]+$/, ""));
+                        }
+                        setActiveTab("cid");
+                      }}
+                    >
+                      <Link2 className="mr-2 h-4 w-4" />
+                      Switch to Add by CID
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {codecWarning && (
               <div className="border-2 border-amber-500/60 bg-amber-500/5 rounded-sm p-4">
