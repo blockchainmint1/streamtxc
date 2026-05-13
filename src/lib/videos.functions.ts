@@ -1303,21 +1303,23 @@ export async function recordView(cid: string, ipHash: string) {
     .update({ view_count: (video.view_count ?? 0) + 1 })
     .eq("cid", cid);
 
-  // Reward credit.
-  const { data: existing } = await supabaseAdmin
-    .from("creator_credits")
-    .select("credits")
-    .eq("wallet", video.owner_wallet)
-    .maybeSingle();
+  // Reward credit — only if the video has a verified owner wallet to credit.
+  if (video.owner_wallet) {
+    const { data: existing } = await supabaseAdmin
+      .from("creator_credits")
+      .select("credits")
+      .eq("wallet", video.owner_wallet)
+      .maybeSingle();
 
-  const newCredits = (Number(existing?.credits) || 0) + 0.001;
-  await supabaseAdmin
-    .from("creator_credits")
-    .upsert({
-      wallet: video.owner_wallet,
-      credits: newCredits,
-      updated_at: new Date().toISOString(),
-    });
+    const newCredits = (Number(existing?.credits) || 0) + 0.001;
+    await supabaseAdmin
+      .from("creator_credits")
+      .upsert({
+        wallet: video.owner_wallet,
+        credits: newCredits,
+        updated_at: new Date().toISOString(),
+      });
+  }
 
   return true;
 }
@@ -1397,7 +1399,7 @@ export const editVideoMetadata = createServerFn({ method: "POST" })
     const meta = await recordMetadataAnchor({
       videoCid: video.cid,
       videoWallet: video.video_wallet,
-      uploaderWallet: video.owner_wallet,
+      uploaderWallet: video.owner_wallet ?? data.wallet,
       title: data.title,
       description: data.description ?? "",
       thumbnailCid: nextThumb,
