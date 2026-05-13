@@ -19,7 +19,6 @@ import { createHash } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { explorerTxUrl } from "./txc.server";
 import { assignVideoWallet } from "./txc-wallets.server";
-import { gatewayUrl } from "./pinata.server";
 
 const optionalWalletSchema = z
   .string()
