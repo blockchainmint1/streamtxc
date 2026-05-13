@@ -1,37 +1,58 @@
 ## Goal
 
-Update the `txc-ipfs-ingest` service so it's ready to deploy on your AWS box, talking to your real cluster and gateway. **No changes to the live site** — that wiring is parked until you've deployed and tested the ingest box.
+Stop auto-assigning fake `0x…` EVM addresses. Let users upload anonymously, and offer a "Sign this upload and claim ownership" step on the upload page that links their real TXC (LTC-clone) wallet via `verifymessage`. Show the connected wallet in the header.
 
-## Changes to the ingest zip
+## Behavior
 
-1. **Cluster auth: Bearer → Basic** in `src/cluster.js`.
-   - Replace `CLUSTER_TOKEN` with `CLUSTER_BASIC_USER` + `CLUSTER_BASIC_PASS`.
-   - Build `Authorization: Basic base64(user:pass)` on every cluster request.
+1. **First page load** — no wallet. `useWallet()` returns `address: null`. Header shows a `connect wallet` link (goes to a small modal/route that explains the address+signature flow). No address is invented.
+2. **Upload (file or by-CID)** — works without a wallet. An optional collapsible panel: *"Sign this upload and claim ownership (optional)"* with two fields:
+   - TXC address (base58, validated client + server-side)
+   - Signature produced by the user's external TXC wallet over a server-issued nonce/message
+   When both are filled, submit them with the upload; server verifies via `verifyMessage` (already wired) and stores `owner_wallet` + `owner_proof_status='verified'`. Otherwise `owner_wallet` stays NULL and `owner_proof_status='unverified'` — video still publishes, payouts/escrow are simply unclaimable until they sign later.
+3. **Header** — when a wallet is connected, show `manage [abcdef]` (chars 2–7 of the TXC address) linking to `/manage`. When not connected, show `connect wallet`. Persist the verified address + signature in `localStorage` so subsequent uploads pre-fill it.
+4. **Manage page** — gains a "Claim ownership" action on each unverified video the user uploaded in this browser session (uses the same nonce → sign → verify flow already in `videos.functions.ts`).
 
-2. **Updated `.env.example`** with your real values pre-filled as defaults:
-   - `CLUSTER_API_URL=https://IpfsCluster-LoadBalancer-571793241.us-east-1.elb.amazonaws.com:9094`
-   - `CLUSTER_BASIC_USER=bevis_backend_live`
-   - `CLUSTER_BASIC_PASS=…` (from the curl)
-   - `PUBLIC_GATEWAY_URL=https://ipfs.blockchainmint.com/ipfs/`
-   - `PINATA_JWT=…` (mirror)
-   - `INGEST_TOKEN=…` (you generate; this is what the site will use later)
-   - `ALLOWED_ORIGINS=https://stream.texitcoin.org,https://txc-stream.lovable.app`
+## Technical Details
 
-3. **Cluster `/add` query params** stay `cid-version=1&raw-leaves=true` so CIDs match what Pinata generates. Send the **transcoded** MP4, not the original, when ffmpeg ran.
+### Wallet client (`src/lib/wallet.ts`)
+- Drop `randomAddress()` and the auto-`connect()` behavior entirely.
+- `useWallet()` exposes `{ address, signature, setVerifiedWallet(addr, sig), disconnect() }` — no auto-creation.
+- Address validation helper for TXC base58 (LTC-style: `L…`, `M…`, `3…`, plus bech32 `txc1…` if the node supports it). Reuse the same regex on the client as the server.
 
-4. **Pinata mirror** stays fire-and-forget after a successful cluster pin — keeps Pinata as a warm backup automatically.
+### Server schema
+- `walletSchema` in `src/lib/videos.functions.ts` currently enforces `^0x[a-fA-F0-9]{40}$`. Replace with a TXC-address schema (base58 + optional bech32). Allow `null` where appropriate.
+- `registerUpload` / `addByCid` / `getUploadUrl`: make `wallet` optional. When omitted, store `owner_wallet = null`, skip the ownership stamp, and skip escrow setup. When present **with** a signature, run the existing `verifyMessage` path inline so the upload is born verified.
+- Add a `getOwnershipNonce({ purpose: 'upload' | 'claim', cid? })` server fn that returns a short-lived nonce string + the exact message to sign. For uploads we issue the nonce up-front (before the file is sent) and bind it to the eventual CID at register time.
 
-5. **TLS / proxy notes**: the cluster ELB uses an AWS-issued cert on its `*.elb.amazonaws.com` hostname; Node trusts it out of the box, no extra CA work.
+### DB
+- `videos.owner_wallet` is currently `NOT NULL`. Migration: make it nullable; add CHECK `owner_proof_status IN ('unverified','pending','verified')`. Existing rows keep their fake `0x…` values for now (no data migration needed for MVP — they'll just look weird in the manage list until re-claimed). Optional follow-up: null them out.
+- `comments.commenter_wallet` already nullable — no change.
 
-6. **Nginx sample** (`nginx/ingest.conf.example`): 5 GB body limit, long read/send timeouts (transcoding can take minutes), CORS allowlist matching `ALLOWED_ORIGINS`.
+### Header (`src/components/Header.tsx`)
+- Read `address` from `useWallet()`. Render either:
+  - `<Link to="/manage">manage {address.slice(1,7)}</Link>` (drop the leading prefix char like `L`/`M`/`t` so it reads as a clean 6-char id), or
+  - a `connect wallet` link/button that opens a small dialog explaining the sign flow (or routes to `/connect`).
 
-7. **README** updated end-to-end: deploy steps, env vars, a `curl` against `/v1/upload` and `/v1/pin` so you can smoke-test before the site is involved.
+### Upload page (`src/routes/upload.tsx`)
+- Remove the `useEffect(() => { if (!address) connect(); }, …)` auto-connect.
+- Drop `!address` from the submit guard.
+- Add an `<Accordion>` / collapsible "Sign this upload and claim ownership (optional)" section with the two inputs and a "How do I sign?" helper (one-line instructions: open TXC Core → File → Sign Message → paste address + message → copy signature here).
+- Pass `wallet` and `signature` (both optional) into `registerUpload` / `addByCid`.
 
-## Deliverable
+### Manage page
+- Show videos uploaded from this browser even if `owner_wallet` is null, by tracking CIDs in `localStorage` at upload time (cheap MVP — no extra table). For each unverified one, show a "Claim ownership" button that runs the existing nonce → signature flow.
 
-`txc-ipfs-ingest_v2.zip`. You deploy it, hit it with the README curl commands to confirm it transcodes + pins + mirrors, then send me back the public URL + the `INGEST_TOKEN` you chose. At that point we'll do Part B (site wiring) as a separate plan.
+## Out of Scope
 
-## Open items for you (not blocking the zip, but blocking real use)
+- Real wallet-extension integration (no MetaMask equivalent for TXC yet).
+- Migrating historical fake `0x…` rows.
+- Changing the comment / boost wallet flows (they already accept null).
 
-- Confirm `https://ipfs.blockchainmint.com/ipfs/<cid>` serves a known test CID in a normal browser, returns `Accept-Ranges: bytes`, and has CORS open enough for `<video>` seeking from the site origin.
-- Confirm whatever box you deploy the ingest service on can reach `:9094` on the cluster ELB (security group / VPC).
+## Files Touched
+
+- `src/lib/wallet.ts` — rewrite (no auto-create, store verified sig)
+- `src/lib/videos.functions.ts` — relax `walletSchema`, make wallet optional in upload fns, add `getOwnershipNonce`
+- `src/components/Header.tsx` — connect/manage chip
+- `src/routes/upload.tsx` — optional sign panel, allow no-wallet submit
+- `src/routes/manage.tsx` — surface anon uploads + per-video claim
+- One migration: `videos.owner_wallet` nullable
