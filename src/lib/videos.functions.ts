@@ -1535,9 +1535,20 @@ function buildOwnershipMessage(opts: {
   wallet: string;
   nonce: string;
 }): string {
-  // Single-line message for diagnostic simplicity — no newlines, no extra
-  // whitespace, no punctuation that wallets might re-encode.
-  return `streamtxc:${opts.cid}:${opts.nonce}`;
+  // Human-readable, EIP-4361-style challenge so the signer can SEE exactly
+  // what they're authorizing. The CID + wallet + nonce are all bound into
+  // the message, so a paster can't re-aim a signature at a different video
+  // or a different address.
+  return [
+    "streamTXC — Claim video ownership",
+    "",
+    "Domain: streamtxc.com",
+    `Address: ${opts.wallet}`,
+    `Video CID: ${opts.cid}`,
+    `Nonce: ${opts.nonce}`,
+    "",
+    "Signing this message does NOT authorize any transaction or spend any TXC.",
+  ].join("\n");
 }
 
 const txcWalletSchema = z
