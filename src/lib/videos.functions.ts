@@ -1639,7 +1639,7 @@ export const submitOwnershipProof = createServerFn({ method: "POST" })
     }
     if (!ok) {
       throw new Error(
-        "Signature recovered a different wallet. Make sure you signed the EXACT message above (no extra whitespace) using the 'Sign message' feature of the same address.",
+        "That exact address/message/signature combination does not verify on the TXC node. This is not a whitespace issue; the wallet likely signed with a different internal key than the address shown, or produced a non-standard message signature.",
       );
     }
 
