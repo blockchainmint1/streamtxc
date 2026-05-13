@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
+import { verifyMessage } from "@/lib/txc.server";
 
 const schema = z.object({
   address: z.string().trim().min(20).max(120),
@@ -53,11 +54,11 @@ export const Route = createFileRoute("/api/public/txc-verify-message")({
           const trimmedSignature = input.signature.trim();
           const trimmedMessage = input.message;
           const base64Bytes = Buffer.from(trimmedSignature, "base64");
-          const verifyResult = await rpc<boolean>("verifymessage", [
+          const verifyResult = await verifyMessage(
             trimmedAddress,
             trimmedSignature,
             trimmedMessage,
-          ]);
+          );
 
           let validateAddress: unknown = null;
           try {

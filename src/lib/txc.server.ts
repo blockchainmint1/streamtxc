@@ -498,9 +498,25 @@ export async function verifyMessage(
 
   try {
     if (isLegacyT) {
-      const ok = await verifyLegacyTMessage(trimmedAddress, trimmedSignature, message);
-      console.log("[verifyMessage] legacy local verify result", { ok });
-      return ok;
+      let localOk = false;
+      try {
+        localOk = await verifyLegacyTMessage(trimmedAddress, trimmedSignature, message);
+        console.log("[verifyMessage] legacy local verify result", { ok: localOk });
+      } catch (error) {
+        console.warn("[verifyMessage] legacy local verify threw", {
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      if (localOk) return true;
+
+      const rpcOk = await rpc<boolean>("verifymessage", [
+        trimmedAddress,
+        trimmedSignature,
+        message,
+      ]);
+      console.log("[verifyMessage] legacy rpc fallback result", { ok: rpcOk });
+      return rpcOk;
     }
 
     if (isBech32) {
