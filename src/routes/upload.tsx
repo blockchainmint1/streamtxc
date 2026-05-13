@@ -228,7 +228,7 @@ function UploadPage() {
       const hit =
         matchedCid
           ? { cid: matchedCid }
-          : await findCidOnIpfs(cids);
+          : await probeCidFn({ data: cids });
       if (hit) {
         toast("Found this file on IPFS — skipping upload", {
           description: "Registering existing CID instead.",
