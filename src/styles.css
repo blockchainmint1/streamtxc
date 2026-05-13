@@ -4,6 +4,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Reserve scrollbar gutter so centered containers don't shift between
+ * short pages (no scrollbar) and tall pages (scrollbar present). */
+html {
+  scrollbar-gutter: stable;
+}
+
 /*
  * Design system definition.
  *
