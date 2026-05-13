@@ -145,7 +145,6 @@ function ManagePageInner() {
   const { address } = useWallet();
   const fetchMine = useServerFn(listMyVideos);
   const fetchByCids = useServerFn(listVideosByCids);
-  const qc = useQueryClient();
 
   // Track CIDs uploaded anonymously from this browser so they can be claimed.
   const [anonCids, setAnonCids] = useState<string[]>(() =>
