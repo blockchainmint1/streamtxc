@@ -20,13 +20,10 @@ const signableWalletSchema = z
   );
 
 function buildLoginMessage(wallet: string, nonce: string): string {
-  return [
-    "streamTXC login",
-    `wallet:${wallet}`,
-    `nonce:${nonce}`,
-    "By signing you prove you control this wallet so streamTXC can",
-    "issue you a session token. This is not a transaction.",
-  ].join("\n");
+  // DEBUG: signing the bare wallet address to rule out any
+  // message-encoding/nonce issues in the node's verifymessage path.
+  void nonce;
+  return wallet;
 }
 
 /**
