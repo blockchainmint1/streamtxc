@@ -140,12 +140,10 @@ function ToggleVisibilityButton({
 }
 
 function ManagePageInner() {
-  const { address, connect } = useWallet();
+  const { address } = useWallet();
   const fetchMine = useServerFn(listMyVideos);
 
-  useEffect(() => {
-    if (!address) connect();
-  }, [address, connect]);
+  // No auto-connect — show a "connect wallet" prompt below if missing.
 
   const { data: videos, isLoading } = useQuery({
     queryKey: ["my-videos", address],

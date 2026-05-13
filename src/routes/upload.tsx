@@ -103,11 +103,8 @@ function UploadPage() {
   const addCid = useServerFn(addByCid);
   const quoteFn = useServerFn(getQuote);
 
-  // Auto-provision an anonymous owner id so uploads are free and frictionless
-  // until the real TXC wallet integration lands.
-  useEffect(() => {
-    if (!address) connect();
-  }, [address, connect]);
+  // No auto-connect: anonymous uploads are allowed. Users can paste a TXC
+  // address (and optionally a signature) to claim ownership.
 
   const [file, setFile] = useState<File | null>(null);
   const [codecWarning, setCodecWarning] = useState<string | null>(null);
