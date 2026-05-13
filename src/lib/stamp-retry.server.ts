@@ -49,7 +49,7 @@ export async function retryStuckStampForVideo(cid: string): Promise<RetryResult>
     try {
       const stamp = await stampEvent({
         cid: video.cid,
-        wallet: video.owner_wallet,
+        wallet: video.owner_wallet ?? "anon",
         eventType: "C",
         toAddress: videoWallet,
       });

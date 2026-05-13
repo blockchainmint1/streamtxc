@@ -186,7 +186,7 @@ function IndexPage() {
                 <div className="p-4">
                   <h3 className="font-bold text-sm truncate">{v.title}</h3>
                   <div className="mt-2 flex justify-between font-mono text-xs text-muted-foreground">
-                    <span>{shortenHash(v.owner_wallet)}</span>
+                    <span>{v.owner_wallet ? shortenHash(v.owner_wallet) : "anonymous"}</span>
                     <span>
                       {v.view_count} views · {formatBytes(v.size_bytes)}
                     </span>

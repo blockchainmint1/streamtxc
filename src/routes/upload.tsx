@@ -103,11 +103,8 @@ function UploadPage() {
   const addCid = useServerFn(addByCid);
   const quoteFn = useServerFn(getQuote);
 
-  // Auto-provision an anonymous owner id so uploads are free and frictionless
-  // until the real TXC wallet integration lands.
-  useEffect(() => {
-    if (!address) connect();
-  }, [address, connect]);
+  // No auto-connect: anonymous uploads are allowed. Users can paste a TXC
+  // address (and optionally a signature) to claim ownership.
 
   const [file, setFile] = useState<File | null>(null);
   const [codecWarning, setCodecWarning] = useState<string | null>(null);
@@ -208,7 +205,7 @@ function UploadPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!file || !address || !title) return;
+    if (!file || !title) return;
     if (tooBig) {
       toast.error(`File too large. Max ${formatBytes(MAX_UPLOAD_BYTES)}.`);
       return;
@@ -234,7 +231,7 @@ function UploadPage() {
         setStage("registering");
         const result = await addCid({
           data: {
-            wallet: address,
+            wallet: address ?? undefined,
             cid: hit.cid,
             title,
             description,
@@ -272,7 +269,7 @@ function UploadPage() {
       setStage("registering");
       const result = await register({
         data: {
-          wallet: address,
+          wallet: address ?? undefined,
           cid: pinResult.cid,
           title,
           description,
@@ -306,14 +303,14 @@ function UploadPage() {
 
   async function handleCidSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!cidInput || !cidTitle || !address) return;
+    if (!cidInput || !cidTitle) return;
     setDuplicate(null);
     setCidNotFound(null);
     try {
       setCidStage("fetching");
       const result = await addCid({
         data: {
-          wallet: address,
+          wallet: address ?? undefined,
           cid: cidInput.trim(),
           title: cidTitle,
           description: cidDescription,
