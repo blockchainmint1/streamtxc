@@ -35,13 +35,16 @@ export const Route = createFileRoute("/api/stream/$cid")({
         // Streaming through the Worker added a hop and CPU/subrequest cost;
         // a 302 lets the player do native HTTP Range requests against Pinata
         // directly, which is dramatically faster on a paid dedicated gateway.
-        // The redirect itself is cached at the edge for a day so repeat
-        // viewers don't even hit the Worker.
+        // IMPORTANT: do NOT cache the redirect — caching it means rewatches
+        // never hit the Worker, so recordView() never runs and view_count
+        // gets stuck at 1. The actual video bytes are still cached by Pinata
+        // and the browser via Range requests, so this only costs us a tiny
+        // 302 per playback.
         return new Response(null, {
           status: 302,
           headers: {
             location: gatewayUrl(cid),
-            "cache-control": "public, max-age=86400",
+            "cache-control": "no-store",
             "access-control-allow-origin": "*",
           },
         });
