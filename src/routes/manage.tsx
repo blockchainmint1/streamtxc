@@ -27,7 +27,6 @@ import {
   buildBulkExtendQuote,
   verifyBulkExtensionTx,
   setVideoVisibility,
-  setVideoFlagged,
 } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, shortenHash } from "@/lib/fees";
@@ -45,7 +44,6 @@ import {
   Copy,
   Eye,
   EyeOff,
-  Flag,
 } from "lucide-react";
 import { toast } from "sonner";
 
