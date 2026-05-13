@@ -19,8 +19,23 @@ const signableWalletSchema = z
     "Wallet must be a legacy TXC address starting with T",
   );
 
-function buildLoginMessage(wallet: string, nonce: string): string {
-  return `streamtxc-login:${wallet}:${nonce}`;
+function buildLoginMessage(args: {
+  wallet: string;
+  nonce: string;
+  issuedAt: string;
+  expiresAt: string;
+}): string {
+  return [
+    "streamTXC — Sign in to prove wallet ownership",
+    "",
+    `Domain: streamtxc.com`,
+    `Address: ${args.wallet}`,
+    `Nonce: ${args.nonce}`,
+    `Issued At: ${args.issuedAt}`,
+    `Expires At: ${args.expiresAt}`,
+    "",
+    "Signing this message does NOT authorize any transaction or spend any TXC.",
+  ].join("\n");
 }
 
 function normalizeSignature(signature: string): string {
@@ -38,7 +53,14 @@ export const requestWalletLogin = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const nonce = crypto.randomUUID().replace(/-/g, "");
-    const message = buildLoginMessage(data.wallet, nonce);
+    const now = new Date();
+    const exp = new Date(now.getTime() + 5 * 60 * 1000);
+    const message = buildLoginMessage({
+      wallet: data.wallet,
+      nonce,
+      issuedAt: now.toISOString(),
+      expiresAt: exp.toISOString(),
+    });
     const challengeToken = await issueChallengeToken({
       wallet: data.wallet,
       nonce,
