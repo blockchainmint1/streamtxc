@@ -457,8 +457,11 @@ async function verifyMessageLocal(
   const { verify } = await import("bitcoinjs-message");
 
   const candidatePrefixes = [
-    "\u0018Bitcoin Signed Message:\n", // most forks (incl. many LTC-derived) keep this
-    "\u0019TEXITcoin Signed Message:\n",
+    // Confirmed via wallet.texitcoin.org bundle: "Texitcoin Signed Message:\n"
+    // (26 chars → length byte 0x1A). Capitalisation matters.
+    "\u001aTexitcoin Signed Message:\n",
+    // Fallbacks for older/forked wallets.
+    "\u0018Bitcoin Signed Message:\n",
     "\u0019Litecoin Signed Message:\n",
     "\u0019Dogecoin Signed Message:\n",
   ];
