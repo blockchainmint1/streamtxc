@@ -247,6 +247,7 @@ function UploadPage() {
         } else {
           toast.success("Registered from IPFS");
         }
+        qc.invalidateQueries({ queryKey: ["recent-videos"] });
         navigate({ to: "/v/$cid", params: { cid: result.cid } });
         return;
       }
@@ -287,6 +288,7 @@ function UploadPage() {
       } else {
         toast.success("Pinned to IPFS");
       }
+      qc.invalidateQueries({ queryKey: ["recent-videos"] });
       navigate({ to: "/v/$cid", params: { cid: result.cid } });
     } catch (err) {
       console.error(err);
@@ -323,6 +325,7 @@ function UploadPage() {
       } else {
         toast.success("CID registered");
       }
+      qc.invalidateQueries({ queryKey: ["recent-videos"] });
       navigate({ to: "/v/$cid", params: { cid: result.cid } });
     } catch (err) {
       console.error(err);
