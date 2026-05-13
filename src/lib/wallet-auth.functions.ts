@@ -20,10 +20,7 @@ const signableWalletSchema = z
   );
 
 function buildLoginMessage(wallet: string, nonce: string): string {
-  // DEBUG: signing the bare wallet address to rule out any
-  // message-encoding/nonce issues in the node's verifymessage path.
-  void nonce;
-  return wallet;
+  return `streamtxc-login:${wallet}:${nonce}`;
 }
 
 function normalizeSignature(signature: string): string {
