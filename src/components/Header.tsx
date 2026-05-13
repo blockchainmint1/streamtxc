@@ -54,6 +54,13 @@ export function Header() {
 
         <nav className="ml-auto flex items-center gap-2 text-sm font-mono">
           <Link
+            to="/about"
+            className="px-3 py-1.5 hover:text-primary transition-colors"
+            activeProps={{ className: "px-3 py-1.5 text-primary" }}
+          >
+            about
+          </Link>
+          <Link
             to="/upload"
             className="px-3 py-1.5 hover:text-primary transition-colors"
             activeProps={{ className: "px-3 py-1.5 text-primary" }}
@@ -78,13 +85,6 @@ export function Header() {
               manage
             </Link>
           )}
-          <Link
-            to="/about"
-            className="px-3 py-1.5 hover:text-primary transition-colors"
-            activeProps={{ className: "px-3 py-1.5 text-primary" }}
-          >
-            about
-          </Link>
           {address ? (
             <button
               onClick={() => {
