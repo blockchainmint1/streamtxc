@@ -304,6 +304,26 @@ const cidSchema = z
   .max(120)
   .regex(/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[A-Za-z2-7]{50,})$/, "Invalid IPFS CID");
 
+/**
+ * Server-side CID probe for the upload UI. Browsers used to HEAD a public
+ * gateway directly, which broke the moment ops switched to a private
+ * cluster or a localhost-only node. Now the browser asks us, and we use
+ * the gateway fallback list.
+ */
+export const probeCidOnIpfs = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({ v1: cidStringSchema, v0: cidStringSchema }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const [v1, v0] = await Promise.all([
+      probeCidViaGateways(data.v1, 8_000),
+      probeCidViaGateways(data.v0, 8_000),
+    ]);
+    if (v1.found) return { cid: data.v1, version: 1 as const };
+    if (v0.found) return { cid: data.v0, version: 0 as const };
+    return null;
+  });
+
 export const addByCid = createServerFn({ method: "POST" })
   .inputValidator((input) =>
     z
