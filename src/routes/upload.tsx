@@ -15,6 +15,7 @@ import {
   registerUpload,
   addByCid,
   getQuote,
+  lookupPinnedCid,
 } from "@/lib/videos.functions";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -29,7 +30,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
-import { computeCids, findCidOnIpfs } from "@/lib/ipfs-cid";
+import { computeCids } from "@/lib/ipfs-cid";
 import { PinataSDK } from "pinata";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 import { recordAnonUpload } from "@/lib/anon-uploads";
@@ -103,6 +104,7 @@ function UploadPage() {
   const register = useServerFn(registerUpload);
   const addCid = useServerFn(addByCid);
   const quoteFn = useServerFn(getQuote);
+  const lookupCid = useServerFn(lookupPinnedCid);
 
   // No auto-connect: anonymous uploads are allowed. Users can paste a TXC
   // address (and optionally a signature) to claim ownership.
@@ -160,7 +162,9 @@ function UploadPage() {
         if (cancelled) return;
         setLocalCids(cids);
         setQuote({ txcAmount: q.txcAmount, usdAmount: q.usdAmount, txcUsd: q.txcUsd });
-        const hit = await findCidOnIpfs(cids);
+        const hit = await lookupCid({
+          data: { cidV1: cids.v1, cidV0: cids.v0 },
+        });
         if (cancelled) return;
         setMatchedCid(hit?.cid ?? null);
         setCidProbe(hit ? "on-ipfs" : "off-ipfs");
@@ -171,7 +175,7 @@ function UploadPage() {
     return () => {
       cancelled = true;
     };
-  }, [file, tooBig, quoteFn]);
+  }, [file, tooBig, quoteFn, lookupCid]);
 
   /**
    * Best-effort browser playability probe. Most browsers don't play
@@ -224,7 +228,7 @@ function UploadPage() {
       const hit =
         matchedCid
           ? { cid: matchedCid }
-          : await findCidOnIpfs(cids);
+          : await lookupCid({ data: { cidV1: cids.v1, cidV0: cids.v0 } });
       if (hit) {
         toast("Found this file on IPFS — skipping upload", {
           description: "Registering existing CID instead.",
