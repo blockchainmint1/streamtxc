@@ -393,6 +393,75 @@ export function explorerTxUrl(txid: string): string {
   return `${base}/tx/${txid}`;
 }
 
+const TXC_SIGNED_MESSAGE_PREFIX = "\u0019Texitcoin Signed Message:\n";
+
+function encodeBitcoinVarInt(value: number): Uint8Array {
+  if (value < 0xfd) return Uint8Array.from([value]);
+  if (value <= 0xffff) {
+    return Uint8Array.from([0xfd, value & 0xff, (value >>> 8) & 0xff]);
+  }
+  if (value <= 0xffffffff) {
+    return Uint8Array.from([
+      0xfe,
+      value & 0xff,
+      (value >>> 8) & 0xff,
+      (value >>> 16) & 0xff,
+      (value >>> 24) & 0xff,
+    ]);
+  }
+  throw new Error("Message too large to verify");
+}
+
+async function verifyLegacyTMessage(
+  address: string,
+  signature: string,
+  message: string,
+): Promise<boolean> {
+  const [{ sha256 }, { ripemd160 }, { secp256k1 }, bs58checkModule] = await Promise.all([
+    import("@noble/hashes/sha256"),
+    import("@noble/hashes/ripemd160"),
+    import("@noble/curves/secp256k1"),
+    import("bs58check"),
+  ]);
+
+  const bs58check = (bs58checkModule.default ?? bs58checkModule) as {
+    decode(input: string): Uint8Array;
+  };
+
+  const signatureBytes = Buffer.from(signature, "base64");
+  if (signatureBytes.length !== 65) {
+    throw new Error("Invalid signature length");
+  }
+
+  const flagByte = signatureBytes[0] - 27;
+  if (flagByte < 0 || flagByte > 15) {
+    throw new Error("Invalid signature parameter");
+  }
+
+  const compressed = !!(flagByte & 12);
+  const recovery = flagByte & 3;
+
+  const prefixBytes = Buffer.from(TXC_SIGNED_MESSAGE_PREFIX, "utf8");
+  const messageBytes = Buffer.from(message, "utf8");
+  const payload = Buffer.concat([
+    prefixBytes,
+    Buffer.from(encodeBitcoinVarInt(messageBytes.length)),
+    messageBytes,
+  ]);
+
+  const digest = sha256(sha256(payload));
+  const publicKey = secp256k1.Signature.fromCompact(signatureBytes.subarray(1))
+    .addRecoveryBit(recovery)
+    .recoverPublicKey(digest)
+    .toRawBytes(compressed);
+
+  const publicKeyHash = ripemd160(sha256(publicKey));
+  const decodedAddress = bs58check.decode(address);
+  const expectedHash = decodedAddress.subarray(1);
+
+  return Buffer.from(publicKeyHash).equals(Buffer.from(expectedHash));
+}
+
 /**
  * Verify a signed wallet-auth / ownership-proof message.
  *
@@ -429,11 +498,7 @@ export async function verifyMessage(
 
   try {
     if (isLegacyT) {
-      const ok = await rpc<boolean>("verifymessage", [
-        trimmedAddress,
-        trimmedSignature,
-        message,
-      ]);
+      const ok = await verifyLegacyTMessage(trimmedAddress, trimmedSignature, message);
       console.log("[verifyMessage] rpc(verifymessage) result", { ok });
       return ok;
     }
