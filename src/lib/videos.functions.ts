@@ -1520,12 +1520,9 @@ function buildOwnershipMessage(opts: {
   wallet: string;
   nonce: string;
 }): string {
-  return [
-    "stream.texitcoin ownership v1",
-    `cid=${opts.cid}`,
-    `wallet=${opts.wallet}`,
-    `nonce=${opts.nonce}`,
-  ].join("\n");
+  // Single-line message for diagnostic simplicity — no newlines, no extra
+  // whitespace, no punctuation that wallets might re-encode.
+  return `streamtxc:${opts.cid}:${opts.nonce}`;
 }
 
 const txcWalletSchema = z
