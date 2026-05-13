@@ -1,50 +1,45 @@
-## Confirming your memory
+## Goal
 
-You're right. The chat history (msgs #16–#18, #105, #251–#254) shows we deliberately switched to direct browser→Pinata TUS uploads to escape Cloudflare Worker's ~100 MB request-body cap, knowing the trade-off was Pinata's CORS allowlist. Every new custom domain (`stream.texitcoin.org`, `streamtxc.com`, `www.streamtxc.com`, plus Lovable preview hosts) re-triggers the allowlist problem.
+1. Replace the `Tp24GJ…2nLv` truncation under videos with the 6-char wallet ID (e.g. `p24GJY`), matching the header chip.
+2. Make that label a clickable link to a new `/u/$wallet` page that shows every video uploaded by that wallet.
+3. On the new page, show the full address and use the full address in the URL.
 
-Both diagnoses from earlier are true at the same time:
-- **Immediate cause** of today's error: `streamtxc.com` is not in the Pinata API key's CORS allowlist.
-- **Root cause** of why we're exposed to that allowlist at all: we route uploads direct-to-Pinata to dodge the Worker body cap.
+## Changes
 
-The pragmatic fix: take Pinata CORS off the critical path. Cap uploads at 100 MB so they fit through our Worker, and route larger files through the existing **Add by CID** flow (which doesn't transfer bytes through us).
+### 1. `src/lib/wallet.ts`
+- Keep `shortWalletId(address)` as-is (drops prefix char, returns 6 chars). This is the canonical "wallet ID" display used in the header — we'll reuse it everywhere.
 
-## Plan
+### 2. New route: `src/routes/u.$wallet.tsx`
+- File-based route at `/u/$wallet`.
+- `head()` sets a route-specific title/description/og:title/og:description (e.g. `Videos by Tp24GJYj9ZAUPW1tpEojhyrkX4F6p82nLv — streamTXC`).
+- `loader` calls a new server fn `listVideosByOwner({ wallet })` (see #4).
+- Component renders:
+  - H1: `Videos by [walletId]` where walletId is `shortWalletId(wallet)` styled like the header chip.
+  - Below H1: full address shown mono with a copy button (reuse copy pattern from `v.$cid.tsx`).
+  - Reuse the same video card grid layout from `index.tsx` (link to `/v/$cid`, thumbnail via `ipfsThumbUrl`, title, size, view count, etc.).
+  - Empty state: "No videos from this wallet yet."
+  - 404 (notFoundComponent) for malformed wallet, errorComponent for fetch errors.
 
-### 1. Lower the cap to 100 MB
-- `src/lib/fees.ts`: change `MAX_UPLOAD_BYTES` from `1024 * 1024 * 1024` to `100 * 1024 * 1024`.
-- All server-fn validators (`getUploadUrl`, `registerUpload`, `finalizeUpload`) already reference this constant, so they update automatically.
-- All UI copy that uses `formatBytes(MAX_UPLOAD_BYTES)` ("max 100.0 MB") updates automatically too.
+### 3. Update uploader labels to link + 6-char ID
 
-### 2. Replace the direct-to-Pinata browser flow with a Worker-proxied multipart upload
-- **New server route**: `src/routes/api/public/upload.ts`
-  - `POST` handler reads `request.formData()`, pulls the `file` field (a `File`/`Blob`), enforces `≤ MAX_UPLOAD_BYTES`, calls existing `pinFileToIPFS(blob, filename)` from `src/lib/pinata.server.ts`, and returns `{ cid, size }` as JSON.
-  - Same-origin call from the SPA, so no CORS headers needed; basic input validation (filename length, size cap) inline.
-- **`src/routes/upload.tsx`**:
-  - Drop `PinataSDK`, `browserPinata`, `uploadToPinata`, `sanitizeFilename`'s base64-presign concerns, and the `getUploadUrl` server-fn call.
-  - New `uploadViaWorker(file, onProgress)` helper: builds a `FormData`, POSTs to `/api/public/upload` via `XMLHttpRequest` so we still get progress events (fetch can't stream upload progress in browsers yet). Returns `{ cid, size }`.
-  - `handleSubmit` flow becomes: hashing → `lookupPinnedCid` → if hit, `addByCid`; else `uploadViaWorker` → `registerUpload`.
-  - Keep `sanitizeFilename` (Pinata still rejects non-Latin1) — but we no longer have the presign/sanitize mismatch problem.
-- **Deprecate but don't delete** `getUploadUrl` server fn — leave a comment that it's unused; can be removed in a later cleanup pass once we're sure we're not reverting.
+In `src/routes/v.$cid.tsx` (line ~186) and `src/routes/index.tsx` (line ~189):
+- Replace `shortenHash(video.owner_wallet)` with a `<Link to="/u/$wallet" params={{ wallet: video.owner_wallet }}>` that renders `shortWalletId(video.owner_wallet)`.
+- Hover/active styling matches existing nav link feel (subtle underline or primary color on hover).
+- Keep "anonymous" fallback for null wallets (no link).
 
-### 3. UX for files >100 MB
-- In `upload.tsx`, when the picked file's size exceeds `MAX_UPLOAD_BYTES`, show a clear inline panel (replacing the current bare red "TOO LARGE" pill):
-  - Headline: "File is over 100 MB — direct upload not supported"
-  - Body: "Pin the file to IPFS yourself first, then paste the CID below. We recommend [pinata.cloud](https://pinata.cloud) (free tier covers most uploads)."
-  - CTA button: "Switch to Add by CID" — programmatically switches the `Tabs` to the `cid` tab and pre-fills `cidTitle` from the file name.
-- Helper text under the file picker (always visible, not just on overflow): "Max 100 MB. Larger files? Pin to IPFS first (e.g. [pinata.cloud](https://pinata.cloud)) and use the **Add by CID** tab."
+Leave `src/components/Comments.tsx` alone for now — out of scope unless you want the same treatment for commenter wallets (let me know).
 
-### 4. No DB / schema / payment changes
-The server route just calls `pinFileToIPFS` and returns the CID. `registerUpload` stays exactly as is.
+### 4. New server fn: `listVideosByOwner` in `src/lib/videos.functions.ts`
+- Public (no auth required) — reads only public fields.
+- Input: `{ wallet: txcWalletSchema }` (existing validator from `wallet.ts`).
+- Returns same shape as the homepage card list (`cid, title, owner_wallet, size_bytes, view_count, created_at, status, payment_required_txc, expires_at, thumbnail_cid`), filtered to `status = 'active'` and ordered `created_at desc`.
+- Note: existing `listMyVideos` returns `*` (full row including pricing/payment fields) and is used by `/manage` for the owner — we keep it separate from this public listing.
 
-## Technical details
-
-- Cloudflare Workers cap request bodies around 100 MB. A 100 MB file in multipart form-data is ~100 MB + a few hundred bytes of boundary overhead — within margin. If we ever hit edge-case rejections we can drop the cap to 95 MB; not worth pre-optimizing.
-- `XMLHttpRequest` is the right choice for the upload because `fetch()` doesn't expose upload progress events in any current browser. We already use `XHR` style progress in the existing code path.
-- `request.formData()` in the server route streams parsing — it doesn't double-buffer the body in Worker memory.
-- The new server route lives under `/api/public/*` so it's reachable without auth (matches our other public endpoints). It's not a webhook, so no signature verification — but it's rate-limited implicitly by Pinata's own quotas and by the size cap. We can layer in a per-IP token-bucket later if abuse appears.
+### 5. routeTree
+- Auto-generated by the TanStack plugin when `u.$wallet.tsx` is added. Don't hand-edit `routeTree.gen.ts`.
 
 ## Out of scope
-
-- Re-adding direct-to-Pinata TUS as a "large files" path. If we want browser→Pinata back later, it should be gated on the user explicitly granting permission and we should add domains to Pinata's CORS allowlist proactively.
-- Streaming/resumable uploads through our Worker (would need TUS-on-Workers or similar). For 100 MB files a single shot is fine.
-- Touching the `addByCid` server fn — its 30 s gateway probe behavior is unchanged.
+- Changing `shortenHash` itself (still used for tx hashes, comment wallets, etc.).
+- Pagination on `/u/$wallet` — initial cut shows up to ~100 most recent (acceptable until any wallet exceeds that).
+- Showing unverified vs verified ownership badge on `/u/$wallet`.
+- Linking commenter wallets in `Comments.tsx`.
