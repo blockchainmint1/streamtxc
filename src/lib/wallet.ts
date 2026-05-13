@@ -33,6 +33,11 @@ export function isSignableOwnershipTxcAddress(addr: string): boolean {
 
 interface StoredWallet {
   address: string;
+  /** Session JWT issued by completeWalletLogin. Required for any
+   *  ownership-gated server fn (edit, hide, flag, payout retry, …). */
+  token?: string;
+  /** Unix seconds. UI uses this to decide whether to prompt a re-sign. */
+  expiresAt?: number;
   signature?: string;
 }
 
@@ -64,11 +69,26 @@ export function getWallet(): string | null {
   return read()?.address ?? null;
 }
 
-export function setVerifiedWallet(address: string, signature?: string) {
-  if (!isValidTxcAddress(address)) {
+export function setWalletSession(args: {
+  address: string;
+  token: string;
+  expiresAt: number;
+}) {
+  if (!isValidTxcAddress(args.address)) {
     throw new Error("That doesn't look like a valid TXC address");
   }
-  write({ address: address.trim(), signature });
+  write({
+    address: args.address.trim(),
+    token: args.token,
+    expiresAt: args.expiresAt,
+  });
+}
+
+export function getWalletToken(): string | null {
+  const s = read();
+  if (!s?.token || !s.expiresAt) return null;
+  if (s.expiresAt * 1000 < Date.now()) return null;
+  return s.token;
 }
 
 export function disconnectWallet() {
@@ -90,8 +110,21 @@ export function useWallet() {
   }, []);
 
   const connect = useCallback((address: string, signature?: string) => {
-    setVerifiedWallet(address, signature);
-    setStored({ address: address.trim(), signature });
+    // Legacy unverified path. Kept for back-compat with anon upload UX where
+    // the user just labels their uploads with an address. Does NOT issue a
+    // session token — gated mutations will still 401 until the user signs
+    // through the new Header dialog.
+    write({ address: address.trim(), signature });
+    setStored(read());
+  }, []);
+
+  const completeLogin = useCallback(
+    (args: { address: string; token: string; expiresAt: number }) => {
+      setWalletSession(args);
+      setStored(read());
+    },
+    [],
+  );
   }, []);
 
   const disconnect = useCallback(() => {
@@ -102,7 +135,10 @@ export function useWallet() {
   return {
     address: stored?.address ?? null,
     signature: stored?.signature ?? null,
+    token: stored?.token ?? null,
+    isAuthenticated: !!stored?.token && !!stored.expiresAt && stored.expiresAt * 1000 > Date.now(),
     connect,
+    completeLogin,
     disconnect,
   };
 }
