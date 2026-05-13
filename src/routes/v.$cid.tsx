@@ -183,7 +183,7 @@ function WatchPage() {
               </span>
               <span>{formatBytes(video.size_bytes)}</span>
               <span className="flex items-center gap-1">
-                uploader: {shortenHash(video.owner_wallet)}
+                uploader: {video.owner_wallet ? shortenHash(video.owner_wallet) : "anonymous"}
               </span>
               <ReportButton cid={video.cid} />
             </div>
