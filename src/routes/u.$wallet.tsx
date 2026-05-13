@@ -5,10 +5,11 @@ import { useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { listVideosByOwner } from "@/lib/videos.functions";
+import { listCommentsByWallet } from "@/lib/comments.functions";
 import { formatBytes } from "@/lib/fees";
 import { shortWalletId } from "@/lib/wallet";
 import { ipfsThumbUrl } from "@/lib/ipfs-gateway";
-import { Copy, Check, Play } from "lucide-react";
+import { Copy, Check, Play, MessageSquare } from "lucide-react";
 
 export const Route = createFileRoute("/u/$wallet")({
   head: ({ params }) => ({
@@ -39,6 +40,7 @@ export const Route = createFileRoute("/u/$wallet")({
 function WalletPage() {
   const { wallet } = Route.useParams();
   const fetchByOwner = useServerFn(listVideosByOwner);
+  const fetchComments = useServerFn(listCommentsByWallet);
   const [copied, setCopied] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -48,7 +50,15 @@ function WalletPage() {
     refetchOnMount: "always",
   });
 
+  const { data: commentsData, isLoading: commentsLoading } = useQuery({
+    queryKey: ["comments-by-wallet", wallet],
+    queryFn: () => fetchComments({ data: { wallet } }),
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+
   const items = data?.items ?? [];
+  const comments = commentsData ?? [];
 
   const copy = async () => {
     try {
@@ -88,6 +98,9 @@ function WalletPage() {
           </button>
         </div>
 
+        <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-3">
+          videos
+        </h2>
         {isLoading ? (
           <div className="font-mono text-sm text-muted-foreground">
             loading…
@@ -139,6 +152,62 @@ function WalletPage() {
               </Link>
             ))}
           </div>
+        )}
+
+        <h2 className="mt-12 font-mono text-xs uppercase tracking-wider text-muted-foreground mb-3">
+          comments
+        </h2>
+        {commentsLoading ? (
+          <div className="font-mono text-sm text-muted-foreground">
+            loading…
+          </div>
+        ) : comments.length === 0 ? (
+          <div className="border border-dashed border-border rounded-sm p-12 text-center font-mono text-sm text-muted-foreground">
+            No comments from this wallet yet.
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {comments.map((c) => {
+              const body =
+                c.body.length > 280 ? c.body.slice(0, 280) + "…" : c.body;
+              const boost = Number(c.boost_total_txc ?? 0);
+              return (
+                <li
+                  key={c.id}
+                  className="bg-card border border-border rounded-sm p-4 hover:border-primary transition-colors"
+                >
+                  <Link
+                    to="/v/$cid"
+                    params={{ cid: c.video_cid }}
+                    className="block"
+                  >
+                    <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground mb-2">
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      <span className="truncate">
+                        on{" "}
+                        <span className="text-foreground">
+                          {c.videoTitle ?? c.video_cid.slice(0, 12) + "…"}
+                        </span>
+                      </span>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap break-words">
+                      {body}
+                    </p>
+                    <div className="mt-2 flex gap-3 font-mono text-[11px] text-muted-foreground">
+                      <span>
+                        {new Date(c.created_at).toLocaleDateString()}
+                      </span>
+                      {boost > 0 && (
+                        <span className="text-primary">
+                          ★ {boost.toFixed(2)} TXC
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </section>
       <Footer />
