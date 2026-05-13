@@ -1,4 +1,5 @@
 // TXC blockchain adapter (server-only).
+import { createHash } from "node:crypto";
 //
 // CHAIN FACTS (don't forget again):
 //   - TEXITcoin (TXC) is a Layer 1 Scrypt PoW UTXO chain — Litecoin/Dogecoin
@@ -407,12 +408,20 @@ export async function verifyMessage(
   if (!rpcConfigured()) {
     return signature.trim().length >= 8;
   }
-  try {
-    return await rpc<boolean>("verifymessage", [address, signature, message]);
-  } catch (err) {
-    console.error("verifyMessage RPC failed", err);
-    return false;
-  }
+  console.log("[verifyMessage]", {
+    address,
+    sigLen: signature.length,
+    sigPrefix: signature.slice(0, 6),
+    messageBytes: Buffer.byteLength(message, "utf8"),
+    messageSha256: createHash("sha256").update(message).digest("hex").slice(0, 16),
+  });
+  // Let RPC errors propagate so callers can surface the real reason
+  // (e.g. "Address does not refer to key" for non-P2PKH addresses, or
+  // "Malformed base64 encoding" for a botched signature paste). Bitcoin's
+  // verifymessage returns `false` only when the signature parses cleanly
+  // but recovers a different pubkey — which is the genuine "wrong wallet"
+  // case we want to report distinctly.
+  return await rpc<boolean>("verifymessage", [address, signature, message]);
 }
 
 /**
