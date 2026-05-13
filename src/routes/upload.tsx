@@ -32,6 +32,7 @@ import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/li
 import { computeCids, findCidOnIpfs } from "@/lib/ipfs-cid";
 import { PinataSDK } from "pinata";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
+import { recordAnonUpload } from "@/lib/anon-uploads";
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
@@ -97,7 +98,7 @@ async function uploadToPinata(
 function UploadPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { address, connect } = useWallet();
+  const { address } = useWallet();
   const getUrl = useServerFn(getUploadUrl);
   const register = useServerFn(registerUpload);
   const addCid = useServerFn(addByCid);
@@ -244,6 +245,7 @@ function UploadPage() {
         } else {
           toast.success("Registered from IPFS");
         }
+        if (!address) recordAnonUpload(result.cid, title);
         qc.invalidateQueries({ queryKey: ["recent-videos"] });
         navigate({ to: "/v/$cid", params: { cid: result.cid } });
         return;
@@ -285,6 +287,7 @@ function UploadPage() {
       } else {
         toast.success("Pinned to IPFS");
       }
+      if (!address) recordAnonUpload(result.cid, title);
       qc.invalidateQueries({ queryKey: ["recent-videos"] });
       navigate({ to: "/v/$cid", params: { cid: result.cid } });
     } catch (err) {
@@ -322,6 +325,7 @@ function UploadPage() {
       } else {
         toast.success("CID registered");
       }
+      if (!address) recordAnonUpload(result.cid, cidTitle);
       qc.invalidateQueries({ queryKey: ["recent-videos"] });
       navigate({ to: "/v/$cid", params: { cid: result.cid } });
     } catch (err) {
@@ -571,7 +575,7 @@ function UploadPage() {
             <Button
               type="submit"
               size="lg"
-              disabled={!file || !title || tooBig || stage !== "idle" || !address}
+              disabled={!file || !title || tooBig || stage !== "idle"}
               className="w-full font-mono"
             >
               {stage === "idle" && (
@@ -676,7 +680,7 @@ function UploadPage() {
               <Button
                 type="submit"
                 size="lg"
-                disabled={!cidInput || !cidTitle || cidStage !== "idle" || !address}
+                disabled={!cidInput || !cidTitle || cidStage !== "idle"}
                 className="w-full font-mono"
               >
                 {cidStage === "idle" ? (
