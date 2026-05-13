@@ -1,4 +1,5 @@
 // TXC blockchain adapter (server-only).
+import { createHash } from "node:crypto";
 //
 // CHAIN FACTS (don't forget again):
 //   - TEXITcoin (TXC) is a Layer 1 Scrypt PoW UTXO chain — Litecoin/Dogecoin
