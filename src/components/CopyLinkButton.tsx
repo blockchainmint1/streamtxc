@@ -59,7 +59,7 @@ export function CopyLinkButton({
       aria-live="polite"
       className={cn(
         "inline-flex items-center gap-1.5 rounded-sm border border-border bg-input px-2.5 py-1.5 font-mono text-xs text-muted-foreground transition-all duration-200 hover:border-primary hover:text-primary active:scale-95",
-        copied && "border-primary text-primary shadow-[0_0_12px_-2px_hsl(var(--primary)/0.6)]",
+        copied && "border-primary text-primary shadow-[0_0_12px_-2px_var(--primary)]",
         pulse && "scale-95",
         className,
       )}
