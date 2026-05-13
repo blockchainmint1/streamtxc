@@ -31,11 +31,13 @@ export async function computeCids(
 }
 
 /**
- * HEAD the public Pinata gateway for this CID. Returns true if the file
- * already resolves there (someone else pinned it). 8s timeout.
+ * HEAD our own /api/stream/:cid (which 302s to the configured Pinata
+ * gateway via PINATA_GATEWAY_DOMAIN). Returns true if the file already
+ * resolves there (someone else pinned it). 8s timeout. Routing through
+ * our endpoint keeps the gateway domain in one server-side secret.
  */
 export async function isCidOnIpfs(cid: string): Promise<boolean> {
-  const url = `https://gateway.pinata.cloud/ipfs/${cid}`;
+  const url = `/api/stream/${cid}`;
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 8_000);
   try {
