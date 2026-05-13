@@ -18,9 +18,28 @@ import { retryStuckStampForVideo } from "./stamp-retry.server";
 import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
 
+// Accepts either an EVM-style 0x… (legacy mock-wallet rows) or a real TXC
+// base58 address (LTC clone — starts with L/M/T/3 etc. or bech32 txc1…).
+// Kept permissive so existing 0x rows in the DB keep working while the new
+// TXC flow is rolled out.
 const walletSchema = z
   .string()
-  .regex(/^0x[a-fA-F0-9]{40}$/, "Invalid wallet address");
+  .trim()
+  .min(8)
+  .max(120)
+  .regex(
+    /^(0x[a-fA-F0-9]{40}|[a-zA-Z0-9]{20,90})$/,
+    "Invalid wallet address",
+  );
+
+/** Same as walletSchema but optional — used at upload time. */
+const optionalWalletSchema = walletSchema.optional().nullable();
+
+/** Owner-comparison helper that tolerates null/legacy-case mismatches. */
+function ownerMatches(rowOwner: string | null, claim: string): boolean {
+  if (!rowOwner) return false;
+  return rowOwner.toLowerCase() === claim.toLowerCase();
+}
 
 const cidStringSchema = z
   .string()
