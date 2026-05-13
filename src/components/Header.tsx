@@ -35,6 +35,10 @@ export function Header() {
   const requestLogin = useServerFn(requestWalletLogin);
   const completeLoginFn = useServerFn(completeWalletLogin);
 
+  function normalizeSignatureInput(value: string) {
+    return value.replace(/\s+/g, "");
+  }
+
   function resetDialog() {
     setAddr("");
     setStep("address");
@@ -64,14 +68,15 @@ export function Header() {
   }
 
   async function handleCompleteLogin() {
-    if (!signature.trim()) {
+    const normalizedSignature = normalizeSignatureInput(signature);
+    if (!normalizedSignature) {
       toast.error("Paste the signature your wallet produced");
       return;
     }
     setBusy(true);
     try {
       const res = await completeLoginFn({
-        data: { challengeToken, signature: signature.trim() },
+        data: { challengeToken, signature: normalizedSignature },
       });
       completeLogin({ address: res.wallet, token: res.token, expiresAt: res.expiresAt });
       toast.success("Signed in");
@@ -211,7 +216,7 @@ export function Header() {
                       <Label className="font-mono text-xs">2. PASTE SIGNATURE</Label>
                       <Textarea
                         value={signature}
-                        onChange={(e) => setSignature(e.target.value)}
+                        onChange={(e) => setSignature(normalizeSignatureInput(e.target.value))}
                         placeholder="H… (base64)"
                         className="font-mono text-xs h-20"
                       />
