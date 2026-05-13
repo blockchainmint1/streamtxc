@@ -35,6 +35,9 @@ function IndexPage() {
   const { data, isFetching } = useQuery({
     queryKey: ["recent-videos", sort, offset],
     queryFn: () => fetchRecent({ data: { sort, limit: PAGE, offset } }),
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   useEffect(() => {

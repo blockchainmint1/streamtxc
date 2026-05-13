@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -95,6 +96,7 @@ async function uploadToPinata(
 
 function UploadPage() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { address, connect } = useWallet();
   const getUrl = useServerFn(getUploadUrl);
   const register = useServerFn(registerUpload);
@@ -245,6 +247,7 @@ function UploadPage() {
         } else {
           toast.success("Registered from IPFS");
         }
+        qc.invalidateQueries({ queryKey: ["recent-videos"] });
         navigate({ to: "/v/$cid", params: { cid: result.cid } });
         return;
       }
@@ -285,6 +288,7 @@ function UploadPage() {
       } else {
         toast.success("Pinned to IPFS");
       }
+      qc.invalidateQueries({ queryKey: ["recent-videos"] });
       navigate({ to: "/v/$cid", params: { cid: result.cid } });
     } catch (err) {
       console.error(err);
@@ -321,6 +325,7 @@ function UploadPage() {
       } else {
         toast.success("CID registered");
       }
+      qc.invalidateQueries({ queryKey: ["recent-videos"] });
       navigate({ to: "/v/$cid", params: { cid: result.cid } });
     } catch (err) {
       console.error(err);
