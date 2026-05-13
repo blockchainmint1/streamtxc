@@ -1533,8 +1533,10 @@ const txcWalletSchema = z
   .regex(/^[a-zA-Z0-9]+$/, "Invalid TXC address");
 
 const signableOwnershipWalletSchema = txcWalletSchema.refine(
-  (value) => /^T[1-9A-HJ-NP-Za-km-z]{20,90}$/.test(value),
-  "Use a legacy T… wallet address for ownership verification. txc1… addresses are not supported by the current Sign message flow yet.",
+  (value) =>
+    /^T[1-9A-HJ-NP-Za-km-z]{20,90}$/.test(value) ||
+    /^txc1[0-9a-z]{20,90}$/i.test(value),
+  "Use a TXC wallet address (legacy T… or bech32 txc1…) for ownership verification.",
 );
 
 /**
