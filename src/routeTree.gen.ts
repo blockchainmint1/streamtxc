@@ -18,6 +18,7 @@ import { Route as UWalletRouteImport } from './routes/u.$wallet'
 import { Route as EmbedCidRouteImport } from './routes/embed.$cid'
 import { Route as ApiStreamCidRouteImport } from './routes/api/stream.$cid'
 import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
+import { Route as ApiPublicTxcVerifyMessageRouteImport } from './routes/api/public/txc-verify-message'
 import { Route as ApiPublicTxcHealthRouteImport } from './routes/api/public/txc-health'
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
@@ -67,6 +68,12 @@ const ApiPublicUploadRoute = ApiPublicUploadRouteImport.update({
   path: '/api/public/upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicTxcVerifyMessageRoute =
+  ApiPublicTxcVerifyMessageRouteImport.update({
+    id: '/api/public/txc-verify-message',
+    path: '/api/public/txc-verify-message',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicTxcHealthRoute = ApiPublicTxcHealthRouteImport.update({
   id: '/api/public/txc-health',
   path: '/api/public/txc-health',
@@ -94,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
+  '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
@@ -108,6 +116,7 @@ export interface FileRoutesByTo {
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
+  '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
@@ -123,6 +132,7 @@ export interface FileRoutesById {
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
+  '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/u/$wallet'
     | '/v/$cid'
     | '/api/public/txc-health'
+    | '/api/public/txc-verify-message'
     | '/api/public/upload'
     | '/api/stream/$cid'
     | '/api/public/admin/retry-stamps'
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/u/$wallet'
     | '/v/$cid'
     | '/api/public/txc-health'
+    | '/api/public/txc-verify-message'
     | '/api/public/upload'
     | '/api/stream/$cid'
     | '/api/public/admin/retry-stamps'
@@ -167,6 +179,7 @@ export interface FileRouteTypes {
     | '/u/$wallet'
     | '/v/$cid'
     | '/api/public/txc-health'
+    | '/api/public/txc-verify-message'
     | '/api/public/upload'
     | '/api/stream/$cid'
     | '/api/public/admin/retry-stamps'
@@ -182,6 +195,7 @@ export interface RootRouteChildren {
   UWalletRoute: typeof UWalletRoute
   VCidRoute: typeof VCidRoute
   ApiPublicTxcHealthRoute: typeof ApiPublicTxcHealthRoute
+  ApiPublicTxcVerifyMessageRoute: typeof ApiPublicTxcVerifyMessageRoute
   ApiPublicUploadRoute: typeof ApiPublicUploadRoute
   ApiStreamCidRoute: typeof ApiStreamCidRoute
   ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
@@ -253,6 +267,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/txc-verify-message': {
+      id: '/api/public/txc-verify-message'
+      path: '/api/public/txc-verify-message'
+      fullPath: '/api/public/txc-verify-message'
+      preLoaderRoute: typeof ApiPublicTxcVerifyMessageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/txc-health': {
       id: '/api/public/txc-health'
       path: '/api/public/txc-health'
@@ -286,6 +307,7 @@ const rootRouteChildren: RootRouteChildren = {
   UWalletRoute: UWalletRoute,
   VCidRoute: VCidRoute,
   ApiPublicTxcHealthRoute: ApiPublicTxcHealthRoute,
+  ApiPublicTxcVerifyMessageRoute: ApiPublicTxcVerifyMessageRoute,
   ApiPublicUploadRoute: ApiPublicUploadRoute,
   ApiStreamCidRoute: ApiStreamCidRoute,
   ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
