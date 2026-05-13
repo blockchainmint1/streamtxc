@@ -1552,24 +1552,32 @@ export const getOwnershipChallenge = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { data: video, error } = await supabaseAdmin
       .from("videos")
-      .select("cid, owner_wallet, video_wallet")
+      .select("cid, owner_wallet, video_wallet, owner_nonce")
       .eq("cid", data.cid)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!video) throw new Error("Video not found");
 
-    // Generate a 16-byte hex nonce. We persist it so the verify step can
-    // re-derive the exact same message without trusting the client.
-    const nonce = createHash("sha256")
-      .update(`${data.cid}:${data.ownerWallet}:${Date.now()}:${Math.random()}`)
-      .digest("hex")
-      .slice(0, 32);
-
-    const { error: uErr } = await supabaseAdmin
-      .from("videos")
-      .update({ owner_nonce: nonce })
-      .eq("cid", data.cid);
-    if (uErr) throw new Error(uErr.message);
+    // Reuse an existing nonce when one is already set so re-opening the
+    // dialog (or the wallet-input debounce re-firing) does NOT invalidate
+    // a signature the user already pasted. We only mint a new nonce when
+    // none exists for this video. The wallet that "owns" the nonce is
+    // determined at verify time — the message includes the claimed wallet,
+    // so a wallet swap won't accidentally accept the wrong signer.
+    let nonce = video.owner_nonce ?? null;
+    if (!nonce) {
+      nonce = createHash("sha256")
+        .update(
+          `${data.cid}:${data.ownerWallet}:${Date.now()}:${Math.random()}`,
+        )
+        .digest("hex")
+        .slice(0, 32);
+      const { error: uErr } = await supabaseAdmin
+        .from("videos")
+        .update({ owner_nonce: nonce })
+        .eq("cid", data.cid);
+      if (uErr) throw new Error(uErr.message);
+    }
 
     const message = buildOwnershipMessage({
       cid: data.cid,
