@@ -15,6 +15,7 @@ import {
   registerUpload,
   addByCid,
   getQuote,
+  probeCidOnIpfs,
 } from "@/lib/videos.functions";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -29,7 +30,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
-import { computeCids, findCidOnIpfs } from "@/lib/ipfs-cid";
+import { computeCids } from "@/lib/ipfs-cid";
 import { PinataSDK } from "pinata";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 
@@ -102,6 +103,7 @@ function UploadPage() {
   const register = useServerFn(registerUpload);
   const addCid = useServerFn(addByCid);
   const quoteFn = useServerFn(getQuote);
+  const probeCidFn = useServerFn(probeCidOnIpfs);
 
   // Auto-provision an anonymous owner id so uploads are free and frictionless
   // until the real TXC wallet integration lands.
@@ -162,7 +164,7 @@ function UploadPage() {
         if (cancelled) return;
         setLocalCids(cids);
         setQuote({ txcAmount: q.txcAmount, usdAmount: q.usdAmount, txcUsd: q.txcUsd });
-        const hit = await findCidOnIpfs(cids);
+        const hit = await probeCidFn({ data: cids });
         if (cancelled) return;
         setMatchedCid(hit?.cid ?? null);
         setCidProbe(hit ? "on-ipfs" : "off-ipfs");
@@ -173,7 +175,7 @@ function UploadPage() {
     return () => {
       cancelled = true;
     };
-  }, [file, tooBig, quoteFn]);
+  }, [file, tooBig, quoteFn, probeCidFn]);
 
   /**
    * Best-effort browser playability probe. Most browsers don't play
