@@ -490,7 +490,6 @@ function ShareBar({
       ))}
       <CopyLinkButton
         value={url}
-        onCopied={() => onCopy(url)}
         icon={<LinkIcon className="h-3.5 w-3.5" />}
       />
       <button
