@@ -6,7 +6,8 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { listRecentVideos } from "@/lib/videos.functions";
-import { formatBytes, shortenHash } from "@/lib/fees";
+import { formatBytes } from "@/lib/fees";
+import { shortWalletId } from "@/lib/wallet";
 import { ArrowUpRight, Upload, Database, Coins, Eye, Play } from "lucide-react";
 import { ipfsThumbUrl } from "@/lib/ipfs-gateway";
 
@@ -186,7 +187,18 @@ function IndexPage() {
                 <div className="p-4">
                   <h3 className="font-bold text-sm truncate">{v.title}</h3>
                   <div className="mt-2 flex justify-between font-mono text-xs text-muted-foreground">
-                    <span>{v.owner_wallet ? shortenHash(v.owner_wallet) : "anonymous"}</span>
+                    {v.owner_wallet ? (
+                      <Link
+                        to="/u/$wallet"
+                        params={{ wallet: v.owner_wallet }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="hover:text-primary transition-colors"
+                      >
+                        {shortWalletId(v.owner_wallet)}
+                      </Link>
+                    ) : (
+                      <span>anonymous</span>
+                    )}
                     <span>
                       {v.view_count} views · {formatBytes(v.size_bytes)}
                     </span>
