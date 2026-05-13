@@ -263,11 +263,6 @@ function ManagePageInner() {
                           {v.status === "stamp_failed" && (
                             <RetryStampButton cid={v.cid} wallet={address!} />
                           )}
-                          <ToggleFlagButton
-                            cid={v.cid}
-                            wallet={address!}
-                            flagged={!!v.flagged_at}
-                          />
                           <ToggleVisibilityButton
                             cid={v.cid}
                             wallet={address!}
