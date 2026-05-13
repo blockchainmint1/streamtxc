@@ -1637,11 +1637,11 @@ export const submitOwnershipProof = createServerFn({ method: "POST" })
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       console.error("[submitOwnershipProof] verifyMessage threw", reason);
-      throw new Error(`Wallet RPC could not verify signature: ${reason}`);
+      throw new Error(`Could not verify signature: ${reason}`);
     }
     if (!ok) {
       throw new Error(
-        "That exact address/message/signature combination does not verify on the TXC node. This is not a whitespace issue; the wallet likely signed with a different internal key than the address shown, or produced a non-standard message signature.",
+        "Signature did not verify against this address. Double-check that the wallet's 'Sign message' dropdown is set to the exact address you entered, and re-paste the signature.",
       );
     }
 
