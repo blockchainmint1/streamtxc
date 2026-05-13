@@ -1620,8 +1620,26 @@ export const submitOwnershipProof = createServerFn({ method: "POST" })
       wallet: data.ownerWallet,
       nonce: video.owner_nonce,
     });
-    const ok = await verifyMessage(data.ownerWallet, data.signature, message);
-    if (!ok) throw new Error("Signature did not verify against that wallet");
+    console.log("[submitOwnershipProof] verifying", {
+      cid: video.cid,
+      ownerWallet: data.ownerWallet,
+      nonce: video.owner_nonce,
+      sigLen: data.signature.length,
+      messagePreview: message.slice(0, 80),
+    });
+    let ok = false;
+    try {
+      ok = await verifyMessage(data.ownerWallet, data.signature, message);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      console.error("[submitOwnershipProof] verifyMessage threw", reason);
+      throw new Error(`Wallet RPC could not verify signature: ${reason}`);
+    }
+    if (!ok) {
+      throw new Error(
+        "Signature recovered a different wallet. Make sure you signed the EXACT message above (no extra whitespace) using the 'Sign message' feature of the same address.",
+      );
+    }
 
     const verifiedAt = new Date().toISOString();
     let stampTxid: string | null = null;
