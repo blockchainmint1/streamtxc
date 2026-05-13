@@ -330,6 +330,43 @@ const cidSchema = z
   .max(120)
   .regex(/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[A-Za-z2-7]{50,})$/, "Invalid IPFS CID");
 
+/**
+ * Look up whether either form (CIDv1 or CIDv0) of a file is already pinned
+ * in OUR Pinata account. Used by the upload flow to skip re-uploading bytes
+ * we already host. We deliberately don't probe the public IPFS network — a
+ * gateway hit doesn't mean Pinata has it, and a missing pin would hang the
+ * downstream addByCid probe for 30s.
+ */
+export const lookupPinnedCid = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({ cidV1: cidStringSchema, cidV0: cidStringSchema })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const jwt = process.env.PINATA_JWT;
+    if (!jwt) return null;
+    const probe = async (cid: string): Promise<boolean> => {
+      try {
+        const res = await fetch(
+          `https://api.pinata.cloud/v3/files/public?cid=${encodeURIComponent(cid)}`,
+          { headers: { Authorization: `Bearer ${jwt}` } },
+        );
+        if (!res.ok) return false;
+        const json = (await res.json()) as {
+          data?: { files?: { id: string }[] };
+        };
+        return (json.data?.files?.length ?? 0) > 0;
+      } catch {
+        return false;
+      }
+    };
+    const [v1, v0] = await Promise.all([probe(data.cidV1), probe(data.cidV0)]);
+    if (v1) return { cid: data.cidV1, version: 1 as const };
+    if (v0) return { cid: data.cidV0, version: 0 as const };
+    return null;
+  });
+
 export const addByCid = createServerFn({ method: "POST" })
   .inputValidator((input) =>
     z
