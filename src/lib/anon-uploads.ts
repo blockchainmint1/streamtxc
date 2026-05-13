@@ -42,7 +42,7 @@ export function listAnonUploads(): AnonUploadRecord[] {
   return read().sort((a, b) => b.uploadedAt - a.uploadedAt);
 }
 
-export function useAnonUploadsSubscription(onChange: () => void) {
+export function subscribeToAnonUploads(onChange: () => void) {
   if (typeof window === "undefined") return () => {};
   const handler = () => onChange();
   window.addEventListener("txc:anon-uploads-changed", handler);
