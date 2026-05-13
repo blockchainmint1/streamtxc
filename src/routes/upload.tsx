@@ -609,7 +609,6 @@ function UploadPage() {
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {stage === "hashing" && "Hashing file…"}
                   {stage === "checking" && "Checking IPFS for this file…"}
-                  {stage === "signing" && "Requesting upload URL…"}
                   {stage === "uploading" && `Uploading ${progress.toFixed(0)}%…`}
                   {stage === "registering" && "Finalizing…"}
                 </>
