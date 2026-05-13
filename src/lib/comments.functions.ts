@@ -229,3 +229,38 @@ export const listComments = createServerFn({ method: "POST" })
       ipfsUrl: r.comment_cid ? gatewayUrl(r.comment_cid) : null,
     }));
   });
+
+export const listCommentsByWallet = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({ wallet: z.string().trim().min(1).max(200) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: rows, error } = await supabaseAdmin
+      .from("comments")
+      .select(
+        "id, body, video_cid, initial_payment_txc, boost_total_txc, last_boost_at, created_at, tx_hash, comment_cid",
+      )
+      .eq("commenter_wallet", data.wallet)
+      .eq("status", "active")
+      .is("hidden_at", null)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw new Error(error.message);
+    const commentRows = rows ?? [];
+    const cids = Array.from(new Set(commentRows.map((r) => r.video_cid)));
+    let titleByCid = new Map<string, string>();
+    if (cids.length > 0) {
+      const { data: vids, error: vErr } = await supabaseAdmin
+        .from("videos")
+        .select("cid, title")
+        .in("cid", cids);
+      if (vErr) throw new Error(vErr.message);
+      titleByCid = new Map((vids ?? []).map((v) => [v.cid, v.title]));
+    }
+    return commentRows.map((r) => ({
+      ...r,
+      videoTitle: titleByCid.get(r.video_cid) ?? null,
+      explorerUrl: r.tx_hash ? explorerTxUrl(r.tx_hash) : null,
+      ipfsUrl: r.comment_cid ? gatewayUrl(r.comment_cid) : null,
+    }));
+  });
