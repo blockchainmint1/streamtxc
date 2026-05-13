@@ -1,0 +1,1 @@
+ALTER TABLE public.videos ALTER COLUMN owner_wallet DROP NOT NULL;

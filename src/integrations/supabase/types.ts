@@ -342,7 +342,7 @@ export type Database = {
           owner_proof_status: string
           owner_signature: string | null
           owner_verified_at: string | null
-          owner_wallet: string
+          owner_wallet: string | null
           ownership_tx_hash: string | null
           paid_at: string | null
           payment_received_txc: number
@@ -381,7 +381,7 @@ export type Database = {
           owner_proof_status?: string
           owner_signature?: string | null
           owner_verified_at?: string | null
-          owner_wallet: string
+          owner_wallet?: string | null
           ownership_tx_hash?: string | null
           paid_at?: string | null
           payment_received_txc?: number
@@ -420,7 +420,7 @@ export type Database = {
           owner_proof_status?: string
           owner_signature?: string | null
           owner_verified_at?: string | null
-          owner_wallet?: string
+          owner_wallet?: string | null
           ownership_tx_hash?: string | null
           paid_at?: string | null
           payment_received_txc?: number
