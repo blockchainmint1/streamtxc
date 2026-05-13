@@ -692,12 +692,26 @@ function VerifyOwnershipDialog({
   }, [wallet, open, cid, challenge, messageWallet]);
 
   async function handleSubmit() {
-    if (!signature || !message) return;
+    console.log("[verify] click", {
+      hasSig: !!signature,
+      hasMessage: !!message,
+      messageWallet,
+      cid,
+    });
+    if (!signature || !message) {
+      toast.error("Missing signature or challenge message");
+      return;
+    }
+    if (!messageWallet) {
+      toast.error("Challenge wallet missing — re-open the dialog");
+      return;
+    }
     setBusy(true);
     try {
       const res = await submit({
         data: { cid, ownerWallet: messageWallet, signature: signature.trim() },
       });
+      console.log("[verify] success", res);
       if (res.releasedTxc > 0) {
         toast.success(
           `Verified — released ${res.releasedTxc.toFixed(4)} TXC from escrow`,
@@ -709,6 +723,7 @@ function VerifyOwnershipDialog({
       qc.invalidateQueries({ queryKey: ["anon-videos"] });
       setOpen(false);
     } catch (err) {
+      console.error("[verify] failed", err);
       toast.error(err instanceof Error ? err.message : "Verification failed");
     } finally {
       setBusy(false);
