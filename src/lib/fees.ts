@@ -5,7 +5,11 @@ export const RATE_USD_PER_MB_PER_MONTH = 0.001; // USD
 export const FALLBACK_TXC_USD = 0.10; // used only if the price feed is down
 export const REWARD_CREDIT_PER_VIEW_USD = 0.0001; // USD equivalent
 export const VIEW_DEBOUNCE_SECONDS = 30;
-export const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024; // 1 GB cap
+// 100 MB cap. Cloudflare Workers reject request bodies larger than ~100 MB,
+// and we proxy uploads through our Worker → Pinata to keep Pinata's CORS
+// allowlist off the critical path. Larger files? Pin to IPFS first
+// (e.g. pinata.cloud) and use the "Add by CID" flow.
+export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 export const PAYMENT_GRACE_HOURS = 24; // unpaid videos are unpinned after this
 
 /** Quote in USD — pure, no network. */
