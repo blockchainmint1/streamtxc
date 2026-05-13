@@ -33,16 +33,18 @@ export const Route = createFileRoute("/api/public/upload")({
         }
 
         const file = form.get("file");
-        if (!(file instanceof File) && !(file instanceof Blob)) {
+        if (file === null || typeof file === "string") {
           return Response.json(
             { error: "Missing 'file' field" },
             { status: 400 },
           );
         }
 
-        const filename =
-          (form.get("filename")?.toString() ||
-            (file instanceof File ? file.name : "video")).slice(0, 200);
+        const fnameField = form.get("filename");
+        const filename = (
+          (typeof fnameField === "string" && fnameField) ||
+          ("name" in file && typeof file.name === "string" ? file.name : "video")
+        ).slice(0, 200);
 
         if (file.size <= 0) {
           return Response.json({ error: "Empty file" }, { status: 400 });
