@@ -395,9 +395,20 @@ export function explorerTxUrl(txid: string): string {
 
 /**
  * Verify a Bitcoin-style signed message (the same flow the TXC web wallet
- * exposes under "Sign message"). Uses the node's `verifymessage` RPC so we
- * never need to ship a JS secp256k1 implementation. In stub mode (no RPC
- * configured) we accept any non-empty signature so local dev still works.
+ * exposes under "Sign message"). Verified IN-PROCESS in pure JS, NOT via
+ * the node's `verifymessage` RPC.
+ *
+ * Why not use the node? bitcoind's `verifymessage` only works for legacy
+ * P2PKH addresses whose pubkey the node already knows; it returns
+ * "Address does not refer to key" for bech32 (`txc1…`) and silently fails
+ * for legacy addresses signed by an external wallet. By recovering the
+ * pubkey ourselves we can verify signatures from ANY wallet for BOTH
+ * address formats:
+ *   • Legacy `T…` (P2PKH, version byte 0x42) → bitcoinjs-message
+ *   • SegWit `txc1…` (bech32, HRP "txc")     → BIP-322 (bip322-js)
+ *
+ * In stub mode (no RPC configured) we accept any non-empty signature so
+ * local dev still works.
  */
 export async function verifyMessage(
   address: string,
@@ -407,20 +418,71 @@ export async function verifyMessage(
   if (!rpcConfigured()) {
     return signature.trim().length >= 8;
   }
-  console.log("[verifyMessage]", {
+  return verifyMessageLocal(address, signature, message);
+}
+
+/**
+ * In-process signature verifier. Tries multiple "magic prefixes" because
+ * different chain forks ship different defaults and we'd rather verify a
+ * legitimate signature than reject the user.
+ */
+async function verifyMessageLocal(
+  address: string,
+  signature: string,
+  message: string,
+): Promise<boolean> {
+  const isBech32 = /^txc1[0-9a-z]+$/i.test(address);
+  const isLegacyT = /^T[1-9A-HJ-NP-Za-km-z]{20,90}$/.test(address);
+
+  if (isBech32) {
+    // BIP-322 path for SegWit addresses.
+    try {
+      const { Verifier } = await import("bip322-js");
+      return Verifier.verifySignature(address, message, signature);
+    } catch (err) {
+      console.error("[verifyMessageLocal] bip322 verify failed", err);
+      return false;
+    }
+  }
+
+  if (!isLegacyT) {
+    throw new Error(
+      `Unsupported TXC address format: "${address.slice(0, 10)}…". Use a legacy T… or bech32 txc1… address.`,
+    );
+  }
+
+  // Legacy P2PKH path. bitcoinjs-message recovers the pubkey from the
+  // signature, hashes it, and compares against the decoded address bytes.
+  // It accepts a custom message prefix; we try the common forks' prefixes.
+  const { verify } = await import("bitcoinjs-message");
+
+  const candidatePrefixes = [
+    "\u0018Bitcoin Signed Message:\n", // most forks (incl. many LTC-derived) keep this
+    "\u0019TEXITcoin Signed Message:\n",
+    "\u0019Litecoin Signed Message:\n",
+    "\u0019Dogecoin Signed Message:\n",
+  ];
+
+  for (const prefix of candidatePrefixes) {
+    try {
+      // checkSegwitAlways=true lets us also accept signatures that the wallet
+      // produced with a SegWit-flavoured recovery flag, even on legacy addrs.
+      if (verify(message, address, signature, prefix, true)) return true;
+    } catch {
+      // Move on to next prefix.
+    }
+    try {
+      if (verify(message, address, signature, prefix, false)) return true;
+    } catch {
+      // ignore
+    }
+  }
+
+  console.warn("[verifyMessageLocal] no prefix matched", {
     address,
     sigLen: signature.length,
-    sigPrefix: signature.slice(0, 6),
-    messageBytes: Buffer.byteLength(message, "utf8"),
-    messagePreview: message.slice(0, 60).replace(/\n/g, "\\n"),
   });
-  // Let RPC errors propagate so callers can surface the real reason
-  // (e.g. "Address does not refer to key" for non-P2PKH addresses, or
-  // "Malformed base64 encoding" for a botched signature paste). Bitcoin's
-  // verifymessage returns `false` only when the signature parses cleanly
-  // but recovers a different pubkey — which is the genuine "wrong wallet"
-  // case we want to report distinctly.
-  return await rpc<boolean>("verifymessage", [address, signature, message]);
+  return false;
 }
 
 /**

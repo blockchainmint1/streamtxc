@@ -1533,8 +1533,10 @@ const txcWalletSchema = z
   .regex(/^[a-zA-Z0-9]+$/, "Invalid TXC address");
 
 const signableOwnershipWalletSchema = txcWalletSchema.refine(
-  (value) => /^T[1-9A-HJ-NP-Za-km-z]{20,90}$/.test(value),
-  "Use a legacy T… wallet address for ownership verification. txc1… addresses are not supported by the current Sign message flow yet.",
+  (value) =>
+    /^T[1-9A-HJ-NP-Za-km-z]{20,90}$/.test(value) ||
+    /^txc1[0-9a-z]{20,90}$/i.test(value),
+  "Use a TXC wallet address (legacy T… or bech32 txc1…) for ownership verification.",
 );
 
 /**
@@ -1635,11 +1637,11 @@ export const submitOwnershipProof = createServerFn({ method: "POST" })
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       console.error("[submitOwnershipProof] verifyMessage threw", reason);
-      throw new Error(`Wallet RPC could not verify signature: ${reason}`);
+      throw new Error(`Could not verify signature: ${reason}`);
     }
     if (!ok) {
       throw new Error(
-        "That exact address/message/signature combination does not verify on the TXC node. This is not a whitespace issue; the wallet likely signed with a different internal key than the address shown, or produced a non-standard message signature.",
+        "Signature did not verify against this address. Double-check that the wallet's 'Sign message' dropdown is set to the exact address you entered, and re-paste the signature.",
       );
     }
 
