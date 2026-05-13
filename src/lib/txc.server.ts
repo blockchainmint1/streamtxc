@@ -452,11 +452,9 @@ async function verifyMessageLocal(
   }
 
   // Legacy P2PKH path. bitcoinjs-message recovers the pubkey from the
- // signature, hashes it, and compares against the decoded address bytes.
+  // signature, hashes it, and compares against the decoded address bytes.
   // It accepts a custom message prefix; we try the common forks' prefixes.
-  const bitcoinMessage = await import("bitcoinjs-message");
-  const verify = (bitcoinMessage as { verify: typeof import("bitcoinjs-message").verify }).verify
-    ?? (bitcoinMessage as { default: typeof import("bitcoinjs-message") }).default.verify;
+  const { verify } = await import("bitcoinjs-message");
 
   const candidatePrefixes = [
     "\u0018Bitcoin Signed Message:\n", // most forks (incl. many LTC-derived) keep this
