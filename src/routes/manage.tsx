@@ -31,7 +31,7 @@ import {
 } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
 import { isValidTxcAddress } from "@/lib/wallet";
-import { listAnonUploads, removeAnonUpload, useAnonUploadsSubscription } from "@/lib/anon-uploads";
+import { listAnonUploads, removeAnonUpload, subscribeToAnonUploads } from "@/lib/anon-uploads";
 import { formatBytes, shortenHash } from "@/lib/fees";
 import { ipfsThumbUrl } from "@/lib/ipfs-gateway";
 import {
@@ -152,7 +152,7 @@ function ManagePageInner() {
     listAnonUploads().map((r) => r.cid),
   );
   useEffect(() => {
-    return useAnonUploadsSubscription(() => {
+    return subscribeToAnonUploads(() => {
       setAnonCids(listAnonUploads().map((r) => r.cid));
     });
   }, []);
