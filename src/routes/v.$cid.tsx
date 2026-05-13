@@ -7,7 +7,8 @@ import { Footer } from "@/components/Footer";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { Button } from "@/components/ui/button";
 import { getVideo, pollTxStatus, reportVideo } from "@/lib/videos.functions";
-import { formatBytes, shortenHash, formatTxc, formatDate } from "@/lib/fees";
+import { formatBytes, formatTxc, formatDate } from "@/lib/fees";
+import { shortWalletId } from "@/lib/wallet";
 import {
   Copy,
   ExternalLink,
@@ -183,7 +184,18 @@ function WatchPage() {
               </span>
               <span>{formatBytes(video.size_bytes)}</span>
               <span className="flex items-center gap-1">
-                uploader: {video.owner_wallet ? shortenHash(video.owner_wallet) : "anonymous"}
+                uploader:{" "}
+                {video.owner_wallet ? (
+                  <Link
+                    to="/u/$wallet"
+                    params={{ wallet: video.owner_wallet }}
+                    className="font-mono hover:text-primary transition-colors"
+                  >
+                    {shortWalletId(video.owner_wallet)}
+                  </Link>
+                ) : (
+                  "anonymous"
+                )}
               </span>
               <ReportButton cid={video.cid} />
             </div>

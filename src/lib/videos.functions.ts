@@ -701,6 +701,30 @@ export const listMyVideos = createServerFn({ method: "POST" })
   });
 
 /**
+ * Public listing of videos uploaded by a specific wallet. Used by the
+ * /u/$wallet "channel" page. Returns the same shape as listRecentVideos
+ * so the same card grid can render the results.
+ */
+export const listVideosByOwner = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({ wallet: walletSchema }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: rows, error } = await supabaseAdmin
+      .from("videos")
+      .select(
+        "cid, title, owner_wallet, size_bytes, view_count, created_at, status, payment_required_txc, expires_at, thumbnail_cid",
+      )
+      .eq("owner_wallet", data.wallet)
+      .in("status", ["active", "mempool"])
+      .is("hidden_at", null)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw new Error(error.message);
+    return { items: (rows ?? []).map((r) => ({ ...r, comment_count: 0 })) };
+  });
+
+/**
  * Fetch a batch of videos by CID. Used by /manage to surface anonymous
  * uploads tracked in the browser's localStorage so the user can later
  * claim ownership of them.

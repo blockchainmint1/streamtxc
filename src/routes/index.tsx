@@ -6,7 +6,8 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { listRecentVideos } from "@/lib/videos.functions";
-import { formatBytes, shortenHash } from "@/lib/fees";
+import { formatBytes } from "@/lib/fees";
+import { shortWalletId } from "@/lib/wallet";
 import { ArrowUpRight, Upload, Database, Coins, Eye, Play } from "lucide-react";
 import { ipfsThumbUrl } from "@/lib/ipfs-gateway";
 
@@ -156,13 +157,15 @@ function IndexPage() {
           <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {accum.map((v) => (
-              <Link
+              <div
                 key={v.cid}
-                to="/v/$cid"
-                params={{ cid: v.cid }}
                 className="group block bg-card border border-border rounded-sm overflow-hidden hover:border-primary transition-colors"
               >
-                <div className="relative aspect-video bg-secondary overflow-hidden">
+                <Link
+                  to="/v/$cid"
+                  params={{ cid: v.cid }}
+                  className="block relative aspect-video bg-secondary overflow-hidden"
+                >
                   {v.thumbnail_cid ? (
                     <img
                       src={ipfsThumbUrl(v.thumbnail_cid)}
@@ -182,11 +185,27 @@ function IndexPage() {
                   <div className="absolute inset-0 flex items-center justify-center bg-background/0 group-hover:bg-background/30 transition-colors">
                     <Play className="h-10 w-10 text-background opacity-0 group-hover:opacity-100 fill-background transition-opacity" />
                   </div>
-                </div>
+                </Link>
                 <div className="p-4">
-                  <h3 className="font-bold text-sm truncate">{v.title}</h3>
+                  <Link
+                    to="/v/$cid"
+                    params={{ cid: v.cid }}
+                    className="block hover:text-primary transition-colors"
+                  >
+                    <h3 className="font-bold text-sm truncate">{v.title}</h3>
+                  </Link>
                   <div className="mt-2 flex justify-between font-mono text-xs text-muted-foreground">
-                    <span>{v.owner_wallet ? shortenHash(v.owner_wallet) : "anonymous"}</span>
+                    {v.owner_wallet ? (
+                      <Link
+                        to="/u/$wallet"
+                        params={{ wallet: v.owner_wallet }}
+                        className="hover:text-primary transition-colors"
+                      >
+                        {shortWalletId(v.owner_wallet)}
+                      </Link>
+                    ) : (
+                      <span>anonymous</span>
+                    )}
                     <span>
                       {v.view_count} views · {formatBytes(v.size_bytes)}
                     </span>
@@ -195,7 +214,7 @@ function IndexPage() {
                     {v.cid}
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
           {hasNextPage && (

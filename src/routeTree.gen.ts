@@ -14,6 +14,7 @@ import { Route as ManageRouteImport } from './routes/manage'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VCidRouteImport } from './routes/v.$cid'
+import { Route as UWalletRouteImport } from './routes/u.$wallet'
 import { Route as EmbedCidRouteImport } from './routes/embed.$cid'
 import { Route as ApiStreamCidRouteImport } from './routes/api/stream.$cid'
 import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
@@ -44,6 +45,11 @@ const IndexRoute = IndexRouteImport.update({
 const VCidRoute = VCidRouteImport.update({
   id: '/v/$cid',
   path: '/v/$cid',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UWalletRoute = UWalletRouteImport.update({
+  id: '/u/$wallet',
+  path: '/u/$wallet',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmbedCidRoute = EmbedCidRouteImport.update({
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/manage': typeof ManageRoute
   '/upload': typeof UploadRoute
   '/embed/$cid': typeof EmbedCidRoute
+  '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
@@ -98,6 +105,7 @@ export interface FileRoutesByTo {
   '/manage': typeof ManageRoute
   '/upload': typeof UploadRoute
   '/embed/$cid': typeof EmbedCidRoute
+  '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
@@ -112,6 +120,7 @@ export interface FileRoutesById {
   '/manage': typeof ManageRoute
   '/upload': typeof UploadRoute
   '/embed/$cid': typeof EmbedCidRoute
+  '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/manage'
     | '/upload'
     | '/embed/$cid'
+    | '/u/$wallet'
     | '/v/$cid'
     | '/api/public/txc-health'
     | '/api/public/upload'
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
     | '/manage'
     | '/upload'
     | '/embed/$cid'
+    | '/u/$wallet'
     | '/v/$cid'
     | '/api/public/txc-health'
     | '/api/public/upload'
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/manage'
     | '/upload'
     | '/embed/$cid'
+    | '/u/$wallet'
     | '/v/$cid'
     | '/api/public/txc-health'
     | '/api/public/upload'
@@ -167,6 +179,7 @@ export interface RootRouteChildren {
   ManageRoute: typeof ManageRoute
   UploadRoute: typeof UploadRoute
   EmbedCidRoute: typeof EmbedCidRoute
+  UWalletRoute: typeof UWalletRoute
   VCidRoute: typeof VCidRoute
   ApiPublicTxcHealthRoute: typeof ApiPublicTxcHealthRoute
   ApiPublicUploadRoute: typeof ApiPublicUploadRoute
@@ -210,6 +223,13 @@ declare module '@tanstack/react-router' {
       path: '/v/$cid'
       fullPath: '/v/$cid'
       preLoaderRoute: typeof VCidRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/u/$wallet': {
+      id: '/u/$wallet'
+      path: '/u/$wallet'
+      fullPath: '/u/$wallet'
+      preLoaderRoute: typeof UWalletRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/embed/$cid': {
@@ -263,6 +283,7 @@ const rootRouteChildren: RootRouteChildren = {
   ManageRoute: ManageRoute,
   UploadRoute: UploadRoute,
   EmbedCidRoute: EmbedCidRoute,
+  UWalletRoute: UWalletRoute,
   VCidRoute: VCidRoute,
   ApiPublicTxcHealthRoute: ApiPublicTxcHealthRoute,
   ApiPublicUploadRoute: ApiPublicUploadRoute,
