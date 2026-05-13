@@ -1,0 +1,31 @@
+UPDATE public.videos
+SET owner_wallet = 'TfnC5167tJz8LmrT36bNZtptfghZ9ayDdp',
+    owner_proof_status = 'verified',
+    owner_verified_at = now()
+WHERE cid IN (
+  'bafybeidlssfeq4vxrnnn62f3jxxz6qse2px22wtx34w3rxuon4golcftyy',
+  'bafybeignfacewtczxz422kqzgvivhlvbdsk5sar4hcyunhywgek6fcjbca',
+  'bafybeidqwh6jcnjimsunzvwlptjmfemyh44m5vvboujxunezm6wrmkpz5y',
+  'bafybeiba3r5ivm2ekj4y4b4nwfqfrnaobdekiapj5x4qgipydvyfyovwni',
+  'bafybeiftiynys63k6lpof3dv2braa6jal5sl2sq5icyrlbdvyrobfk5g7e',
+  'bafybeifl6ny6ybl2adnwohpc2skmgqtfbx3hwulrpdejcidynfoubbregi',
+  'bafybeibolifyavg3quwmsardkewmsst3it5dhealfzzlzbht2t4thlcq5m',
+  'bafybeidj727rl2tmhpqhfvoqjkpxyu42yfed3vfpwu3gehsyadjkjaovoq',
+  'bafybeiaj2iyfospujihar5sm3nusfvevbjugeizj24eagruwgsaql5tozi',
+  'bafybeiha4wggnuwn2wgk7f7ncjzesqlsjfikcc2lklncimlal3pcqm5y7u',
+  'bafybeigazgzcffzq3c3mfm2pnbygxlv3pcwzrldzzfex6mbixrmgpxvgie',
+  'bafybeialknldgiuvplzdv2l7tikyupl5wufxvovt4s2646ld4gsulzt6re',
+  'bafybeie4swpaadnl2arhqsj22vk6ovxeyvs7nmcceu5opvjcr22nixrgcy',
+  'bafybeiclvn7t7navxfcxgiy676dm3mv436nxlcks3ul3dlojwrsj3km5n4',
+  'bafybeiei2u747hy2l35qutetmkclzyoseij7w6b7dje6m7upzzpjtv4en4',
+  'bafybeibpdjqdwfcwk5tky7gc6ttwbpx4hrs4rni2pc22mwb42moobzp5pi',
+  'bafybeiduwmdg6df3lcgwbl5s5x4mhdftaocy57abtrw5h73j4sfvvhsnha',
+  'bafybeigsadin5xifoghctyagribzogdu6txq7utidtzoharoz3sdelp2n4',
+  'bafybeih3ighkj2xuurs4f4f3vy5lcnpxv6s4cgzqcio6fj55a2ckhm4eee',
+  'bafybeiax4sm5t7mxxgkbtehiyoualmsurp6cpmcv72qcyqzp4wzwcnqfum',
+  'bafybeigp4bksh5zyx2fmfxaiecdgdqocewunqwuqnymiff52fc5m2ynizu',
+  'bafybeih6kfamkyd3zb43ypbmxgsllqbkq2n6zglet5gfaqbqgqkms6fzoi',
+  'bafybeigq7xeql5jpxmysj74lilutv3lht6ldhgg2qt2m674gacdp3hgg2a',
+  'bafybeihdfy7e4vrwnbes4h4nx5kxhln2tdmp3ejhh3stfy73vpsomxc26a',
+  'bafybeicpbi2nyvqkvwzkadu6225i6g3wkl4zzc2yrnqmgnxnlvz444q74y'
+);
