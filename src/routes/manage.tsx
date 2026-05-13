@@ -139,48 +139,6 @@ function ToggleVisibilityButton({
   );
 }
 
-function ToggleFlagButton({
-  cid,
-  wallet,
-  flagged,
-}: {
-  cid: string;
-  wallet: string;
-  flagged: boolean;
-}) {
-  const qc = useQueryClient();
-  const toggle = useServerFn(setVideoFlagged);
-  const [busy, setBusy] = useState(false);
-  return (
-    <Button
-      size="sm"
-      variant={flagged ? "default" : "outline"}
-      className="font-mono"
-      disabled={busy}
-      title={flagged ? "Clear flag" : "Flag for follow-up (owner-only)"}
-      onClick={async () => {
-        setBusy(true);
-        try {
-          await toggle({ data: { wallet, cid, flagged: !flagged } });
-          toast.success(flagged ? "Flag cleared" : "Video flagged");
-          qc.invalidateQueries({ queryKey: ["my-videos"] });
-        } catch (err) {
-          toast.error(err instanceof Error ? err.message : "Failed");
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      {busy ? (
-        <Loader2 className="h-3 w-3 animate-spin" />
-      ) : (
-        <Flag className={"h-3 w-3 " + (flagged ? "fill-current" : "")} />
-      )}
-      <span className="ml-1">{flagged ? "flagged" : "flag"}</span>
-    </Button>
-  );
-}
-
 function ManagePageInner() {
   const { address, connect } = useWallet();
   const fetchMine = useServerFn(listMyVideos);
