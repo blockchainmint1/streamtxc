@@ -118,7 +118,7 @@ export const registerUpload = createServerFn({ method: "POST" })
   .inputValidator((input) =>
     z
       .object({
-        wallet: walletSchema,
+        wallet: optionalWalletSchema,
         cid: z
           .string()
           .trim()
@@ -139,13 +139,15 @@ export const registerUpload = createServerFn({ method: "POST" })
     await assertCidUnclaimed(data.cid);
     const _price = (await getTxcUsdPrice()).usd;
     const fee = usdToTxc(quoteUsd(data.sizeBytes, data.months), _price);
-    const paymentTx = mockPaymentTx(data.wallet, fee);
+    const ownerWallet = data.wallet ?? null;
+    const opReturnWallet = ownerWallet ?? "anon";
+    const paymentTx = mockPaymentTx(opReturnWallet, fee);
     const videoWallet = await assignVideoWallet();
     const stamp = await recordChainEvent({
       cid: data.cid,
       videoWallet: videoWallet.address,
       eventType: "C",
-      uploaderWallet: data.wallet,
+      uploaderWallet: opReturnWallet,
     });
     const videoStatus = stamp.real ? "mempool" : "stamp_failed";
     const txHash = stamp.real ? stamp.txid : null;
@@ -155,7 +157,7 @@ export const registerUpload = createServerFn({ method: "POST" })
     const meta = await recordMetadataAnchor({
       videoCid: data.cid,
       videoWallet: videoWallet.address,
-      uploaderWallet: data.wallet,
+      uploaderWallet: opReturnWallet,
       title: data.title,
       description: data.description ?? "",
       thumbnailCid: data.thumbnailCid ?? null,
@@ -166,7 +168,7 @@ export const registerUpload = createServerFn({ method: "POST" })
 
     const { error: vErr } = await supabaseAdmin.from("videos").insert({
       cid: data.cid,
-      owner_wallet: data.wallet,
+      owner_wallet: ownerWallet,
       title: data.title,
       description: data.description || null,
       size_bytes: data.sizeBytes,
@@ -189,14 +191,16 @@ export const registerUpload = createServerFn({ method: "POST" })
       throw new Error(`Failed to save video: ${vErr.message}`);
     }
 
-    const { error: pErr } = await supabaseAdmin.from("payments").insert({
-      video_cid: data.cid,
-      wallet: data.wallet,
-      txc_amount: fee,
-      months_prepaid: data.months,
-      mock_tx_hash: paymentTx,
-    });
-    if (pErr) throw new Error(`Failed to save payment: ${pErr.message}`);
+    if (ownerWallet) {
+      const { error: pErr } = await supabaseAdmin.from("payments").insert({
+        video_cid: data.cid,
+        wallet: ownerWallet,
+        txc_amount: fee,
+        months_prepaid: data.months,
+        mock_tx_hash: paymentTx,
+      });
+      if (pErr) throw new Error(`Failed to save payment: ${pErr.message}`);
+    }
 
     return {
       cid: data.cid,
