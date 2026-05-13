@@ -30,5 +30,38 @@ export async function computeCids(
   return { v1, v0 };
 }
 
-// IPFS reachability probing happens server-side via the `probeCidOnIpfs`
-// server function — the browser never hits a gateway directly.
+/**
+ * HEAD the public Pinata gateway for this CID. Returns true if the file
+ * already resolves there (someone else pinned it). 8s timeout.
+ */
+export async function isCidOnIpfs(cid: string): Promise<boolean> {
+  const url = `https://gateway.pinata.cloud/ipfs/${cid}`;
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 8_000);
+  try {
+    const res = await fetch(url, { method: "HEAD", signal: ctl.signal });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/**
+ * Probe IPFS for a file under BOTH its CIDv1 and CIDv0 forms in parallel.
+ * Returns the first CID that resolves, or null if neither does.
+ */
+export async function findCidOnIpfs(cids: {
+  v1: string;
+  v0: string;
+}): Promise<{ cid: string; version: 0 | 1 } | null> {
+  const [v1Hit, v0Hit] = await Promise.all([
+    isCidOnIpfs(cids.v1),
+    isCidOnIpfs(cids.v0),
+  ]);
+  // Prefer v1 since it matches what we'd upload as.
+  if (v1Hit) return { cid: cids.v1, version: 1 };
+  if (v0Hit) return { cid: cids.v0, version: 0 };
+  return null;
+}

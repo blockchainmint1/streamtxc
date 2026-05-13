@@ -269,7 +269,10 @@ function WatchPage() {
                 <Field
                   label="Metadata CID (title + description, on IPFS)"
                   value={video.metadata_cid}
-                  href={`/api/stream/${video.metadata_cid}`}
+                  href={`https://${
+                    import.meta.env.VITE_PINATA_GATEWAY_DOMAIN ||
+                    "gateway.pinata.cloud"
+                  }/ipfs/${video.metadata_cid}`}
                   onCopy={copy}
                   mono
                 />
