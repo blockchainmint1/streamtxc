@@ -393,15 +393,7 @@ export function explorerTxUrl(txid: string): string {
   return `${base}/tx/${txid}`;
 }
 
-const TXC_SIGNED_MESSAGE_MAGIC = "Texitcoin Signed Message:\n";
-
-function buildSignedMessagePrefixBytes(prefix: string): Uint8Array {
-  const prefixBytes = Buffer.from(prefix, "utf8");
-  return Buffer.concat([
-    Buffer.from(encodeBitcoinVarInt(prefixBytes.length)),
-    prefixBytes,
-  ]);
-}
+const TXC_SIGNED_MESSAGE_PREFIX = "\u0019Texitcoin Signed Message:\n";
 
 function encodeBitcoinVarInt(value: number): Uint8Array {
   if (value < 0xfd) return Uint8Array.from([value]);
@@ -449,7 +441,7 @@ async function verifyLegacyTMessage(
   const compressed = !!(flagByte & 12);
   const recovery = flagByte & 3;
 
-  const prefixBytes = buildSignedMessagePrefixBytes(TXC_SIGNED_MESSAGE_MAGIC);
+  const prefixBytes = Buffer.from(TXC_SIGNED_MESSAGE_PREFIX, "utf8");
   const messageBytes = Buffer.from(message, "utf8");
   const payload = Buffer.concat([
     prefixBytes,
@@ -506,9 +498,25 @@ export async function verifyMessage(
 
   try {
     if (isLegacyT) {
-      const ok = await verifyLegacyTMessage(trimmedAddress, trimmedSignature, message);
-      console.log("[verifyMessage] legacy local verify result", { ok });
-      return ok;
+      let localOk = false;
+      try {
+        localOk = await verifyLegacyTMessage(trimmedAddress, trimmedSignature, message);
+        console.log("[verifyMessage] legacy local verify result", { ok: localOk });
+      } catch (error) {
+        console.warn("[verifyMessage] legacy local verify threw", {
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      if (localOk) return true;
+
+      const rpcOk = await rpc<boolean>("verifymessage", [
+        trimmedAddress,
+        trimmedSignature,
+        message,
+      ]);
+      console.log("[verifyMessage] legacy rpc fallback result", { ok: rpcOk });
+      return rpcOk;
     }
 
     if (isBech32) {
