@@ -29,8 +29,7 @@ import {
   verifyBulkExtensionTx,
   setVideoVisibility,
 } from "@/lib/videos.functions";
-import { useWallet } from "@/lib/wallet";
-import { isValidTxcAddress } from "@/lib/wallet";
+import { useWallet, isSignableOwnershipTxcAddress } from "@/lib/wallet";
 import { listAnonUploads, removeAnonUpload, subscribeToAnonUploads } from "@/lib/anon-uploads";
 import { formatBytes, shortenHash } from "@/lib/fees";
 import { ipfsThumbUrl } from "@/lib/ipfs-gateway";
@@ -670,7 +669,7 @@ function VerifyOwnershipDialog({
   useEffect(() => {
     if (!open) return;
     const trimmed = wallet.trim();
-    if (!isValidTxcAddress(trimmed)) {
+    if (!isSignableOwnershipTxcAddress(trimmed)) {
       setMessage("");
       setMessageWallet("");
       return;
@@ -790,7 +789,7 @@ function VerifyOwnershipDialog({
             <Input
               value={wallet}
               onChange={(e) => setWallet(e.target.value)}
-              placeholder="txc1q..."
+              placeholder="T..."
               className="font-mono text-xs"
               autoFocus
             />
@@ -804,7 +803,7 @@ function VerifyOwnershipDialog({
               >
                 wallet.texitcoin.org
               </a>{" "}
-              and use its "Sign message" feature.
+              and use its "Sign message" feature with the same legacy <span className="text-foreground">T…</span> address. <span className="text-foreground">txc1…</span> addresses are not supported by this verification flow yet.
             </p>
           </div>
 
@@ -829,7 +828,7 @@ function VerifyOwnershipDialog({
                   ? message
                   : issuing
                     ? "issuing challenge…"
-                    : "Enter a valid TXC address above to generate a message."
+                    : "Enter a legacy T… address above to generate a message."
               }
               readOnly
               rows={5}
