@@ -1,58 +1,47 @@
-## Goal
+## Root cause (confirmed)
 
-Stop auto-assigning fake `0x…` EVM addresses. Let users upload anonymously, and offer a "Sign this upload and claim ownership" step on the upload page that links their real TXC (LTC-clone) wallet via `verifymessage`. Show the connected wallet in the header.
+`src/lib/ipfs-cid.ts` `isCidOnIpfs()` does `fetch('/api/stream/<cid>', { method: 'HEAD' })` and trusts `res.ok`.
 
-## Behavior
+`/api/stream/:cid` (in `src/routes/api/stream.$cid.tsx`) **always** returns a `302` redirect to the gateway, without checking existence. On the production host that redirect lands on `https://streamtxc.com/api/stream/<cid>`, which returns **`200 text/html`** (the SPA shell). `fetch` follows the redirect, sees `200`, and reports the CID as "on IPFS" — for *every* CID.
 
-1. **First page load** — no wallet. `useWallet()` returns `address: null`. Header shows a `connect wallet` link (goes to a small modal/route that explains the address+signature flow). No address is invented.
-2. **Upload (file or by-CID)** — works without a wallet. An optional collapsible panel: *"Sign this upload and claim ownership (optional)"* with two fields:
-   - TXC address (base58, validated client + server-side)
-   - Signature produced by the user's external TXC wallet over a server-issued nonce/message
-   When both are filled, submit them with the upload; server verifies via `verifyMessage` (already wired) and stores `owner_wallet` + `owner_proof_status='verified'`. Otherwise `owner_wallet` stays NULL and `owner_proof_status='unverified'` — video still publishes, payouts/escrow are simply unclaimable until they sign later.
-3. **Header** — when a wallet is connected, show `manage [abcdef]` (chars 2–7 of the TXC address) linking to `/manage`. When not connected, show `connect wallet`. Persist the verified address + signature in `localStorage` so subsequent uploads pre-fill it.
-4. **Manage page** — gains a "Claim ownership" action on each unverified video the user uploaded in this browser session (uses the same nonce → sign → verify flow already in `videos.functions.ts`).
+Verified with `curl -IL` against the live `bafybeie2pykofxtopbc4pzz7nqohxrvld5spcgt3ltsar63zd6ves5b3dy`: final response is `HTTP/2 200, content-type: text/html`.
 
-## Technical Details
+After the false positive, `handleSubmit` calls `addByCid`, which calls `pinByCid()` (no-op for an unknown CID) and then probes the Pinata gateway for up to 30 s for a `content-length`. That's the "not doing anything" — it's hung on the probe, eventually throwing `CID_NOT_FOUND`.
 
-### Wallet client (`src/lib/wallet.ts`)
-- Drop `randomAddress()` and the auto-`connect()` behavior entirely.
-- `useWallet()` exposes `{ address, signature, setVerifiedWallet(addr, sig), disconnect() }` — no auto-creation.
-- Address validation helper for TXC base58 (LTC-style: `L…`, `M…`, `3…`, plus bech32 `txc1…` if the node supports it). Reuse the same regex on the client as the server.
+## Fix
 
-### Server schema
-- `walletSchema` in `src/lib/videos.functions.ts` currently enforces `^0x[a-fA-F0-9]{40}$`. Replace with a TXC-address schema (base58 + optional bech32). Allow `null` where appropriate.
-- `registerUpload` / `addByCid` / `getUploadUrl`: make `wallet` optional. When omitted, store `owner_wallet = null`, skip the ownership stamp, and skip escrow setup. When present **with** a signature, run the existing `verifyMessage` path inline so the upload is born verified.
-- Add a `getOwnershipNonce({ purpose: 'upload' | 'claim', cid? })` server fn that returns a short-lived nonce string + the exact message to sign. For uploads we issue the nonce up-front (before the file is sent) and bind it to the eventual CID at register time.
+Replace the unreliable redirect-follow probe with a true "is this in our Pinata account?" check. That's the only case where skipping the upload is actually safe.
 
-### DB
-- `videos.owner_wallet` is currently `NOT NULL`. Migration: make it nullable; add CHECK `owner_proof_status IN ('unverified','pending','verified')`. Existing rows keep their fake `0x…` values for now (no data migration needed for MVP — they'll just look weird in the manage list until re-claimed). Optional follow-up: null them out.
-- `comments.commenter_wallet` already nullable — no change.
+### Changes
 
-### Header (`src/components/Header.tsx`)
-- Read `address` from `useWallet()`. Render either:
-  - `<Link to="/manage">manage {address.slice(1,7)}</Link>` (drop the leading prefix char like `L`/`M`/`t` so it reads as a clean 6-char id), or
-  - a `connect wallet` link/button that opens a small dialog explaining the sign flow (or routes to `/connect`).
+1. **New server fn `lookupPinnedCid`** in `src/lib/videos.functions.ts`
+   - Input (Zod-validated): `{ cidV1: string, cidV0: string }` using existing `cidStringSchema`.
+   - For each CID, in parallel, `GET https://api.pinata.cloud/v3/files/public?cid=<cid>` with `Authorization: Bearer ${process.env.PINATA_JWT}`.
+   - Treat as a hit only when the response is `200` and `data.files` is a non-empty array.
+   - Return `{ cid: string, version: 0 | 1 } | null`. Prefer v1 on tie.
 
-### Upload page (`src/routes/upload.tsx`)
-- Remove the `useEffect(() => { if (!address) connect(); }, …)` auto-connect.
-- Drop `!address` from the submit guard.
-- Add an `<Accordion>` / collapsible "Sign this upload and claim ownership (optional)" section with the two inputs and a "How do I sign?" helper (one-line instructions: open TXC Core → File → Sign Message → paste address + message → copy signature here).
-- Pass `wallet` and `signature` (both optional) into `registerUpload` / `addByCid`.
+2. **`src/routes/upload.tsx`** — swap the two callers of `findCidOnIpfs`:
+   - In the file-selected `useEffect`: call `lookupPinnedCid({ data: { cidV1: cids.v1, cidV0: cids.v0 } })` via `useServerFn`.
+   - In `handleSubmit`: same swap; keep the existing UX (toast, `addByCid`, navigate).
+   - Drop the `findCidOnIpfs` import. `computeCids` stays.
 
-### Manage page
-- Show videos uploaded from this browser even if `owner_wallet` is null, by tracking CIDs in `localStorage` at upload time (cheap MVP — no extra table). For each unverified one, show a "Claim ownership" button that runs the existing nonce → signature flow.
+3. **`src/lib/ipfs-cid.ts`** — delete `isCidOnIpfs` and `findCidOnIpfs` (only used by upload). Keep `computeCids` / `computeCidV0` / `computeCidV1`. Quick `rg` first to confirm no other callers; if any exist, leave the helpers but mark them with a comment saying they're unreliable for existence checks.
 
-## Out of Scope
+4. **No change to `/api/stream/:cid`** — its redirect behavior is correct for playback. The bug was using it as an existence probe.
 
-- Real wallet-extension integration (no MetaMask equivalent for TXC yet).
-- Migrating historical fake `0x…` rows.
-- Changing the comment / boost wallet flows (they already accept null).
+5. **Optional nicety in `addByCid` (`src/lib/videos.functions.ts`)**: if a future caller still hits the 30 s probe, surface a clearer toast — but that's not needed once the upload flow stops sending phantom CIDs into it.
 
-## Files Touched
+### Why not "probe the public IPFS DHT"
 
-- `src/lib/wallet.ts` — rewrite (no auto-create, store verified sig)
-- `src/lib/videos.functions.ts` — relax `walletSchema`, make wallet optional in upload fns, add `getOwnershipNonce`
-- `src/components/Header.tsx` — connect/manage chip
-- `src/routes/upload.tsx` — optional sign panel, allow no-wallet submit
-- `src/routes/manage.tsx` — surface anon uploads + per-video claim
-- One migration: `videos.owner_wallet` nullable
+Even a correct gateway check (no SPA fallthrough) only tells us whether *some* peer on IPFS has the bytes — not whether Pinata has them, which is what we actually need for reliable playback. Pinning happens on Pinata; checking Pinata's own pinset is the correct signal. If a user genuinely wants to register a foreign CID, the **Add by CID** tab already exists for that.
+
+### Technical details
+
+- Pinata endpoint shape: `GET /v3/files/public?cid=<cid>` → `{ data: { files: [{ id, cid, ... }], ... } }`. Empty `files` ⇒ not in our account.
+- `lookupPinnedCid` runs server-side so the JWT never reaches the browser.
+- No DB migration, no schema change, no UI redesign — pure plumbing swap.
+
+## Out of scope
+
+- Adding a `HEAD` mode to `/api/stream/:cid` that returns `404` for unknown CIDs (would need to authenticate to Pinata first; not worth it just to keep the current probe alive).
+- Re-enabling cross-account "found on public IPFS, skip upload" — see above; if you want it back, it should live behind the explicit Add-by-CID flow.
