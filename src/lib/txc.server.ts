@@ -465,10 +465,10 @@ async function verifyLegacyTMessage(
 /**
  * Verify a signed wallet-auth / ownership-proof message.
  *
- * The current TXC wallet login flow uses legacy `T…` addresses, so we let the
- * TXC node verify those signatures via its `verifymessage` RPC. That keeps the
- * exact chain-specific message prefix and hash rules on the node side and
- * avoids the Worker runtime crypto incompatibility we saw in production.
+ * The current TXC wallet login flow uses legacy `T…` addresses, verified
+ * locally with a Worker-safe recovery path using TXC's signed-message prefix.
+ * This avoids the node's flaky `verifymessage` behavior and the earlier Worker
+ * runtime incompatibility from the Node-only hashing stack.
  *
  * For bech32 `txc1…` addresses we keep a local BIP-322 fallback, though the UI
  * currently restricts sign-in and ownership proof to legacy `T…` addresses.
@@ -499,7 +499,7 @@ export async function verifyMessage(
   try {
     if (isLegacyT) {
       const ok = await verifyLegacyTMessage(trimmedAddress, trimmedSignature, message);
-      console.log("[verifyMessage] rpc(verifymessage) result", { ok });
+      console.log("[verifyMessage] legacy local verify result", { ok });
       return ok;
     }
 
