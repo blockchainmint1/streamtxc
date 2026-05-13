@@ -27,7 +27,6 @@ import {
   buildBulkExtendQuote,
   verifyBulkExtensionTx,
   setVideoVisibility,
-  setVideoFlagged,
 } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, shortenHash } from "@/lib/fees";
@@ -45,7 +44,6 @@ import {
   Copy,
   Eye,
   EyeOff,
-  Flag,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -137,48 +135,6 @@ function ToggleVisibilityButton({
         <Eye className="h-3 w-3" />
       )}
       <span className="ml-1">{hidden ? "show" : "hide"}</span>
-    </Button>
-  );
-}
-
-function ToggleFlagButton({
-  cid,
-  wallet,
-  flagged,
-}: {
-  cid: string;
-  wallet: string;
-  flagged: boolean;
-}) {
-  const qc = useQueryClient();
-  const toggle = useServerFn(setVideoFlagged);
-  const [busy, setBusy] = useState(false);
-  return (
-    <Button
-      size="sm"
-      variant={flagged ? "default" : "outline"}
-      className="font-mono"
-      disabled={busy}
-      title={flagged ? "Clear flag" : "Flag for follow-up (owner-only)"}
-      onClick={async () => {
-        setBusy(true);
-        try {
-          await toggle({ data: { wallet, cid, flagged: !flagged } });
-          toast.success(flagged ? "Flag cleared" : "Video flagged");
-          qc.invalidateQueries({ queryKey: ["my-videos"] });
-        } catch (err) {
-          toast.error(err instanceof Error ? err.message : "Failed");
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      {busy ? (
-        <Loader2 className="h-3 w-3 animate-spin" />
-      ) : (
-        <Flag className={"h-3 w-3 " + (flagged ? "fill-current" : "")} />
-      )}
-      <span className="ml-1">{flagged ? "flagged" : "flag"}</span>
     </Button>
   );
 }
@@ -307,11 +263,6 @@ function ManagePageInner() {
                           {v.status === "stamp_failed" && (
                             <RetryStampButton cid={v.cid} wallet={address!} />
                           )}
-                          <ToggleFlagButton
-                            cid={v.cid}
-                            wallet={address!}
-                            flagged={!!v.flagged_at}
-                          />
                           <ToggleVisibilityButton
                             cid={v.cid}
                             wallet={address!}
