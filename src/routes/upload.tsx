@@ -432,19 +432,43 @@ function UploadPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label className="font-mono text-xs">VIDEO FILE</Label>
-              <label className="block border-2 border-dashed border-border hover:border-primary rounded-sm p-8 cursor-pointer transition-colors bg-card">
+              <label
+                className={`block border-2 border-dashed rounded-sm p-8 cursor-pointer transition-colors bg-card ${
+                  isDragging
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary"
+                }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (!isDragging) setIsDragging(true);
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  const f = e.dataTransfer.files?.[0];
+                  if (!f) return;
+                  if (!f.type.startsWith("video/") && !/\.(mp4|webm|mov|m4v)$/i.test(f.name)) {
+                    toast.error("Please drop a video file (mp4, webm, mov)");
+                    return;
+                  }
+                  acceptFile(f);
+                }}
+              >
                 <input
                   type="file"
                   accept="video/mp4,video/webm,video/quicktime"
                   className="hidden"
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (f) {
-                      setFile(f);
-                      setCodecWarning(checkCodec(f));
-                      if (!title) setTitle(f.name.replace(/\.[^.]+$/, ""));
-                      setThumbnailCid(null);
-                    }
+                    if (f) acceptFile(f);
                   }}
                 />
                 {file ? (
@@ -467,7 +491,9 @@ function UploadPage() {
                 ) : (
                   <div className="text-center">
                     <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <div className="font-mono text-sm">click to choose a video</div>
+                    <div className="font-mono text-sm">
+                      {isDragging ? "drop to upload" : "drag & drop or click to choose a video"}
+                    </div>
                     <div className="font-mono text-xs text-muted-foreground mt-1">
                       mp4 / webm / mov · max {formatBytes(MAX_UPLOAD_BYTES)}
                     </div>
