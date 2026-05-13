@@ -30,7 +30,8 @@ import {
   setVideoVisibility,
 } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
-import { listAnonUploads, removeAnonUpload, useAnonUploadsSubscription } from "@/lib/anon-uploads";
+import { isValidTxcAddress } from "@/lib/wallet";
+import { listAnonUploads, removeAnonUpload, subscribeToAnonUploads } from "@/lib/anon-uploads";
 import { formatBytes, shortenHash } from "@/lib/fees";
 import { ipfsThumbUrl } from "@/lib/ipfs-gateway";
 import {
@@ -151,7 +152,7 @@ function ManagePageInner() {
     listAnonUploads().map((r) => r.cid),
   );
   useEffect(() => {
-    return useAnonUploadsSubscription(() => {
+    return subscribeToAnonUploads(() => {
       setAnonCids(listAnonUploads().map((r) => r.cid));
     });
   }, []);
@@ -636,40 +637,55 @@ function VerifyOwnershipDialog({
   const challenge = useServerFn(getOwnershipChallenge);
   const submit = useServerFn(submitOwnershipProof);
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<"wallet" | "sign">("wallet");
   const [wallet, setWallet] = useState(currentWallet);
   const [message, setMessage] = useState("");
+  const [messageWallet, setMessageWallet] = useState("");
+  const [issuing, setIssuing] = useState(false);
   const [signature, setSignature] = useState("");
   const [busy, setBusy] = useState(false);
 
   function reset() {
-    setStep("wallet");
     setWallet(currentWallet);
     setMessage("");
+    setMessageWallet("");
     setSignature("");
     setBusy(false);
+    setIssuing(false);
   }
 
-  async function handleStartChallenge() {
-    if (!wallet) return;
-    setBusy(true);
-    try {
-      const res = await challenge({ data: { cid, ownerWallet: wallet } });
-      setMessage(res.message);
-      setStep("sign");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to start");
-    } finally {
-      setBusy(false);
+  // Auto-issue the challenge as soon as the address looks valid. Debounced
+  // so we don't spam the server while the user is still typing/pasting, and
+  // re-runs whenever the wallet changes so the message always matches.
+  useEffect(() => {
+    if (!open) return;
+    const trimmed = wallet.trim();
+    if (!isValidTxcAddress(trimmed)) {
+      setMessage("");
+      setMessageWallet("");
+      return;
     }
-  }
+    if (trimmed === messageWallet) return;
+    const id = setTimeout(async () => {
+      setIssuing(true);
+      try {
+        const res = await challenge({ data: { cid, ownerWallet: trimmed } });
+        setMessage(res.message);
+        setMessageWallet(trimmed);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to issue challenge");
+      } finally {
+        setIssuing(false);
+      }
+    }, 350);
+    return () => clearTimeout(id);
+  }, [wallet, open, cid, challenge, messageWallet]);
 
   async function handleSubmit() {
-    if (!signature) return;
+    if (!signature || !message) return;
     setBusy(true);
     try {
       const res = await submit({
-        data: { cid, ownerWallet: wallet, signature: signature.trim() },
+        data: { cid, ownerWallet: messageWallet, signature: signature.trim() },
       });
       if (res.releasedTxc > 0) {
         toast.success(
@@ -679,12 +695,21 @@ function VerifyOwnershipDialog({
         toast.success("Wallet ownership verified on chain");
       }
       qc.invalidateQueries({ queryKey: ["my-videos"] });
+      qc.invalidateQueries({ queryKey: ["anon-videos"] });
       setOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Verification failed");
     } finally {
       setBusy(false);
     }
+  }
+
+  function copyMessage() {
+    if (!message) return;
+    navigator.clipboard.writeText(message).then(
+      () => toast.success("Message copied"),
+      () => toast.error("Copy failed"),
+    );
   }
 
   return (
@@ -733,102 +758,95 @@ function VerifyOwnershipDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {step === "wallet" ? (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label className="font-mono text-xs">PAYOUT TXC ADDRESS</Label>
-              <Input
-                value={wallet}
-                onChange={(e) => setWallet(e.target.value)}
-                placeholder="txc1q..."
-                className="font-mono text-xs"
-              />
-              <p className="font-mono text-[10px] text-muted-foreground">
-                Comment revenue (90%) will be sent to this address. Open it in{" "}
-                <a
-                  href="https://wallet.texitcoin.org"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-primary hover:underline"
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="font-mono text-xs">1. PAYOUT TXC ADDRESS</Label>
+            <Input
+              value={wallet}
+              onChange={(e) => setWallet(e.target.value)}
+              placeholder="txc1q..."
+              className="font-mono text-xs"
+              autoFocus
+            />
+            <p className="font-mono text-[10px] text-muted-foreground">
+              Comment revenue (90%) will be sent to this address. Open it in{" "}
+              <a
+                href="https://wallet.texitcoin.org"
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary hover:underline"
+              >
+                wallet.texitcoin.org
+              </a>{" "}
+              and use its "Sign message" feature.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="font-mono text-xs">2. SIGN THIS MESSAGE</Label>
+              {message && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 font-mono text-[10px]"
+                  onClick={copyMessage}
                 >
-                  wallet.texitcoin.org
-                </a>{" "}
-                — you'll need its "Sign message" feature next.
-              </p>
+                  <Copy className="h-3 w-3 mr-1" /> copy
+                </Button>
+              )}
             </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                className="font-mono"
-                onClick={() => setOpen(false)}
-                disabled={busy}
-              >
-                cancel
-              </Button>
-              <Button
-                className="font-mono"
-                onClick={handleStartChallenge}
-                disabled={!wallet || busy}
-              >
-                {busy ? (
-                  <>
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" /> issuing…
-                  </>
-                ) : (
-                  "next: sign message"
-                )}
-              </Button>
-            </DialogFooter>
+            <Textarea
+              value={
+                message
+                  ? message
+                  : issuing
+                    ? "issuing challenge…"
+                    : "Enter a valid TXC address above to generate a message."
+              }
+              readOnly
+              rows={5}
+              className="font-mono text-[11px]"
+            />
           </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label className="font-mono text-xs">1. SIGN THIS MESSAGE</Label>
-              <Textarea
-                value={message}
-                readOnly
-                rows={5}
-                className="font-mono text-[11px]"
-              />
-              <p className="font-mono text-[10px] text-muted-foreground">
-                Open wallet.texitcoin.org → Sign message → paste this exactly.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label className="font-mono text-xs">2. PASTE SIGNATURE</Label>
-              <Textarea
-                value={signature}
-                onChange={(e) => setSignature(e.target.value)}
-                rows={3}
-                placeholder="H+...="
-                className="font-mono text-[11px]"
-              />
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                className="font-mono"
-                onClick={() => setStep("wallet")}
-                disabled={busy}
-              >
-                back
-              </Button>
-              <Button
-                className="font-mono"
-                onClick={handleSubmit}
-                disabled={!signature || busy}
-              >
-                {busy ? (
-                  <>
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" /> verifying…
-                  </>
-                ) : (
-                  "verify & stamp"
-                )}
-              </Button>
-            </DialogFooter>
+
+          <div className="space-y-2">
+            <Label className="font-mono text-xs">3. PASTE SIGNATURE</Label>
+            <Textarea
+              value={signature}
+              onChange={(e) => setSignature(e.target.value)}
+              rows={3}
+              placeholder="H+...="
+              className="font-mono text-[11px]"
+              disabled={!message}
+            />
           </div>
-        )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="font-mono"
+              onClick={() => setOpen(false)}
+              disabled={busy}
+            >
+              cancel
+            </Button>
+            <Button
+              className="font-mono"
+              onClick={handleSubmit}
+              disabled={!signature || !message || busy || issuing}
+            >
+              {busy ? (
+                <>
+                  <Loader2 className="mr-2 h-3 w-3 animate-spin" /> verifying…
+                </>
+              ) : (
+                "verify & stamp"
+              )}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
