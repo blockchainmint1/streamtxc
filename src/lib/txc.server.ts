@@ -1,5 +1,4 @@
 // TXC blockchain adapter (server-only).
-import { createHash } from "crypto";
 //
 // CHAIN FACTS (don't forget again):
 //   - TEXITcoin (TXC) is a Layer 1 Scrypt PoW UTXO chain — Litecoin/Dogecoin
@@ -413,7 +412,7 @@ export async function verifyMessage(
     sigLen: signature.length,
     sigPrefix: signature.slice(0, 6),
     messageBytes: Buffer.byteLength(message, "utf8"),
-    messageSha256: createHash("sha256").update(message).digest("hex").slice(0, 16),
+    messagePreview: message.slice(0, 60).replace(/\n/g, "\\n"),
   });
   // Let RPC errors propagate so callers can surface the real reason
   // (e.g. "Address does not refer to key" for non-P2PKH addresses, or
