@@ -7,7 +7,7 @@ import { Footer } from "@/components/Footer";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { Button } from "@/components/ui/button";
 import { getVideo, pollTxStatus, reportVideo } from "@/lib/videos.functions";
-import { formatBytes, shortenHash, formatTxc, formatDate } from "@/lib/fees";
+import { formatBytes, formatTxc, formatDate } from "@/lib/fees";
 import { shortWalletId } from "@/lib/wallet";
 import {
   Copy,
