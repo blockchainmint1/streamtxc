@@ -26,6 +26,10 @@ function buildLoginMessage(wallet: string, nonce: string): string {
   return wallet;
 }
 
+function normalizeSignature(signature: string): string {
+  return signature.replace(/\s+/g, "");
+}
+
 /**
  * Step 1 of wallet login. Returns the message the user must sign and an
  * opaque challenge token they hand back in step 2. No DB write — challenge
@@ -61,13 +65,14 @@ export const completeWalletLogin = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    const normalizedSignature = normalizeSignature(data.signature);
     const claims = await verifyChallengeToken(data.challengeToken);
     if (!claims) {
       throw new Error("Login challenge expired — start over.");
     }
     let ok = false;
     try {
-      ok = await verifyMessage(claims.wallet, data.signature, claims.message);
+      ok = await verifyMessage(claims.wallet, normalizedSignature, claims.message);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       console.error("[completeWalletLogin] verifyMessage threw", reason);
