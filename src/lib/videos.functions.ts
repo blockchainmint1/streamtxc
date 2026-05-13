@@ -334,7 +334,7 @@ export const addByCid = createServerFn({ method: "POST" })
   .inputValidator((input) =>
     z
       .object({
-        wallet: walletSchema,
+        wallet: optionalWalletSchema,
         cid: cidSchema,
         title: z.string().min(1).max(200),
         description: z.string().max(2000).optional().default(""),
@@ -409,13 +409,15 @@ export const addByCid = createServerFn({ method: "POST" })
 
     const _price = (await getTxcUsdPrice()).usd;
     const fee = usdToTxc(quoteUsd(Math.max(sizeBytes, 1), data.months), _price);
-    const paymentTx = mockPaymentTx(data.wallet, fee);
+    const ownerWallet = data.wallet ?? null;
+    const opReturnWallet = ownerWallet ?? "anon";
+    const paymentTx = mockPaymentTx(opReturnWallet, fee);
     const videoWallet = await assignVideoWallet();
     const stamp = await recordChainEvent({
       cid: data.cid,
       videoWallet: videoWallet.address,
       eventType: "C",
-      uploaderWallet: data.wallet,
+      uploaderWallet: opReturnWallet,
     });
     const videoStatus = stamp.real ? "mempool" : "stamp_failed";
     const txHash = stamp.real ? stamp.txid : null;
@@ -423,7 +425,7 @@ export const addByCid = createServerFn({ method: "POST" })
     const meta = await recordMetadataAnchor({
       videoCid: data.cid,
       videoWallet: videoWallet.address,
-      uploaderWallet: data.wallet,
+      uploaderWallet: opReturnWallet,
       title: data.title,
       description: data.description ?? "",
       thumbnailCid: data.thumbnailCid ?? null,
@@ -434,7 +436,7 @@ export const addByCid = createServerFn({ method: "POST" })
 
     const { error: vErr } = await supabaseAdmin.from("videos").insert({
       cid: data.cid,
-      owner_wallet: data.wallet,
+      owner_wallet: ownerWallet,
       title: data.title,
       description: data.description || null,
       size_bytes: sizeBytes,
@@ -455,14 +457,16 @@ export const addByCid = createServerFn({ method: "POST" })
       throw new Error(`Failed to save video: ${vErr.message}`);
     }
 
-    const { error: pErr } = await supabaseAdmin.from("payments").insert({
-      video_cid: data.cid,
-      wallet: data.wallet,
-      txc_amount: fee,
-      months_prepaid: data.months,
-      mock_tx_hash: paymentTx,
-    });
-    if (pErr) throw new Error(`Failed to save payment: ${pErr.message}`);
+    if (ownerWallet) {
+      const { error: pErr } = await supabaseAdmin.from("payments").insert({
+        video_cid: data.cid,
+        wallet: ownerWallet,
+        txc_amount: fee,
+        months_prepaid: data.months,
+        mock_tx_hash: paymentTx,
+      });
+      if (pErr) throw new Error(`Failed to save payment: ${pErr.message}`);
+    }
 
     return {
       cid: data.cid,
@@ -614,7 +618,7 @@ export const backfillMetadataAnchors = createServerFn({ method: "POST" })
         const meta = await recordMetadataAnchor({
           videoCid: v.cid,
           videoWallet: v.video_wallet!,
-          uploaderWallet: v.owner_wallet,
+          uploaderWallet: v.owner_wallet ?? "anon",
           title: v.title,
           description: v.description ?? "",
         });
@@ -682,7 +686,7 @@ export const setVideoVisibility = createServerFn({ method: "POST" })
       .maybeSingle();
     if (rErr) throw new Error(rErr.message);
     if (!row) throw new Error("Video not found");
-    if (row.owner_wallet.toLowerCase() !== data.wallet.toLowerCase()) {
+    if (!ownerMatches(row.owner_wallet, data.wallet)) {
       throw new Error("Not the owner of this video");
     }
 
@@ -720,7 +724,7 @@ export const setVideoFlagged = createServerFn({ method: "POST" })
       .maybeSingle();
     if (rErr) throw new Error(rErr.message);
     if (!row) throw new Error("Video not found");
-    if (row.owner_wallet.toLowerCase() !== data.wallet.toLowerCase()) {
+    if (!ownerMatches(row.owner_wallet, data.wallet)) {
       throw new Error("Not the owner of this video");
     }
 
@@ -1256,7 +1260,7 @@ export const retryOwnStamp = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!v) throw new Error("Video not found");
-    if (v.owner_wallet.toLowerCase() !== data.wallet.toLowerCase()) {
+    if (!ownerMatches(v.owner_wallet, data.wallet)) {
       throw new Error("Not your video");
     }
     if (v.status !== "stamp_failed") {
@@ -1378,7 +1382,7 @@ export const editVideoMetadata = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!video) throw new Error("Video not found");
-    if (video.owner_wallet.toLowerCase() !== data.wallet.toLowerCase()) {
+    if (!ownerMatches(video.owner_wallet, data.wallet)) {
       throw new Error("Only the owner can edit this video");
     }
     if (!video.video_wallet) {
@@ -1754,7 +1758,7 @@ export const retryCommentPayout = createServerFn({ method: "POST" })
       .select("owner_wallet")
       .eq("cid", c.video_cid)
       .maybeSingle();
-    if (!v || v.owner_wallet.toLowerCase() !== data.wallet.toLowerCase())
+    if (!v || !ownerMatches(v.owner_wallet, data.wallet))
       throw new Error("Only the video owner can retry payouts");
     return await sweepCommentPayout(data.commentId);
   });
