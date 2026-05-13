@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { gatewayUrl } from "@/lib/pinata.server";
 import { recordView } from "@/lib/videos.functions";
+import { buildIpfsUrl, getIpfsGateways } from "@/lib/ipfsGateway";
 
 async function hashIp(ip: string): Promise<string> {
   const data = new TextEncoder().encode(ip);
@@ -31,19 +31,86 @@ export const Route = createFileRoute("/api/stream/$cid")({
           console.error("view tracking failed", e),
         );
 
-        // Redirect the browser straight to our dedicated Pinata gateway.
-        // Streaming through the Worker added a hop and CPU/subrequest cost;
-        // a 302 lets the player do native HTTP Range requests against Pinata
-        // directly, which is dramatically faster on a paid dedicated gateway.
-        // The redirect itself is cached at the edge for a day so repeat
-        // viewers don't even hit the Worker.
-        return new Response(null, {
-          status: 302,
-          headers: {
-            location: gatewayUrl(cid),
-            "cache-control": "public, max-age=86400",
-            "access-control-allow-origin": "*",
-          },
+        // Proxy through configured gateways with fallback so the frontend
+        // never has to know which gateway works. Range/If-* headers are
+        // forwarded so HTTP byte-range seeking still works.
+        const range = request.headers.get("range") ?? undefined;
+        const ifRange = request.headers.get("if-range") ?? undefined;
+        const accept = request.headers.get("accept") ?? undefined;
+
+        const gateways = getIpfsGateways();
+        let lastStatus = 0;
+        let lastBody = "All IPFS gateways failed";
+        for (const gw of gateways) {
+          const url = buildIpfsUrl(gw, cid);
+          const ctl = new AbortController();
+          const t = setTimeout(() => ctl.abort(), 12_000);
+          try {
+            const upstream = await fetch(url, {
+              method: "GET",
+              headers: {
+                ...(range ? { Range: range } : {}),
+                ...(ifRange ? { "If-Range": ifRange } : {}),
+                ...(accept ? { Accept: accept } : {}),
+              },
+              signal: ctl.signal,
+              redirect: "follow",
+            });
+            // 2xx (incl. 206 partial) and 304 are good. 416 is a legitimate
+            // client-error response we want to pass through.
+            const passthrough =
+              (upstream.status >= 200 && upstream.status < 300) ||
+              upstream.status === 304 ||
+              upstream.status === 416;
+            if (!passthrough) {
+              lastStatus = upstream.status;
+              lastBody = `Gateway ${gw} returned ${upstream.status}`;
+              try {
+                await upstream.arrayBuffer();
+              } catch {
+                /* ignore */
+              }
+              continue;
+            }
+            const headers = new Headers();
+            const passHeaders = [
+              "content-type",
+              "content-length",
+              "content-range",
+              "accept-ranges",
+              "etag",
+              "last-modified",
+            ];
+            for (const h of passHeaders) {
+              const v = upstream.headers.get(h);
+              if (v) headers.set(h, v);
+            }
+            headers.set("access-control-allow-origin", "*");
+            headers.set("cache-control", "public, max-age=3600");
+            return new Response(upstream.body, {
+              status: upstream.status,
+              headers,
+            });
+          } catch (err) {
+            lastBody =
+              err instanceof Error && err.name === "AbortError"
+                ? `Gateway ${gw} timed out`
+                : err instanceof Error
+                  ? err.message
+                  : `Gateway ${gw} failed`;
+          } finally {
+            clearTimeout(t);
+          }
+        }
+
+        console.error("stream proxy: all gateways failed", {
+          cid,
+          lastStatus,
+          lastBody,
+        });
+        return new Response(lastBody, {
+          status: 502,
+          headers: { "access-control-allow-origin": "*" },
         });
       },
     },
