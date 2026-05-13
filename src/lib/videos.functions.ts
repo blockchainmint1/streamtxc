@@ -688,14 +688,16 @@ export const backfillMetadataAnchors = createServerFn({ method: "POST" })
   });
 
 export const listMyVideos = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input) =>
     z.object({ wallet: walletSchema }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ context }) => {
+    const wallet = context.wallet;
     const { data: videos, error } = await supabaseAdmin
       .from("videos")
       .select("*")
-      .eq("owner_wallet", data.wallet)
+      .eq("owner_wallet", wallet)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return videos ?? [];
@@ -754,6 +756,7 @@ export const listVideosByCids = createServerFn({ method: "POST" })
  * the owner's /manage view so they can be unhidden.
  */
 export const setVideoVisibility = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input) =>
     z
       .object({
@@ -763,7 +766,8 @@ export const setVideoVisibility = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const wallet = context.wallet;
     const { data: row, error: rErr } = await supabaseAdmin
       .from("videos")
       .select("cid, owner_wallet")
@@ -771,7 +775,7 @@ export const setVideoVisibility = createServerFn({ method: "POST" })
       .maybeSingle();
     if (rErr) throw new Error(rErr.message);
     if (!row) throw new Error("Video not found");
-    if (!ownerMatches(row.owner_wallet, data.wallet)) {
+    if (!ownerMatches(row.owner_wallet, wallet)) {
       throw new Error("Not the owner of this video");
     }
 
@@ -791,6 +795,7 @@ export const setVideoVisibility = createServerFn({ method: "POST" })
  * — just shows a badge in /manage so the owner can come back to it.
  */
 export const setVideoFlagged = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input) =>
     z
       .object({
@@ -801,7 +806,8 @@ export const setVideoFlagged = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const wallet = context.wallet;
     const { data: row, error: rErr } = await supabaseAdmin
       .from("videos")
       .select("cid, owner_wallet")
@@ -809,7 +815,7 @@ export const setVideoFlagged = createServerFn({ method: "POST" })
       .maybeSingle();
     if (rErr) throw new Error(rErr.message);
     if (!row) throw new Error("Video not found");
-    if (!ownerMatches(row.owner_wallet, data.wallet)) {
+    if (!ownerMatches(row.owner_wallet, wallet)) {
       throw new Error("Not the owner of this video");
     }
 
@@ -832,6 +838,7 @@ export const setVideoFlagged = createServerFn({ method: "POST" })
  * CLI string. Nothing is broadcast — the user pastes this into their wallet.
  */
 export const buildBulkExtendQuote = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input) =>
     z
       .object({
@@ -840,11 +847,12 @@ export const buildBulkExtendQuote = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const wallet = context.wallet;
     const { data: rows, error } = await supabaseAdmin
       .from("videos")
       .select("cid, title, video_wallet, size_bytes, expires_at")
-      .eq("owner_wallet", data.wallet)
+      .eq("owner_wallet", wallet)
       .not("video_wallet", "is", null)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
@@ -899,6 +907,7 @@ export const buildBulkExtendQuote = createServerFn({ method: "POST" })
  * later when extension semantics land there.
  */
 export const markBulkExtended = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input) =>
     z
       .object({
@@ -908,11 +917,12 @@ export const markBulkExtended = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const wallet = context.wallet;
     const { data: rows, error } = await supabaseAdmin
       .from("videos")
       .select("cid, video_wallet, size_bytes, expires_at, months_prepaid")
-      .eq("owner_wallet", data.wallet)
+      .eq("owner_wallet", wallet)
       .not("video_wallet", "is", null);
     if (error) throw new Error(error.message);
 
@@ -937,7 +947,7 @@ export const markBulkExtended = createServerFn({ method: "POST" })
 
       await supabaseAdmin.from("payments").insert({
         video_cid: v.cid,
-        wallet: data.wallet,
+        wallet,
         txc_amount: txcAmount,
         months_prepaid: data.months,
         mock_tx_hash: data.txHash || `bulk-extend-${Date.now()}`,
@@ -1329,6 +1339,7 @@ export const pollTxStatus = createServerFn({ method: "POST" })
  * the requesting wallet owns the video before broadcasting.
  */
 export const retryOwnStamp = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input) =>
     z
       .object({
@@ -1337,7 +1348,8 @@ export const retryOwnStamp = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const wallet = context.wallet;
     const { data: v, error } = await supabaseAdmin
       .from("videos")
       .select("cid, owner_wallet, status")
@@ -1345,7 +1357,7 @@ export const retryOwnStamp = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!v) throw new Error("Video not found");
-    if (!ownerMatches(v.owner_wallet, data.wallet)) {
+    if (!ownerMatches(v.owner_wallet, wallet)) {
       throw new Error("Not your video");
     }
     if (v.status !== "stamp_failed") {
@@ -1450,6 +1462,7 @@ export const pinThumbnail = createServerFn({ method: "POST" })
  * read paths.
  */
 export const editVideoMetadata = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input) =>
     z
       .object({
@@ -1461,7 +1474,8 @@ export const editVideoMetadata = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const wallet = context.wallet;
     const { data: video, error } = await supabaseAdmin
       .from("videos")
       .select("cid, owner_wallet, video_wallet, thumbnail_cid")
@@ -1469,7 +1483,7 @@ export const editVideoMetadata = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!video) throw new Error("Video not found");
-    if (!ownerMatches(video.owner_wallet, data.wallet)) {
+    if (!ownerMatches(video.owner_wallet, wallet)) {
       throw new Error("Only the owner can edit this video");
     }
     if (!video.video_wallet) {
@@ -1484,7 +1498,7 @@ export const editVideoMetadata = createServerFn({ method: "POST" })
     const meta = await recordMetadataAnchor({
       videoCid: video.cid,
       videoWallet: video.video_wallet,
-      uploaderWallet: video.owner_wallet ?? data.wallet,
+      uploaderWallet: video.owner_wallet ?? wallet,
       title: data.title,
       description: data.description ?? "",
       thumbnailCid: nextThumb,
@@ -1855,6 +1869,7 @@ export async function sweepCommentPayout(commentId: string): Promise<{
  * outage). Owner-only.
  */
 export const retryCommentPayout = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input) =>
     z
       .object({
@@ -1863,7 +1878,8 @@ export const retryCommentPayout = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const wallet = context.wallet;
     const { data: c } = await supabaseAdmin
       .from("comments")
       .select("video_cid")
@@ -1875,7 +1891,7 @@ export const retryCommentPayout = createServerFn({ method: "POST" })
       .select("owner_wallet")
       .eq("cid", c.video_cid)
       .maybeSingle();
-    if (!v || !ownerMatches(v.owner_wallet, data.wallet))
+    if (!v || !ownerMatches(v.owner_wallet, wallet))
       throw new Error("Only the video owner can retry payouts");
     return await sweepCommentPayout(data.commentId);
   });
