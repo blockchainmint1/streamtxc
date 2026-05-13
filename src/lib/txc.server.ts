@@ -415,10 +415,27 @@ export async function verifyMessage(
   signature: string,
   message: string,
 ): Promise<boolean> {
+  console.log("[verifyMessage] enter", {
+    addr: address,
+    sigLen: signature.length,
+    msgLen: message.length,
+    rpcConfigured: rpcConfigured(),
+  });
   if (!rpcConfigured()) {
     return signature.trim().length >= 8;
   }
-  return verifyMessageLocal(address, signature, message);
+  try {
+    const ok = await verifyMessageLocal(address, signature, message);
+    console.log("[verifyMessage] result", { ok });
+    return ok;
+  } catch (err) {
+    console.error("[verifyMessage] threw", {
+      name: err instanceof Error ? err.name : "unknown",
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack?.split("\n").slice(0, 5).join(" | ") : undefined,
+    });
+    throw err;
+  }
 }
 
 /**
@@ -431,6 +448,11 @@ async function verifyMessageLocal(
   signature: string,
   message: string,
 ): Promise<boolean> {
+  console.log("[verifyMessageLocal] enter", {
+    addr: address,
+    sigLen: signature.length,
+    bufferAvail: typeof Buffer !== "undefined",
+  });
   const isBech32 = /^txc1[0-9a-z]+$/i.test(address);
   const isLegacyT = /^T[1-9A-HJ-NP-Za-km-z]{20,90}$/.test(address);
 
@@ -453,8 +475,25 @@ async function verifyMessageLocal(
 
   // Legacy P2PKH path. bitcoinjs-message recovers the pubkey from the
   // signature, hashes it, and compares against the decoded address bytes.
-  // It accepts a custom message prefix; we try the common forks' prefixes.
-  const { verify } = await import("bitcoinjs-message");
+  // The dynamic import is wrapped because on Cloudflare Workers it can fail
+  // at module-load time (e.g. missing Node Buffer global) and we want that
+  // failure to surface clearly instead of looking like a "bad signature".
+  let verify: typeof import("bitcoinjs-message").verify;
+  try {
+    const mod = await import("bitcoinjs-message");
+    verify = mod.verify;
+    console.log("[verifyMessageLocal] bitcoinjs-message loaded", {
+      verifyType: typeof verify,
+    });
+  } catch (err) {
+    console.error("[verifyMessageLocal] import bitcoinjs-message failed", {
+      name: err instanceof Error ? err.name : "unknown",
+      message: err instanceof Error ? err.message : String(err),
+    });
+    throw new Error(
+      `Could not load signature library on the edge: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 
   const candidatePrefixes = [
     // Confirmed via wallet.texitcoin.org bundle, where the network params
@@ -471,21 +510,28 @@ async function verifyMessageLocal(
   ];
 
   for (const prefix of candidatePrefixes) {
+    const tag = JSON.stringify(prefix).slice(0, 40);
     try {
       // checkSegwitAlways=true lets us also accept signatures that the wallet
       // produced with a SegWit-flavoured recovery flag, even on legacy addrs.
-      if (verify(message, address, signature, prefix, true)) return true;
+      const ok = verify(message, address, signature, prefix, true);
+      console.log("[verifyMessageLocal] verify(segwit=true)", { tag, ok });
+      if (ok) return true;
     } catch (err) {
       console.warn("[verifyMessageLocal] verify(segwit=true) threw", {
-        prefix: JSON.stringify(prefix),
+        tag,
+        name: err instanceof Error ? err.name : "unknown",
         err: err instanceof Error ? err.message : String(err),
       });
     }
     try {
-      if (verify(message, address, signature, prefix, false)) return true;
+      const ok = verify(message, address, signature, prefix, false);
+      console.log("[verifyMessageLocal] verify(segwit=false)", { tag, ok });
+      if (ok) return true;
     } catch (err) {
       console.warn("[verifyMessageLocal] verify(segwit=false) threw", {
-        prefix: JSON.stringify(prefix),
+        tag,
+        name: err instanceof Error ? err.name : "unknown",
         err: err instanceof Error ? err.message : String(err),
       });
     }
