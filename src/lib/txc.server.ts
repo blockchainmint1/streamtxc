@@ -457,8 +457,12 @@ async function verifyMessageLocal(
   const { verify } = await import("bitcoinjs-message");
 
   const candidatePrefixes = [
-    // Confirmed via wallet.texitcoin.org bundle: "Texitcoin Signed Message:\n"
-    // (26 chars → length byte 0x1A). Capitalisation matters.
+    // Confirmed via wallet.texitcoin.org bundle, where the network params
+    // hardcode `\x19Texitcoin Signed Message:\n`. Note the length byte is
+    // 0x19 even though the string has 26 chars — the wallet signs and
+    // verifies with this exact byte sequence, so we must too.
+    "\u0019Texitcoin Signed Message:\n",
+    // Defensive variant in case the wallet ever fixes the length byte.
     "\u001aTexitcoin Signed Message:\n",
     // Fallbacks for older/forked wallets.
     "\u0018Bitcoin Signed Message:\n",
