@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   listMyVideos,
+  listVideosByCids,
   editVideoMetadata,
   pinThumbnail,
   getOwnershipChallenge,
@@ -29,6 +30,7 @@ import {
   setVideoVisibility,
 } from "@/lib/videos.functions";
 import { useWallet } from "@/lib/wallet";
+import { listAnonUploads, removeAnonUpload, useAnonUploadsSubscription } from "@/lib/anon-uploads";
 import { formatBytes, shortenHash } from "@/lib/fees";
 import { ipfsThumbUrl } from "@/lib/ipfs-gateway";
 import {
@@ -142,6 +144,18 @@ function ToggleVisibilityButton({
 function ManagePageInner() {
   const { address } = useWallet();
   const fetchMine = useServerFn(listMyVideos);
+  const fetchByCids = useServerFn(listVideosByCids);
+  const qc = useQueryClient();
+
+  // Track CIDs uploaded anonymously from this browser so they can be claimed.
+  const [anonCids, setAnonCids] = useState<string[]>(() =>
+    listAnonUploads().map((r) => r.cid),
+  );
+  useEffect(() => {
+    return useAnonUploadsSubscription(() => {
+      setAnonCids(listAnonUploads().map((r) => r.cid));
+    });
+  }, []);
 
   // No auto-connect — show a "connect wallet" prompt below if missing.
 
@@ -150,6 +164,34 @@ function ManagePageInner() {
     queryFn: () => (address ? fetchMine({ data: { wallet: address } }) : []),
     enabled: !!address,
   });
+
+  const { data: anonVideos } = useQuery({
+    queryKey: ["anon-videos", anonCids],
+    queryFn: () =>
+      anonCids.length === 0
+        ? []
+        : fetchByCids({ data: { cids: anonCids } }),
+    enabled: anonCids.length > 0,
+  });
+
+  // Once an anon video has been claimed (owner_wallet set + verified) AND
+ // matches the connected wallet, drop it from the local anon list — it now
+  // shows up in the main "my videos" table.
+  useEffect(() => {
+    if (!anonVideos || !address) return;
+    for (const v of anonVideos) {
+      if (
+        v.owner_wallet &&
+        v.owner_wallet.toLowerCase() === address.toLowerCase()
+      ) {
+        removeAnonUpload(v.cid);
+      }
+    }
+  }, [anonVideos, address]);
+
+  const unclaimedAnon = (anonVideos ?? []).filter(
+    (v) => !v.owner_wallet || v.owner_proof_status !== "verified",
+  );
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -167,6 +209,55 @@ function ManagePageInner() {
             <BulkExtendDialog wallet={address} />
           )}
         </div>
+
+        {unclaimedAnon.length > 0 && (
+          <div className="mb-10 border-2 border-amber-500/40 bg-amber-500/5 rounded-sm p-5">
+            <div className="font-mono text-xs text-amber-500 mb-2">
+              [ ANONYMOUS UPLOADS · CLAIM TO LINK A WALLET ]
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              You uploaded {unclaimedAnon.length} video
+              {unclaimedAnon.length === 1 ? "" : "s"} without a wallet from this
+              browser. Sign a one-time message in your TXC wallet to claim
+              ownership and unlock payouts.
+            </p>
+            <div className="space-y-2">
+              {unclaimedAnon.map((v) => (
+                <div
+                  key={v.cid}
+                  className="flex items-center gap-3 border border-border rounded-sm p-3 bg-background"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold truncate">{v.title}</div>
+                    <div className="font-mono text-[10px] text-muted-foreground truncate">
+                      {v.cid}
+                    </div>
+                  </div>
+                  <Link to="/v/$cid" params={{ cid: v.cid }}>
+                    <Button size="sm" variant="ghost" className="font-mono">
+                      view
+                    </Button>
+                  </Link>
+                  <VerifyOwnershipDialog
+                    cid={v.cid}
+                    verified={false}
+                    currentWallet={address ?? ""}
+                    escrowed={Number(v.escrowed_creator_txc ?? 0)}
+                  />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="font-mono text-xs text-muted-foreground"
+                    onClick={() => removeAnonUpload(v.cid)}
+                    title="Stop tracking this upload in this browser"
+                  >
+                    dismiss
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {!address || isLoading ? (
           <div className="font-mono text-muted-foreground">Loading…</div>
