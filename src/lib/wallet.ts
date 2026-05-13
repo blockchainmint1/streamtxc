@@ -21,6 +21,16 @@ export function isValidTxcAddress(addr: string): boolean {
   return /^[a-zA-Z0-9]{20,90}$/.test(s);
 }
 
+/**
+ * The current TXC "Sign message" verification flow only works with
+ * legacy base58 addresses that start with T. Native segwit `txc1...`
+ * addresses need a different signing standard (BIP-322), which the
+ * current wallet/node flow does not support yet.
+ */
+export function isSignableOwnershipTxcAddress(addr: string): boolean {
+  return /^T[1-9A-HJ-NP-Za-km-z]{20,90}$/.test(addr.trim());
+}
+
 interface StoredWallet {
   address: string;
   signature?: string;
