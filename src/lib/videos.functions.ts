@@ -17,6 +17,7 @@ import { verifyMessage, sendToAddress, getPlatformAddress } from "./txc.server";
 import { retryStuckStampForVideo } from "./stamp-retry.server";
 import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
+import { probeCidViaGateways } from "./ipfsGateway";
 
 const walletSchema = z
   .string()
@@ -303,6 +304,26 @@ const cidSchema = z
   .max(120)
   .regex(/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[A-Za-z2-7]{50,})$/, "Invalid IPFS CID");
 
+/**
+ * Server-side CID probe for the upload UI. Browsers used to HEAD a public
+ * gateway directly, which broke the moment ops switched to a private
+ * cluster or a localhost-only node. Now the browser asks us, and we use
+ * the gateway fallback list.
+ */
+export const probeCidOnIpfs = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({ v1: cidStringSchema, v0: cidStringSchema }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const [v1, v0] = await Promise.all([
+      probeCidViaGateways(data.v1, 8_000),
+      probeCidViaGateways(data.v0, 8_000),
+    ]);
+    if (v1.found) return { cid: data.v1, version: 1 as const };
+    if (v0.found) return { cid: data.v0, version: 0 as const };
+    return null;
+  });
+
 export const addByCid = createServerFn({ method: "POST" })
   .inputValidator((input) =>
     z
@@ -320,67 +341,23 @@ export const addByCid = createServerFn({ method: "POST" })
     // Reject if already registered (with structured details for the UI)
     await assertCidUnclaimed(data.cid);
 
-    // 1) Kick off Pinata's "fetch this CID from the IPFS network" job FIRST.
-    //    Without this, the gateway HEAD probe below has nothing to serve and
-    //    will hang waiting for IPFS DHT discovery to finish.
+    // 1) Kick off Pinata's "fetch this CID from the IPFS network" job FIRST
+    //    so the public gateways have something to serve while we probe.
     await pinByCid(data.cid, data.title);
 
-    // 2) Probe the gateway to learn size + mime, with a generous timeout.
-    //    IPFS DHT lookups for fresh CIDs can take 20-30s on a cold gateway.
-    const gatewayDomain = process.env.PINATA_GATEWAY_DOMAIN;
-    const url = gatewayDomain
-      ? `https://${gatewayDomain}/ipfs/${data.cid}`
-      : `https://gateway.pinata.cloud/ipfs/${data.cid}`;
-
-    let sizeBytes = 0;
-    let mimeType = "video/mp4";
-    let probeError: string | null = null;
-    const probe = async (init: RequestInit): Promise<Response> => {
-      const ctl = new AbortController();
-      const t = setTimeout(() => ctl.abort(), 30_000);
-      try {
-        return await fetch(url, { ...init, signal: ctl.signal });
-      } finally {
-        clearTimeout(t);
-      }
-    };
-    try {
-      let res = await probe({ method: "HEAD" });
-      if (!res.ok || !res.headers.get("content-length")) {
-        res = await probe({ headers: { Range: "bytes=0-0" } });
-      }
-      if (!res.ok) {
-        probeError = `Gateway returned ${res.status}`;
-      } else {
-        sizeBytes = Number(
-          res.headers.get("content-range")?.split("/")[1] ||
-            res.headers.get("content-length") ||
-            0,
-        );
-        mimeType = res.headers.get("content-type") || mimeType;
-      }
-    } catch (err) {
-      probeError =
-        err instanceof Error && err.name === "AbortError"
-          ? "Timed out fetching CID from IPFS (30s). The file may not be available on the public IPFS network."
-          : err instanceof Error
-            ? err.message
-            : "Gateway probe failed";
-    }
-
-    // Hard fail if we got nothing back OR if the gateway responded but the
-    // size is still unknown — better a clear error than a video row with
-    // size=0 (which would skip the real hosting fee).
-    if (sizeBytes <= 0) {
-      throw new Error(
-        `CID_NOT_FOUND:${
-          probeError ??
-          "Gateway returned no content-length yet. The CID is being pinned — try again in 30-60s."
-        }`,
-      );
+    // 2) Probe size + mime via the configured gateways, with fallback. If
+    //    every gateway is unavailable or doesn't expose a size, we still
+    //    register the CID — sizeBytes=0 means "unknown" downstream.
+    const probe = await probeCidViaGateways(data.cid, 12_000);
+    const sizeBytes = probe.sizeBytes ?? 0;
+    const mimeType = probe.mimeType ?? "video/mp4";
+    if (!probe.found && probe.error) {
+      console.warn(`addByCid probe soft-fail for ${data.cid}: ${probe.error}`);
     }
 
     const _price = (await getTxcUsdPrice()).usd;
+    // For unknown sizes we charge the minimum (size=1) — the watcher can
+    // re-probe later once the CID is reachable and adjust if needed.
     const fee = usdToTxc(quoteUsd(Math.max(sizeBytes, 1), data.months), _price);
     const paymentTx = mockPaymentTx(data.wallet, fee);
     const videoWallet = await assignVideoWallet();
