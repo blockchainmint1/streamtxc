@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -27,31 +27,29 @@ export const Route = createFileRoute("/")({
 function IndexPage() {
   const fetchRecent = useServerFn(listRecentVideos);
   const [sort, setSort] = useState<SortKey>("newest");
-  const [offset, setOffset] = useState(0);
-  const [accum, setAccum] = useState<
-    Awaited<ReturnType<typeof listRecentVideos>>["items"]
-  >([]);
 
-  const { data, isFetching } = useQuery({
-    queryKey: ["recent-videos", sort, offset],
-    queryFn: () => fetchRecent({ data: { sort, limit: PAGE, offset } }),
+  const {
+    data,
+    isFetching,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["recent-videos", sort],
+    queryFn: ({ pageParam }) =>
+      fetchRecent({ data: { sort, limit: PAGE, offset: pageParam } }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, page) => sum + page.items.length, 0);
+      return loaded < lastPage.total ? loaded : undefined;
+    },
     staleTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
   });
 
-  useEffect(() => {
-    if (!data) return;
-    setAccum((prev) => (offset === 0 ? data.items : [...prev, ...data.items]));
-  }, [data, offset]);
-
-  useEffect(() => {
-    setOffset(0);
-    setAccum([]);
-  }, [sort]);
-
-  const total = data?.total ?? 0;
-  const hasMore = accum.length < total;
+  const accum = data?.pages.flatMap((page) => page.items) ?? [];
+  const total = data?.pages[0]?.total ?? 0;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -200,15 +198,15 @@ function IndexPage() {
               </Link>
             ))}
           </div>
-          {hasMore && (
+          {hasNextPage && (
             <div className="mt-8 flex justify-center">
               <Button
                 variant="outline"
                 className="font-mono"
-                disabled={isFetching}
-                onClick={() => setOffset((o) => o + PAGE)}
+                disabled={isFetchingNextPage}
+                onClick={() => fetchNextPage()}
               >
-                {isFetching ? "loading…" : "load more"}
+                {isFetchingNextPage ? "loading…" : "load more"}
               </Button>
             </div>
           )}
