@@ -475,13 +475,19 @@ async function verifyMessageLocal(
       // checkSegwitAlways=true lets us also accept signatures that the wallet
       // produced with a SegWit-flavoured recovery flag, even on legacy addrs.
       if (verify(message, address, signature, prefix, true)) return true;
-    } catch {
-      // Move on to next prefix.
+    } catch (err) {
+      console.warn("[verifyMessageLocal] verify(segwit=true) threw", {
+        prefix: JSON.stringify(prefix),
+        err: err instanceof Error ? err.message : String(err),
+      });
     }
     try {
       if (verify(message, address, signature, prefix, false)) return true;
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[verifyMessageLocal] verify(segwit=false) threw", {
+        prefix: JSON.stringify(prefix),
+        err: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
