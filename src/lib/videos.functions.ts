@@ -1535,6 +1535,11 @@ const txcWalletSchema = z
   .max(120)
   .regex(/^[a-zA-Z0-9]+$/, "Invalid TXC address");
 
+const signableOwnershipWalletSchema = txcWalletSchema.refine(
+  (value) => /^T[1-9A-HJ-NP-Za-km-z]{20,90}$/.test(value),
+  "Use a legacy T… wallet address for ownership verification. txc1… addresses are not supported by the current Sign message flow yet.",
+);
+
 /**
  * Issue a fresh nonce + return the exact message the user must sign in
  * their TXC web wallet. Re-callable: each call rotates the nonce so an
@@ -1545,7 +1550,7 @@ export const getOwnershipChallenge = createServerFn({ method: "POST" })
     z
       .object({
         cid: z.string().min(1).max(200),
-        ownerWallet: txcWalletSchema,
+        ownerWallet: signableOwnershipWalletSchema,
       })
       .parse(input),
   )
@@ -1597,7 +1602,7 @@ export const submitOwnershipProof = createServerFn({ method: "POST" })
     z
       .object({
         cid: z.string().min(1).max(200),
-        ownerWallet: txcWalletSchema,
+        ownerWallet: signableOwnershipWalletSchema,
         signature: z.string().trim().min(8).max(200),
       })
       .parse(input),
