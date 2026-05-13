@@ -31,7 +31,6 @@ import {
 } from "lucide-react";
 import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
 import { computeCids } from "@/lib/ipfs-cid";
-import { PinataSDK } from "pinata";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 import { recordAnonUpload } from "@/lib/anon-uploads";
 
@@ -72,35 +71,53 @@ function sanitizeFilename(name: string): string {
 }
 
 /**
- * Upload a file from the browser using a Pinata presigned URL. Pinata's
- * v3 upload endpoint speaks TUS (resumable, HEAD+PATCH+POST). The official
- * SDK with `.url(presignedUrl)` handles the protocol and gives us CIDv1.
- * Direct-to-Pinata is required because our Worker proxy can't carry video-
- * sized request bodies (CF Workers cap at ~100MB per request).
+ * POST the file to our own Worker, which streams it to Pinata server-side.
+ * Same-origin → no Pinata CORS allowlist to maintain. Capped at
+ * MAX_UPLOAD_BYTES (~100 MB) by Cloudflare's request-body limit.
+ * Uses XHR so we get real upload progress events (fetch can't stream
+ * upload progress in any current browser).
  */
-const browserPinata = new PinataSDK({ pinataJwt: "" });
-
-async function uploadToPinata(
-  url: string,
+async function uploadViaWorker(
   file: File,
-  _onProgress: (pct: number) => void,
-): Promise<{ cid: string; size: number; id: string }> {
-  const result = await browserPinata.upload.public
-    .file(file)
-    .url(url)
-    .cidVersion("v1");
-  return {
-    cid: result.cid,
-    size: result.size ?? file.size,
-    id: (result as { id?: string }).id ?? "",
-  };
+  filename: string,
+  onProgress: (pct: number) => void,
+): Promise<{ cid: string; size: number }> {
+  const form = new FormData();
+  form.append("file", file, filename);
+  form.append("filename", filename);
+
+  return await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/public/upload");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress((e.loaded / e.total) * 100);
+    };
+    xhr.onload = () => {
+      try {
+        const json = JSON.parse(xhr.responseText) as {
+          cid?: string;
+          size?: number;
+          error?: string;
+        };
+        if (xhr.status >= 200 && xhr.status < 300 && json.cid) {
+          resolve({ cid: json.cid, size: json.size ?? file.size });
+        } else {
+          reject(new Error(json.error || `Upload failed (${xhr.status})`));
+        }
+      } catch {
+        reject(new Error(`Upload failed (${xhr.status})`));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Network error during upload"));
+    xhr.ontimeout = () => reject(new Error("Upload timed out"));
+    xhr.send(form);
+  });
 }
 
 function UploadPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { address } = useWallet();
-  const getUrl = useServerFn(getUploadUrl);
   const register = useServerFn(registerUpload);
   const addCid = useServerFn(addByCid);
   const quoteFn = useServerFn(getQuote);
@@ -129,9 +146,10 @@ function UploadPage() {
     "idle" | "fetching" | "registering"
   >("idle");
   const [cidNotFound, setCidNotFound] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"file" | "cid">("file");
   const months = 1;
   const [stage, setStage] = useState<
-    "idle" | "hashing" | "checking" | "signing" | "uploading" | "registering"
+    "idle" | "hashing" | "checking" | "uploading" | "registering"
   >("idle");
   const [progress, setProgress] = useState(0);
   const [duplicate, setDuplicate] = useState<DuplicateCidInfo | null>(null);
@@ -255,19 +273,10 @@ function UploadPage() {
         return;
       }
 
-      // 3. Not on IPFS yet — get a Pinata presigned URL and upload directly.
-      setStage("signing");
-      const safeName = sanitizeFilename(file.name);
-      const { url } = await getUrl({
-        data: { filename: safeName, sizeBytes: file.size },
-      });
-
+      // 3. Not on IPFS yet — stream the file through our Worker to Pinata.
       setStage("uploading");
-      const safeFile =
-        safeName === file.name
-          ? file
-          : new File([file], safeName, { type: file.type });
-      const pinResult = await uploadToPinata(url, safeFile, (pct) =>
+      const safeName = sanitizeFilename(file.name);
+      const pinResult = await uploadViaWorker(file, safeName, (pct) =>
         setProgress(pct),
       );
 
@@ -365,7 +374,11 @@ function UploadPage() {
           timestamp receipt.
         </p>
 
-        <Tabs defaultValue="file" className="w-full">
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as "file" | "cid")}
+          className="w-full"
+        >
           {duplicate && (
             <div className="mb-6 border-2 border-destructive/60 bg-destructive/5 rounded-sm p-5">
               <div className="flex items-start gap-3">
@@ -439,7 +452,7 @@ function UploadPage() {
                     </div>
                     {tooBig && (
                       <span className="font-mono text-xs text-destructive">
-                        TOO LARGE
+                        OVER 100 MB
                       </span>
                     )}
                   </div>
@@ -453,7 +466,60 @@ function UploadPage() {
                   </div>
                 )}
               </label>
+              <p className="font-mono text-[11px] text-muted-foreground">
+                Larger files? Pin to IPFS first (e.g.{" "}
+                <a
+                  href="https://pinata.cloud"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  pinata.cloud
+                </a>
+                ) and use the <span className="text-foreground">Add by CID</span> tab.
+              </p>
             </div>
+
+            {tooBig && (
+              <div className="border-2 border-destructive/60 bg-destructive/5 rounded-sm p-5">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0 space-y-3">
+                    <div className="font-mono text-xs text-destructive">
+                      [ FILE OVER 100 MB — DIRECT UPLOAD NOT SUPPORTED ]
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Pin your file to IPFS first, then paste its CID into{" "}
+                      <span className="text-foreground">Add by CID</span> below.
+                      We recommend{" "}
+                      <a
+                        href="https://pinata.cloud"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        pinata.cloud
+                      </a>{" "}
+                      — their free tier covers most uploads.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="font-mono"
+                      onClick={() => {
+                        if (file && !cidTitle) {
+                          setCidTitle(file.name.replace(/\.[^.]+$/, ""));
+                        }
+                        setActiveTab("cid");
+                      }}
+                    >
+                      <Link2 className="mr-2 h-4 w-4" />
+                      Switch to Add by CID
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {codecWarning && (
               <div className="border-2 border-amber-500/60 bg-amber-500/5 rounded-sm p-4">
@@ -600,7 +666,6 @@ function UploadPage() {
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   {stage === "hashing" && "Hashing file…"}
                   {stage === "checking" && "Checking IPFS for this file…"}
-                  {stage === "signing" && "Requesting upload URL…"}
                   {stage === "uploading" && `Uploading ${progress.toFixed(0)}%…`}
                   {stage === "registering" && "Finalizing…"}
                 </>

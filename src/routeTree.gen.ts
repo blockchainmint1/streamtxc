@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as VCidRouteImport } from './routes/v.$cid'
 import { Route as EmbedCidRouteImport } from './routes/embed.$cid'
 import { Route as ApiStreamCidRouteImport } from './routes/api/stream.$cid'
+import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
 import { Route as ApiPublicTxcHealthRouteImport } from './routes/api/public/txc-health'
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
@@ -55,6 +56,11 @@ const ApiStreamCidRoute = ApiStreamCidRouteImport.update({
   path: '/api/stream/$cid',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicUploadRoute = ApiPublicUploadRouteImport.update({
+  id: '/api/public/upload',
+  path: '/api/public/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicTxcHealthRoute = ApiPublicTxcHealthRouteImport.update({
   id: '/api/public/txc-health',
   path: '/api/public/txc-health',
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/embed/$cid': typeof EmbedCidRoute
   '/v/$cid': typeof VCidRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
+  '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByTo {
   '/embed/$cid': typeof EmbedCidRoute
   '/v/$cid': typeof VCidRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
+  '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
@@ -106,6 +114,7 @@ export interface FileRoutesById {
   '/embed/$cid': typeof EmbedCidRoute
   '/v/$cid': typeof VCidRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
+  '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
@@ -120,6 +129,7 @@ export interface FileRouteTypes {
     | '/embed/$cid'
     | '/v/$cid'
     | '/api/public/txc-health'
+    | '/api/public/upload'
     | '/api/stream/$cid'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/payment-watcher'
@@ -132,6 +142,7 @@ export interface FileRouteTypes {
     | '/embed/$cid'
     | '/v/$cid'
     | '/api/public/txc-health'
+    | '/api/public/upload'
     | '/api/stream/$cid'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/payment-watcher'
@@ -144,6 +155,7 @@ export interface FileRouteTypes {
     | '/embed/$cid'
     | '/v/$cid'
     | '/api/public/txc-health'
+    | '/api/public/upload'
     | '/api/stream/$cid'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/payment-watcher'
@@ -157,6 +169,7 @@ export interface RootRouteChildren {
   EmbedCidRoute: typeof EmbedCidRoute
   VCidRoute: typeof VCidRoute
   ApiPublicTxcHealthRoute: typeof ApiPublicTxcHealthRoute
+  ApiPublicUploadRoute: typeof ApiPublicUploadRoute
   ApiStreamCidRoute: typeof ApiStreamCidRoute
   ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
   ApiPublicHooksPaymentWatcherRoute: typeof ApiPublicHooksPaymentWatcherRoute
@@ -213,6 +226,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStreamCidRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/upload': {
+      id: '/api/public/upload'
+      path: '/api/public/upload'
+      fullPath: '/api/public/upload'
+      preLoaderRoute: typeof ApiPublicUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/txc-health': {
       id: '/api/public/txc-health'
       path: '/api/public/txc-health'
@@ -245,6 +265,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmbedCidRoute: EmbedCidRoute,
   VCidRoute: VCidRoute,
   ApiPublicTxcHealthRoute: ApiPublicTxcHealthRoute,
+  ApiPublicUploadRoute: ApiPublicUploadRoute,
   ApiStreamCidRoute: ApiStreamCidRoute,
   ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
   ApiPublicHooksPaymentWatcherRoute: ApiPublicHooksPaymentWatcherRoute,
