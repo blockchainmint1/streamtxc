@@ -33,6 +33,8 @@ import {
   Link as LinkIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { copyToClipboard } from "@/lib/copy-to-clipboard";
+import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Collapsible,
@@ -133,9 +135,8 @@ function WatchPage() {
   const embedCode = `<iframe src="${embedSrc}" width="${embedW}" height="${embedH}" allow="autoplay; fullscreen" frameborder="0"></iframe>`;
 
   const copy = (text: string) => {
-    navigator.clipboard.writeText(text);
+    void copyToClipboard(text);
     setCopied(true);
-    toast.success("Copied");
     setTimeout(() => setCopied(false), 1500);
   };
 
@@ -487,14 +488,10 @@ function ShareBar({
           {l.name}
         </a>
       ))}
-      <button
-        onClick={() => onCopy(url)}
-        className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-input px-2.5 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-        aria-label="Copy link"
-      >
-        <LinkIcon className="h-3.5 w-3.5" />
-        copy link
-      </button>
+      <CopyLinkButton
+        value={url}
+        icon={<LinkIcon className="h-3.5 w-3.5" />}
+      />
       <button
         onClick={nativeShare}
         className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-input px-2.5 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:border-primary hover:text-primary"
