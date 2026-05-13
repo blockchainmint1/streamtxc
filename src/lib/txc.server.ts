@@ -394,21 +394,18 @@ export function explorerTxUrl(txid: string): string {
 }
 
 /**
- * Verify a Bitcoin-style signed message (the same flow the TXC web wallet
- * exposes under "Sign message"). Verified IN-PROCESS in pure JS, NOT via
- * the node's `verifymessage` RPC.
+ * Verify a signed wallet-auth / ownership-proof message.
  *
- * Why not use the node? bitcoind's `verifymessage` only works for legacy
- * P2PKH addresses whose pubkey the node already knows; it returns
- * "Address does not refer to key" for bech32 (`txc1…`) and silently fails
- * for legacy addresses signed by an external wallet. By recovering the
- * pubkey ourselves we can verify signatures from ANY wallet for BOTH
- * address formats:
- *   • Legacy `T…` (P2PKH, version byte 0x42) → bitcoinjs-message
- *   • SegWit `txc1…` (bech32, HRP "txc")     → BIP-322 (bip322-js)
+ * The current TXC wallet login flow uses legacy `T…` addresses, so we let the
+ * TXC node verify those signatures via its `verifymessage` RPC. That keeps the
+ * exact chain-specific message prefix and hash rules on the node side and
+ * avoids the Worker runtime crypto incompatibility we saw in production.
  *
- * In stub mode (no RPC configured) we accept any non-empty signature so
- * local dev still works.
+ * For bech32 `txc1…` addresses we keep a local BIP-322 fallback, though the UI
+ * currently restricts sign-in and ownership proof to legacy `T…` addresses.
+ *
+ * In stub mode (no RPC configured) we accept any non-empty signature so local
+ * dev still works.
  */
 export async function verifyMessage(
   address: string,
@@ -424,10 +421,33 @@ export async function verifyMessage(
   if (!rpcConfigured()) {
     return signature.trim().length >= 8;
   }
+
+  const trimmedAddress = address.trim();
+  const trimmedSignature = signature.trim();
+  const isLegacyT = /^T[1-9A-HJ-NP-Za-km-z]{20,90}$/.test(trimmedAddress);
+  const isBech32 = /^txc1[0-9a-z]+$/i.test(trimmedAddress);
+
   try {
-    const ok = await verifyMessageLocal(address, signature, message);
-    console.log("[verifyMessage] result", { ok });
-    return ok;
+    if (isLegacyT) {
+      const ok = await rpc<boolean>("verifymessage", [
+        trimmedAddress,
+        trimmedSignature,
+        message,
+      ]);
+      console.log("[verifyMessage] rpc(verifymessage) result", { ok });
+      return ok;
+    }
+
+    if (isBech32) {
+      const { Verifier } = await import("bip322-js");
+      const ok = Verifier.verifySignature(trimmedAddress, message, trimmedSignature);
+      console.log("[verifyMessage] bip322 result", { ok });
+      return ok;
+    }
+
+    throw new Error(
+      `Unsupported TXC address format: "${trimmedAddress.slice(0, 10)}…". Use a legacy T… or bech32 txc1… address.`,
+    );
   } catch (err) {
     console.error("[verifyMessage] threw", {
       name: err instanceof Error ? err.name : "unknown",
@@ -436,112 +456,6 @@ export async function verifyMessage(
     });
     throw err;
   }
-}
-
-/**
- * In-process signature verifier. Tries multiple "magic prefixes" because
- * different chain forks ship different defaults and we'd rather verify a
- * legitimate signature than reject the user.
- */
-async function verifyMessageLocal(
-  address: string,
-  signature: string,
-  message: string,
-): Promise<boolean> {
-  console.log("[verifyMessageLocal] enter", {
-    addr: address,
-    sigLen: signature.length,
-    bufferAvail: typeof Buffer !== "undefined",
-  });
-  const isBech32 = /^txc1[0-9a-z]+$/i.test(address);
-  const isLegacyT = /^T[1-9A-HJ-NP-Za-km-z]{20,90}$/.test(address);
-
-  if (isBech32) {
-    // BIP-322 path for SegWit addresses.
-    try {
-      const { Verifier } = await import("bip322-js");
-      return Verifier.verifySignature(address, message, signature);
-    } catch (err) {
-      console.error("[verifyMessageLocal] bip322 verify failed", err);
-      return false;
-    }
-  }
-
-  if (!isLegacyT) {
-    throw new Error(
-      `Unsupported TXC address format: "${address.slice(0, 10)}…". Use a legacy T… or bech32 txc1… address.`,
-    );
-  }
-
-  // Legacy P2PKH path. bitcoinjs-message recovers the pubkey from the
-  // signature, hashes it, and compares against the decoded address bytes.
-  // The dynamic import is wrapped because on Cloudflare Workers it can fail
-  // at module-load time (e.g. missing Node Buffer global) and we want that
-  // failure to surface clearly instead of looking like a "bad signature".
-  let verify: typeof import("bitcoinjs-message").verify;
-  try {
-    const mod = await import("bitcoinjs-message");
-    verify = mod.verify;
-    console.log("[verifyMessageLocal] bitcoinjs-message loaded", {
-      verifyType: typeof verify,
-    });
-  } catch (err) {
-    console.error("[verifyMessageLocal] import bitcoinjs-message failed", {
-      name: err instanceof Error ? err.name : "unknown",
-      message: err instanceof Error ? err.message : String(err),
-    });
-    throw new Error(
-      `Could not load signature library on the edge: ${err instanceof Error ? err.message : String(err)}`,
-    );
-  }
-
-  const candidatePrefixes = [
-    // Confirmed via wallet.texitcoin.org bundle, where the network params
-    // hardcode `\x19Texitcoin Signed Message:\n`. Note the length byte is
-    // 0x19 even though the string has 26 chars — the wallet signs and
-    // verifies with this exact byte sequence, so we must too.
-    "\u0019Texitcoin Signed Message:\n",
-    // Defensive variant in case the wallet ever fixes the length byte.
-    "\u001aTexitcoin Signed Message:\n",
-    // Fallbacks for older/forked wallets.
-    "\u0018Bitcoin Signed Message:\n",
-    "\u0019Litecoin Signed Message:\n",
-    "\u0019Dogecoin Signed Message:\n",
-  ];
-
-  for (const prefix of candidatePrefixes) {
-    const tag = JSON.stringify(prefix).slice(0, 40);
-    try {
-      // checkSegwitAlways=true lets us also accept signatures that the wallet
-      // produced with a SegWit-flavoured recovery flag, even on legacy addrs.
-      const ok = verify(message, address, signature, prefix, true);
-      console.log("[verifyMessageLocal] verify(segwit=true)", { tag, ok });
-      if (ok) return true;
-    } catch (err) {
-      console.warn("[verifyMessageLocal] verify(segwit=true) threw", {
-        tag,
-        name: err instanceof Error ? err.name : "unknown",
-        err: err instanceof Error ? err.message : String(err),
-      });
-    }
-    try {
-      const ok = verify(message, address, signature, prefix, false);
-      console.log("[verifyMessageLocal] verify(segwit=false)", { tag, ok });
-      if (ok) return true;
-    } catch (err) {
-      console.warn("[verifyMessageLocal] verify(segwit=false) threw", {
-        tag,
-        name: err instanceof Error ? err.name : "unknown",
-        err: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
-
-  console.warn("[verifyMessageLocal] no prefix matched", {
-    address,
-    sigLen: signature.length,
-  });
-  return false;
 }
 
 /**
