@@ -277,11 +277,9 @@ function WatchPage() {
                   mono
                 />
               )}
-              <Field
-                label="Expires"
-                value={formatDate(video.expires_at)}
-                mono
-              />
+              <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider pt-2 border-t border-border">
+                TXC proof is permanent — timestamped proof on TXC does not expire.
+              </p>
             </CollapsibleSection>
 
             <CollapsibleSection
