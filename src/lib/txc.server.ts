@@ -393,7 +393,15 @@ export function explorerTxUrl(txid: string): string {
   return `${base}/tx/${txid}`;
 }
 
-const TXC_SIGNED_MESSAGE_PREFIX = "\u0019Texitcoin Signed Message:\n";
+const TXC_SIGNED_MESSAGE_MAGIC = "Texitcoin Signed Message:\n";
+
+function buildSignedMessagePrefixBytes(prefix: string): Uint8Array {
+  const prefixBytes = Buffer.from(prefix, "utf8");
+  return Buffer.concat([
+    Buffer.from(encodeBitcoinVarInt(prefixBytes.length)),
+    prefixBytes,
+  ]);
+}
 
 function encodeBitcoinVarInt(value: number): Uint8Array {
   if (value < 0xfd) return Uint8Array.from([value]);
@@ -441,7 +449,7 @@ async function verifyLegacyTMessage(
   const compressed = !!(flagByte & 12);
   const recovery = flagByte & 3;
 
-  const prefixBytes = Buffer.from(TXC_SIGNED_MESSAGE_PREFIX, "utf8");
+  const prefixBytes = buildSignedMessagePrefixBytes(TXC_SIGNED_MESSAGE_MAGIC);
   const messageBytes = Buffer.from(message, "utf8");
   const payload = Buffer.concat([
     prefixBytes,
