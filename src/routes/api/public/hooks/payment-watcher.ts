@@ -239,7 +239,7 @@ async function processVideos() {
       try {
         const retriedTxid = await retryFailedPaymentStampForPaidVideo({
           cid: v.cid,
-          owner_wallet: v.owner_wallet,
+          owner_wallet: v.owner_wallet ?? "anon",
           video_wallet: v.video_wallet,
         });
         if (retriedTxid) {
@@ -283,7 +283,7 @@ async function processVideos() {
           cid: v.cid,
           videoWallet: v.video_wallet,
           eventType: "P",
-          uploaderWallet: v.owner_wallet,
+          uploaderWallet: v.owner_wallet ?? "anon",
           extra: received.toFixed(4),
         });
         await supabaseAdmin
@@ -318,7 +318,7 @@ async function processVideos() {
           cid: v.cid,
           videoWallet: v.video_wallet,
           eventType: "X",
-          uploaderWallet: v.owner_wallet,
+          uploaderWallet: v.owner_wallet ?? "anon",
           extra: "unpaid",
         });
         await unpinByCid(v.cid);
