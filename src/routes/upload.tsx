@@ -153,8 +153,16 @@ function UploadPage() {
   >("idle");
   const [progress, setProgress] = useState(0);
   const [duplicate, setDuplicate] = useState<DuplicateCidInfo | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const tooBig = !!file && file.size > MAX_UPLOAD_BYTES;
+
+  function acceptFile(f: File) {
+    setFile(f);
+    setCodecWarning(checkCodec(f));
+    if (!title) setTitle(f.name.replace(/\.[^.]+$/, ""));
+    setThumbnailCid(null);
+  }
 
   /**
    * When a file is selected, kick off (in parallel) the local CIDv1 hash,
