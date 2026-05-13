@@ -124,3 +124,14 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
+
+function ResponsiveToaster() {
+  const isMobile = useIsMobile();
+  return (
+    <Toaster
+      richColors
+      position={isMobile ? "bottom-center" : "top-right"}
+      duration={2500}
+    />
+  );
+}
