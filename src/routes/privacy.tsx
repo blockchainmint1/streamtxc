@@ -5,13 +5,13 @@ import { Footer } from "@/components/Footer";
 export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
-      { title: "Privacy Policy — StreamTXC" },
+      { title: "Privacy Policy — streamTXC" },
       {
         name: "description",
         content:
-          "How StreamTXC handles your data: wallet IDs, uploaded video CIDs, and third-party imports from Dropbox, Google Drive and WeTransfer.",
+          "How streamTXC handles your data: wallet IDs, uploaded video CIDs, and third-party imports from Dropbox, Google Drive and WeTransfer.",
       },
-      { property: "og:title", content: "Privacy Policy — StreamTXC" },
+      { property: "og:title", content: "Privacy Policy — streamTXC" },
       {
         property: "og:description",
         content:
@@ -34,7 +34,7 @@ function PrivacyPage() {
 
           <Section title="The short version">
             <p>
-              StreamTXC is a wallet-native publishing tool. We don&rsquo;t ask
+              streamTXC is a wallet-native publishing tool. We don&rsquo;t ask
               for your email, your name, or your phone number. The only
               identifier we use is your TXC wallet address, which is already
               public on-chain. Files you upload are pinned to IPFS via Pinata
