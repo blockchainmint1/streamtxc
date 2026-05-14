@@ -8,6 +8,7 @@ import {
   pinFileToIPFS,
   createPresignedUploadUrl,
   pinByCid,
+  headCidOnGateway,
 } from "./pinata.server";
 import { mockPaymentTx } from "./chain";
 import { getTxStatus, explorerTxUrl } from "./txc.server";
@@ -759,6 +760,141 @@ export const restoreUnpinnedVideos = createServerFn({ method: "POST" })
       }
     }
     return { total: items.length, queued, failed };
+  });
+
+/**
+ * Live availability probe for a single CID. Used by the watch page to
+ * decide whether to render the player or the "no longer on IPFS" overlay.
+ * Treats a row as unavailable if EITHER `unpinned_at` is set OR the
+ * gateway HEAD probe fails — the two get out of sync (e.g. the
+ * Restore-from-IPFS flow queues a pin but doesn't verify the bytes
+ * actually came back), so we trust the live probe over `status`.
+ */
+export const probeAvailability = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({ cid: cidStringSchema }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: row } = await supabaseAdmin
+      .from("videos")
+      .select("cid, unpinned_at")
+      .eq("cid", data.cid)
+      .maybeSingle();
+    const unpinnedFlag = !!row?.unpinned_at;
+    const reachable = await headCidOnGateway(data.cid);
+    return {
+      cid: data.cid,
+      reachable,
+      unpinnedFlag,
+      available: reachable && !unpinnedFlag,
+      checkedAt: new Date().toISOString(),
+    };
+  });
+
+/**
+ * Public single-CID restore. Asks Pinata to re-fetch this CID from the
+ * IPFS DHT. Best-effort — Pinata may say "queued" even if no peer is
+ * actually seeding it. Status is not flipped here; the watch page's
+ * probeAvailability call decides truth from the live gateway HEAD.
+ */
+export const restoreOneFromIpfs = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({ cid: cidStringSchema }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: row } = await supabaseAdmin
+      .from("videos")
+      .select("cid, title")
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (!row) throw new Error("Video not found.");
+    try {
+      await pinByCid(row.cid, row.title ?? row.cid);
+      return { ok: true };
+    } catch (err) {
+      console.warn("restoreOneFromIpfs failed", row.cid, err);
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+/**
+ * Owner-only re-seed. Called after the browser has re-uploaded the
+ * original file via /api/public/upload — that endpoint already pinned
+ * the bytes to our Pinata account, so by the time we get here the CID
+ * is back on the gateway. We just verify, clear `unpinned_at`, flip
+ * status to `active`, and stamp an `R` (renewal/re-seed) event.
+ */
+export const reseedVideo = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
+  .inputValidator((input) =>
+    z.object({ cid: cidStringSchema }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const callerWallet = context.wallet;
+    const { data: video, error } = await supabaseAdmin
+      .from("videos")
+      .select(
+        "cid, owner_wallet, video_wallet, expires_at, unpinned_at, status",
+      )
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!video) throw new Error("Video not found.");
+    if (!ownerMatches(video.owner_wallet, callerWallet)) {
+      throw new Error(
+        "Only the original uploader's wallet can re-seed this video.",
+      );
+    }
+
+    // The browser already POSTed the file through /api/public/upload,
+    // which pins it to our Pinata account. Confirm the gateway now
+    // serves the CID before we flip any DB state.
+    const reachable = await headCidOnGateway(data.cid, 8000);
+    if (!reachable) {
+      throw new Error(
+        "Re-seed pinned, but the gateway can't serve the file yet. Wait a minute and try again.",
+      );
+    }
+
+    await supabaseAdmin
+      .from("videos")
+      .update({
+        unpinned_at: null,
+        status: "active",
+      })
+      .eq("cid", data.cid);
+
+    // Best-effort chain stamp. Don't fail the re-seed if the broadcast
+    // hiccups — recordChainEvent already stubs a placeholder txid in
+    // that case.
+    let stampTxid: string | null = null;
+    try {
+      if (video.video_wallet) {
+        const stamp = await recordChainEvent({
+          cid: video.cid,
+          videoWallet: video.video_wallet,
+          eventType: "R",
+          uploaderWallet: callerWallet,
+          extra: "reseed",
+        });
+        stampTxid = stamp.real ? stamp.txid : null;
+      }
+    } catch (err) {
+      console.warn("reseedVideo: chain stamp failed", err);
+    }
+
+    const expiresAt = video.expires_at
+      ? new Date(video.expires_at).getTime()
+      : 0;
+    const expired = expiresAt > 0 && expiresAt < Date.now();
+
+    return {
+      cid: video.cid,
+      reachable: true,
+      stampTxid,
+      expired,
+      expiresAt: video.expires_at,
+    };
   });
 
 /**

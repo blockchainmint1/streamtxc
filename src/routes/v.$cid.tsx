@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -6,7 +6,13 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { Button } from "@/components/ui/button";
-import { getVideo, pollTxStatus, reportVideo } from "@/lib/videos.functions";
+import {
+  getVideo,
+  pollTxStatus,
+  reportVideo,
+  probeAvailability,
+  restoreOneFromIpfs,
+} from "@/lib/videos.functions";
 import { formatBytes, formatTxc, formatDate } from "@/lib/fees";
 import { shortWalletId } from "@/lib/wallet";
 import {
@@ -31,7 +37,11 @@ import {
   Send,
   MessageCircle,
   Link as LinkIcon,
+  CloudOff,
+  RefreshCw,
+  Upload as UploadIcon,
 } from "lucide-react";
+import { useWallet } from "@/lib/wallet";
 import { toast } from "sonner";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
@@ -68,8 +78,12 @@ export const Route = createFileRoute("/v/$cid")({
 
 function WatchPage() {
   const { cid } = Route.useParams();
+  const navigate = useNavigate();
+  const { address } = useWallet();
   const fetchVideo = useServerFn(getVideo);
   const pollTx = useServerFn(pollTxStatus);
+  const probe = useServerFn(probeAvailability);
+  const restoreOne = useServerFn(restoreOneFromIpfs);
   const { data: video, isLoading } = useQuery({
     queryKey: ["video", cid],
     queryFn: () => fetchVideo({ data: { cid } }),
@@ -91,6 +105,42 @@ function WatchPage() {
   const txHash = chain?.txHash ?? video?.tx_hash ?? null;
   const confirmed = status === "active" && !!blockNumber;
   const stampFailed = status === "stamp_failed";
+
+  // Live availability — true when bytes can be served from our gateway
+  // and the row isn't flagged as unpinned. Runs after `getVideo` resolves
+  // and won't block first paint.
+  const { data: avail, refetch: refetchAvail } = useQuery({
+    queryKey: ["video-availability", cid],
+    queryFn: () => probe({ data: { cid } }),
+    enabled: !!video,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+  const unavailable = !!avail && !avail.available;
+  const isOwner =
+    !!address &&
+    !!video?.owner_wallet &&
+    address.toLowerCase() === video.owner_wallet.toLowerCase();
+  const [restoring, setRestoring] = useState(false);
+
+  const handleRestoreFromIpfs = async () => {
+    setRestoring(true);
+    try {
+      const res = await restoreOne({ data: { cid } });
+      if (res.ok) {
+        toast.success(
+          "Asked Pinata to re-fetch from IPFS. Re-checking in 10s…",
+        );
+        setTimeout(() => void refetchAvail(), 10_000);
+      } else {
+        toast.error(res.error || "Restore request failed.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Restore failed");
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   const [embedW, setEmbedW] = useState(640);
   const [embedH, setEmbedH] = useState(360);
@@ -147,12 +197,87 @@ function WatchPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Player + meta */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden">
-              <VideoPlayer
-                src={streamUrl}
-                poster={ipfsThumbUrl(video.thumbnail_cid)}
-              />
-            </div>
+            {unavailable ? (
+              <div className="aspect-video bg-black border-2 border-destructive/60 rounded-sm overflow-hidden relative">
+                {video.thumbnail_cid && (
+                  <img
+                    src={ipfsThumbUrl(video.thumbnail_cid)}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover grayscale opacity-30"
+                  />
+                )}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 gap-3 bg-background/40">
+                  <CloudOff className="h-10 w-10 text-destructive" />
+                  <div className="font-mono text-xs text-destructive uppercase tracking-wider">
+                    [ NO LONGER ON IPFS ]
+                  </div>
+                  <p className="text-sm text-foreground max-w-md">
+                    Our pinning node released this file (hosting prepayment
+                    expired) and no other peer is currently seeding it. The
+                    on-chain record is permanent — the bytes just aren't
+                    being served right now.
+                  </p>
+                  <div className="flex flex-wrap gap-2 justify-center mt-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRestoreFromIpfs}
+                      disabled={restoring}
+                      className="font-mono text-xs"
+                    >
+                      <RefreshCw className={`mr-2 h-3.5 w-3.5 ${restoring ? "animate-spin" : ""}`} />
+                      {restoring ? "asking peers…" : "try restore from peers"}
+                    </Button>
+                    {isOwner && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() =>
+                          navigate({
+                            to: "/v/$cid/restore",
+                            params: { cid: video.cid },
+                          })
+                        }
+                        className="font-mono text-xs"
+                      >
+                        <UploadIcon className="mr-2 h-3.5 w-3.5" />
+                        re-seed from original file
+                      </Button>
+                    )}
+                    <a
+                      href={`https://ipfs.io/ipfs/${video.cid}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-primary px-3 py-1.5"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      check ipfs.io
+                    </a>
+                  </div>
+                  {!isOwner && video.owner_wallet && (
+                    <p className="font-mono text-[11px] text-muted-foreground mt-2">
+                      Only the original uploader (
+                      <Link
+                        to="/u/$wallet"
+                        params={{ wallet: video.owner_wallet }}
+                        className="text-primary hover:underline"
+                      >
+                        {shortWalletId(video.owner_wallet)}
+                      </Link>
+                      ) can re-seed the original file.
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden">
+                <VideoPlayer
+                  src={streamUrl}
+                  poster={ipfsThumbUrl(video.thumbnail_cid)}
+                />
+              </div>
+            )}
             <h1 className="text-2xl font-bold tracking-tight">{video.title}</h1>
             {video.description && (
               <p className="text-muted-foreground whitespace-pre-wrap">
