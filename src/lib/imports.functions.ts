@@ -14,10 +14,33 @@ export const getDropboxAppKey = createServerFn({ method: "GET" }).handler(
 
 export const resolveImportUrl = createServerFn({ method: "POST" })
   .inputValidator((input) =>
-    z.object({ url: z.string().trim().min(1).max(2000) }).parse(input),
+    z
+      .object({
+        url: z.string().trim().min(1).max(2000),
+        // Optional: when the URL is a one-shot direct link supplied by an
+        // SDK (e.g. the Dropbox Chooser), trust the SDK's filename + size
+        // and DO NOT re-probe with HEAD — that would burn the one-shot
+        // token and the streaming GET would hang.
+        prefetched: z
+          .object({
+            source: z.enum(["dropbox"]),
+            filename: z.string().min(1).max(500),
+            sizeBytes: z.number().int().positive(),
+          })
+          .optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data }) => {
-    const resolved = await resolveImport(data.url);
+    const resolved = data.prefetched
+      ? {
+          source: data.prefetched.source,
+          directUrl: data.url,
+          filename: data.prefetched.filename,
+          sizeBytes: data.prefetched.sizeBytes,
+          fetchHeaders: undefined as Record<string, string> | undefined,
+        }
+      : await resolveImport(data.url);
 
     if (resolved.sizeBytes !== null && resolved.sizeBytes > IMPORT_MAX_BYTES) {
       const gb = (IMPORT_MAX_BYTES / (1024 ** 3)).toFixed(0);
