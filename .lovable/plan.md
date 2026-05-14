@@ -1,67 +1,42 @@
 ## What's happening
 
-Your wallet `txc1qa8w…ntr` (video "Bobby's Goofy Disclaimer", CID `QmZj4N…6c3N`) has received **30.0003 TXC** total across 4 funding txs. Required to renew was **7.859 TXC**, so you're paid up ~3.8x over.
+The video isn't actually expiring in 14.7 hours. In the database, `expires_at` for `bafybei…iba` is **37 days out** — the +7-day extension worked.
 
-The reason it still shows "payment due / expired":
+The "14.7h" is a **stale UI countdown** on the video page that's hardcoded to 24, not reading the `PAYMENT_GRACE_HOURS` constant we bumped to `24 * 7` in `src/lib/fees.ts`.
 
-`processVideos()` in `payment-watcher.ts` filters with `.is("unpinned_at", null)`. Once a video is unpinned, the watcher stops looking at its wallet entirely — so any later payment is invisible to the system. Combined with the earlier bug where `restoreUnpinnedVideos` flips `status='active'` without clearing `unpinned_at`, the row is in a weird middle state: marked active, but excluded from the watcher.
+```
+src/routes/v.$cid.tsx:655
+const graceLeft = Math.max(0, 24 - ageHrs);   // ← hardcoded 24
+```
+
+Video uploaded ~9.3h ago → 24 − 9.3 ≈ 14.7h. Exact match.
+
+The watcher (`payment-watcher.ts`) already uses `PAYMENT_GRACE_HOURS` correctly, so the actual unpin behavior is on the 7-day clock — only the user-visible countdown lies.
 
 ## Plan
 
-Scope: payment-watcher only. UI/restore overlay is the previous plan.
+One file, two-line fix in `src/routes/v.$cid.tsx`:
 
-### 1. Watcher: handle unpinned videos as a renewal path
+1. Import the constant:
+   ```ts
+   import { PAYMENT_GRACE_HOURS } from "@/lib/fees";
+   ```
+2. Replace line 655:
+   ```ts
+   const graceLeft = Math.max(0, PAYMENT_GRACE_HOURS - ageHrs);
+   ```
+3. Update the display at line 785 so values >24h render as days instead of an awkward "162.3h":
+   ```tsx
+   {graceLeft <= 0
+     ? "0h"
+     : graceLeft >= 48
+       ? `${(graceLeft / 24).toFixed(1)} days`
+       : `${graceLeft.toFixed(1)}h`}
+   ```
 
-In `src/routes/api/public/hooks/payment-watcher.ts → processVideos()`:
+No DB changes, no watcher changes, no other files. After this, your video will correctly show ~6.6 days of grace remaining instead of 14.7 hours.
 
-- Drop the `.is("unpinned_at", null)` filter. Select unpinned rows too.
-- Add a new branch *before* the existing `paid_at` / `paid` / `grace` branches:
+## Out of scope
 
-  ```text
-  if (v.unpinned_at != null) {
-    received = getAddressReceived(wallet)
-    delta    = received - payment_received_txc
-    if (delta >= monthlyRate)  // at least 1 month of new funds since takedown
-      → re-pin via pinByCid(cid)
-      → probe gateway (HEAD, ~3s)
-      → if probe ok:
-          stamp "R" (renewal) OP_RETURN with delta
-          update videos: unpinned_at=null, status='active',
-                         paid_at=COALESCE(paid_at, now()),
-                         payment_received_txc=received,
-                         expires_at = created_at + (received/monthlyRate)*30d
-          result: { action: 'restored', received, delta, expires_at }
-        else:
-          result: { action: 'restore_pin_unavailable' }  // leave row unpinned
-    else:
-      result: { action: 'unpinned_waiting', received, needed: monthlyRate }
-  }
-  ```
-
-  This makes a payment to an expired video's wallet automatically re-pin and reactivate it, with on-chain proof. No manual intervention.
-
-- Existing `paid_at` (top-up extension), fresh-paid, grace-expired, and waiting branches remain unchanged for `unpinned_at IS NULL` rows.
-
-### 2. Backfill the one stuck row
-
-After the deploy, the watcher's next tick will see `QmZj4N…6c3N` has 30.0003 TXC vs 7.859 required and:
-- re-pin from Pinata by CID (Pinata keeps the CID record; if peers still hold it, it comes back; if not, the probe fails and we surface that)
-- stamp R, set `unpinned_at=null`, `status='active'`, `expires_at ≈ created_at + (30.0003/7.859)*30d ≈ created_at + 114 days`
-
-No manual SQL needed if the re-pin probe succeeds. If the probe fails (file genuinely gone from IPFS), the row stays unpinned and the owner re-seed flow from the previous plan kicks in — but the payment is now tracked, so the re-seed only has to upload bytes, not also pay again.
-
-### 3. UI: show "renewal pending" vs "expired"
-
-In `/u/<wallet>` (and the video page overlay from the prior plan), when `unpinned_at IS NOT NULL` AND `payment_received_txc - (paid amount baseline) >= monthlyRate`, label as **"Renewal received — restoring…"** instead of **"Expired"**. Cosmetic; one extra branch in the existing badge logic.
-
-### Files to edit
-
-- `src/routes/api/public/hooks/payment-watcher.ts` — drop filter, add unpinned-renewal branch
-- `src/lib/pinata.server.ts` — re-export `pinByCid` if not already exported
-- `src/routes/u.$wallet.tsx` — add "renewal pending" badge state
-
-### Out of scope
-
-- The video-page overlay + owner re-seed flow (covered by the previous approved plan, partially implemented)
-- Reconciling other inconsistent rows (we'll let the watcher heal them naturally on next tick)
-- Refunding overpayment — the extra ~22 TXC on this wallet just buys ~85 extra days of hosting via the existing `expires_at` formula
+- The actual 37-day `expires_at` is already correct from the previous bulk update; not touching it.
+- Other "24h" copy in `upload.tsx` / `about.tsx` was already updated to "7 days" in the prior change — verified, nothing else to fix.
