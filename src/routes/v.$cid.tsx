@@ -286,6 +286,12 @@ function WatchPage() {
                   sizeBytes={video.size_bytes}
                   createdAt={video.created_at}
                 />
+                <ExpiringSoonOverlay
+                  expiresAt={video.expires_at}
+                  paymentRequired={Number(video.payment_required_txc ?? 0)}
+                  paymentReceived={Number(video.payment_received_txc ?? 0)}
+                  unpinnedAt={video.unpinned_at ?? null}
+                />
               </div>
             )}
             <h1 className="text-2xl font-bold tracking-tight">{video.title}</h1>
@@ -412,6 +418,7 @@ function WatchPage() {
               </p>
             </CollapsibleSection>
             {video.video_wallet && video.payment_required_txc != null && (
+              <div id="hosting-payment" className="scroll-mt-24">
               <CollapsibleSection
                 title="[ HOSTING PAYMENT ]"
                 icon={<Wallet className="h-3.5 w-3.5" />}
@@ -428,6 +435,7 @@ function WatchPage() {
                   onCopy={copy}
                 />
               </CollapsibleSection>
+              </div>
             )}
 
             <CollapsibleSection
