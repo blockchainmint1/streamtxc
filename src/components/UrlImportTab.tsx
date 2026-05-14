@@ -37,6 +37,7 @@ import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 import {
   resolveImportUrl,
   getImportStatus,
+  getDropboxAppKey,
 } from "@/lib/imports.functions";
 import { addByCid } from "@/lib/videos.functions";
 import { formatBytes } from "@/lib/fees";
@@ -72,6 +73,7 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
   const resolve = useServerFn(resolveImportUrl);
   const status = useServerFn(getImportStatus);
   const addCid = useServerFn(addByCid);
+  const fetchDbxKey = useServerFn(getDropboxAppKey);
   const qc = useQueryClient();
   const navigate = useNavigate();
 
@@ -86,6 +88,7 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
   const [pinnedCid, setPinnedCid] = useState<string | null>(null);
   const [thumbnailCid, setThumbnailCid] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [dbxReady, setDbxReady] = useState(false);
 
   // Stop polling on unmount.
   useEffect(
@@ -94,6 +97,64 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
     },
     [],
   );
+
+  // Load the Dropbox Chooser SDK once, using the app key from the server.
+  useEffect(() => {
+    let cancelled = false;
+    if (typeof window === "undefined") return;
+    if ((window as any).Dropbox?.choose) {
+      setDbxReady(true);
+      return;
+    }
+    if (document.getElementById("dropboxjs")) {
+      const check = setInterval(() => {
+        if ((window as any).Dropbox?.choose) {
+          setDbxReady(true);
+          clearInterval(check);
+        }
+      }, 200);
+      return () => clearInterval(check);
+    }
+    (async () => {
+      try {
+        const { appKey } = await fetchDbxKey({});
+        if (!appKey || cancelled) return;
+        const s = document.createElement("script");
+        s.id = "dropboxjs";
+        s.src = "https://www.dropbox.com/static/api/2/dropins.js";
+        s.setAttribute("data-app-key", appKey);
+        s.onload = () => {
+          if (!cancelled) setDbxReady(true);
+        };
+        document.body.appendChild(s);
+      } catch {
+        /* leave dbxReady false — URL paste still works */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchDbxKey]);
+
+  function handleDropboxChoose() {
+    const Dropbox = (window as any).Dropbox;
+    if (!Dropbox?.choose) return;
+    Dropbox.choose({
+      success: (files: Array<{ link: string; name: string; bytes: number }>) => {
+        if (!files?.[0]) return;
+        setUrl(files[0].link);
+        // Auto-resolve immediately so the user only clicks once.
+        setTimeout(() => {
+          const btn = document.getElementById("import-resolve-btn");
+          (btn as HTMLButtonElement | null)?.click();
+        }, 0);
+      },
+      cancel: () => {},
+      linkType: "direct",
+      multiselect: false,
+      extensions: ["video"],
+    });
+  }
 
   async function handleResolve() {
     setError(null);
@@ -251,6 +312,7 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
             className="font-mono"
           />
           <Button
+            id="import-resolve-btn"
             type="button"
             variant="outline"
             onClick={handleResolve}
@@ -267,6 +329,21 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
               </>
             )}
           </Button>
+        </div>
+        <div className="flex items-center gap-2 pt-1">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleDropboxChoose}
+            disabled={!dbxReady || stage === "resolving" || stage === "streaming"}
+            className="font-mono"
+          >
+            <Link2 className="mr-2 h-3 w-3" />
+            {dbxReady ? "Choose from Dropbox" : "Loading Dropbox…"}
+          </Button>
+          <span className="font-mono text-[11px] text-muted-foreground">
+            opens Dropbox's file picker — no need to copy a link
+          </span>
         </div>
         <p className="font-mono text-[11px] text-muted-foreground">
           We'll find the actual file behind the share page and pin it
