@@ -17,7 +17,7 @@ import { recordChainEvent, recordMetadataAnchor } from "./chain-events.server";
 import { recordOwnershipAnchor, recordSplitPayout } from "./chain-events.server";
 import { verifyMessage, sendToAddress, getPlatformAddress } from "./txc.server";
 import { retryStuckStampForVideo } from "./stamp-retry.server";
-import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES } from "./fees";
+import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES, PAYMENT_GRACE_HOURS } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
 
 // Accepts either an EVM-style 0x… (legacy mock-wallet rows) or a real TXC
