@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UploadRouteImport } from './routes/upload'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ManageRouteImport } from './routes/manage'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
@@ -28,6 +29,11 @@ import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/publ
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
   path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ManageRoute = ManageRouteImport.update({
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/manage': typeof ManageRoute
+  '/privacy': typeof PrivacyRoute
   '/upload': typeof UploadRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/manage': typeof ManageRoute
+  '/privacy': typeof PrivacyRoute
   '/upload': typeof UploadRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/manage': typeof ManageRoute
+  '/privacy': typeof PrivacyRoute
   '/upload': typeof UploadRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/manage'
+    | '/privacy'
     | '/upload'
     | '/embed/$cid'
     | '/u/$wallet'
@@ -179,6 +189,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/manage'
+    | '/privacy'
     | '/upload'
     | '/embed/$cid'
     | '/u/$wallet'
@@ -196,6 +207,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/manage'
+    | '/privacy'
     | '/upload'
     | '/embed/$cid'
     | '/u/$wallet'
@@ -214,6 +226,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   ManageRoute: typeof ManageRoute
+  PrivacyRoute: typeof PrivacyRoute
   UploadRoute: typeof UploadRoute
   EmbedCidRoute: typeof EmbedCidRoute
   UWalletRoute: typeof UWalletRoute
@@ -234,6 +247,13 @@ declare module '@tanstack/react-router' {
       path: '/upload'
       fullPath: '/upload'
       preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/manage': {
@@ -351,6 +371,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   ManageRoute: ManageRoute,
+  PrivacyRoute: PrivacyRoute,
   UploadRoute: UploadRoute,
   EmbedCidRoute: EmbedCidRoute,
   UWalletRoute: UWalletRoute,
@@ -366,3 +387,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
