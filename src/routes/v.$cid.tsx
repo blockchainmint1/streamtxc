@@ -414,7 +414,7 @@ function WatchPage() {
                 />
               )}
               <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider pt-2 border-t border-border">
-                TXC proof is permanent — timestamped proof on TXC does not expire.
+                TXC PROOF IS PERMANENT — DOES NOT EXPIRE.
               </p>
             </CollapsibleSection>
             {video.video_wallet && video.payment_required_txc != null && (
