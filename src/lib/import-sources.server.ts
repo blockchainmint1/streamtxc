@@ -7,7 +7,7 @@
 // Adding a new source = add a host to `HOST_ALLOWLIST` and wire one
 // resolver function below.
 
-export type ImportSource = "wetransfer" | "dropbox";
+export type ImportSource = "wetransfer" | "dropbox" | "google-drive";
 
 export interface ResolvedImport {
   source: ImportSource;
@@ -27,6 +27,8 @@ export const HOST_ALLOWLIST = [
   "dropbox.com",
   "www.dropbox.com",
   "dl.dropboxusercontent.com",
+  "drive.google.com",
+  "docs.google.com",
 ];
 
 export async function resolveImport(rawUrl: string): Promise<ResolvedImport> {
@@ -48,6 +50,9 @@ export async function resolveImport(rawUrl: string): Promise<ResolvedImport> {
   }
   if (host.endsWith("dropbox.com") || host === "dl.dropboxusercontent.com") {
     return resolveDropbox(parsed);
+  }
+  if (host === "drive.google.com" || host === "docs.google.com") {
+    return resolveGoogleDrive(parsed);
   }
   throw new Error(`No resolver for ${host}`);
 }
