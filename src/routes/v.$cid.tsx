@@ -197,12 +197,87 @@ function WatchPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Player + meta */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden">
-              <VideoPlayer
-                src={streamUrl}
-                poster={ipfsThumbUrl(video.thumbnail_cid)}
-              />
-            </div>
+            {unavailable ? (
+              <div className="aspect-video bg-black border-2 border-destructive/60 rounded-sm overflow-hidden relative">
+                {video.thumbnail_cid && (
+                  <img
+                    src={ipfsThumbUrl(video.thumbnail_cid)}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover grayscale opacity-30"
+                  />
+                )}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 gap-3 bg-background/40">
+                  <CloudOff className="h-10 w-10 text-destructive" />
+                  <div className="font-mono text-xs text-destructive uppercase tracking-wider">
+                    [ NO LONGER ON IPFS ]
+                  </div>
+                  <p className="text-sm text-foreground max-w-md">
+                    Our pinning node released this file (hosting prepayment
+                    expired) and no other peer is currently seeding it. The
+                    on-chain record is permanent — the bytes just aren't
+                    being served right now.
+                  </p>
+                  <div className="flex flex-wrap gap-2 justify-center mt-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRestoreFromIpfs}
+                      disabled={restoring}
+                      className="font-mono text-xs"
+                    >
+                      <RefreshCw className={`mr-2 h-3.5 w-3.5 ${restoring ? "animate-spin" : ""}`} />
+                      {restoring ? "asking peers…" : "try restore from peers"}
+                    </Button>
+                    {isOwner && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() =>
+                          navigate({
+                            to: "/v/$cid/restore",
+                            params: { cid: video.cid },
+                          })
+                        }
+                        className="font-mono text-xs"
+                      >
+                        <UploadIcon className="mr-2 h-3.5 w-3.5" />
+                        re-seed from original file
+                      </Button>
+                    )}
+                    <a
+                      href={`https://ipfs.io/ipfs/${video.cid}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground hover:text-primary px-3 py-1.5"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      check ipfs.io
+                    </a>
+                  </div>
+                  {!isOwner && video.owner_wallet && (
+                    <p className="font-mono text-[11px] text-muted-foreground mt-2">
+                      Only the original uploader (
+                      <Link
+                        to="/u/$wallet"
+                        params={{ wallet: video.owner_wallet }}
+                        className="text-primary hover:underline"
+                      >
+                        {shortWalletId(video.owner_wallet)}
+                      </Link>
+                      ) can re-seed the original file.
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden">
+                <VideoPlayer
+                  src={streamUrl}
+                  poster={ipfsThumbUrl(video.thumbnail_cid)}
+                />
+              </div>
+            )}
             <h1 className="text-2xl font-bold tracking-tight">{video.title}</h1>
             {video.description && (
               <p className="text-muted-foreground whitespace-pre-wrap">
