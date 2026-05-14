@@ -21,6 +21,7 @@ import { Route as ApiStreamCidRouteImport } from './routes/api/stream.$cid'
 import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
 import { Route as ApiPublicTxcVerifyMessageRouteImport } from './routes/api/public/txc-verify-message'
 import { Route as ApiPublicTxcHealthRouteImport } from './routes/api/public/txc-health'
+import { Route as ApiPublicImportStreamRouteImport } from './routes/api/public/import-stream'
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
 
@@ -85,6 +86,11 @@ const ApiPublicTxcHealthRoute = ApiPublicTxcHealthRouteImport.update({
   path: '/api/public/txc-health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicImportStreamRoute = ApiPublicImportStreamRouteImport.update({
+  id: '/api/public/import-stream',
+  path: '/api/public/import-stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksPaymentWatcherRoute =
   ApiPublicHooksPaymentWatcherRouteImport.update({
     id: '/api/public/hooks/payment-watcher',
@@ -106,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
+  '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
+  '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
+  '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
@@ -157,6 +166,7 @@ export interface FileRouteTypes {
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
+    | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
     | '/api/public/upload'
@@ -173,6 +183,7 @@ export interface FileRouteTypes {
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
+    | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
     | '/api/public/upload'
@@ -189,6 +200,7 @@ export interface FileRouteTypes {
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
+    | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
     | '/api/public/upload'
@@ -206,6 +218,7 @@ export interface RootRouteChildren {
   EmbedCidRoute: typeof EmbedCidRoute
   UWalletRoute: typeof UWalletRoute
   VCidRoute: typeof VCidRouteWithChildren
+  ApiPublicImportStreamRoute: typeof ApiPublicImportStreamRoute
   ApiPublicTxcHealthRoute: typeof ApiPublicTxcHealthRoute
   ApiPublicTxcVerifyMessageRoute: typeof ApiPublicTxcVerifyMessageRoute
   ApiPublicUploadRoute: typeof ApiPublicUploadRoute
@@ -300,6 +313,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTxcHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/import-stream': {
+      id: '/api/public/import-stream'
+      path: '/api/public/import-stream'
+      fullPath: '/api/public/import-stream'
+      preLoaderRoute: typeof ApiPublicImportStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/payment-watcher': {
       id: '/api/public/hooks/payment-watcher'
       path: '/api/public/hooks/payment-watcher'
@@ -335,6 +355,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmbedCidRoute: EmbedCidRoute,
   UWalletRoute: UWalletRoute,
   VCidRoute: VCidRouteWithChildren,
+  ApiPublicImportStreamRoute: ApiPublicImportStreamRoute,
   ApiPublicTxcHealthRoute: ApiPublicTxcHealthRoute,
   ApiPublicTxcVerifyMessageRoute: ApiPublicTxcVerifyMessageRoute,
   ApiPublicUploadRoute: ApiPublicUploadRoute,
@@ -345,3 +366,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
