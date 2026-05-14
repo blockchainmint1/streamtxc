@@ -277,10 +277,14 @@ function WatchPage() {
                 </div>
               </div>
             ) : (
-              <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden">
+              <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden relative">
                 <VideoPlayer
                   src={streamUrl}
                   poster={ipfsThumbUrl(video.thumbnail_cid)}
+                />
+                <LargeFileWarmupOverlay
+                  sizeBytes={video.size_bytes}
+                  createdAt={video.created_at}
                 />
               </div>
             )}
@@ -961,5 +965,44 @@ function ReportButton({ cid }: { cid: string }) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function LargeFileWarmupOverlay({
+  sizeBytes,
+  createdAt,
+}: {
+  sizeBytes: number;
+  createdAt: string;
+}) {
+  const ageMin = (Date.now() - new Date(createdAt).getTime()) / 60_000;
+  const isLarge = sizeBytes >= 200 * 1024 * 1024; // ≥200 MB
+  const isFresh = ageMin < 60; // first hour after upload
+  const [dismissed, setDismissed] = useState(false);
+  if (!isLarge || !isFresh || dismissed) return null;
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center p-3">
+      <div className="pointer-events-auto max-w-md rounded-sm border border-primary/40 bg-background/90 backdrop-blur px-3 py-2 flex items-start gap-2 shadow-lg">
+        <Loader2 className="h-3.5 w-3.5 mt-0.5 text-primary animate-spin shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="font-mono text-[10px] uppercase tracking-wider text-primary">
+            [ large file · warming up ]
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {formatBytes(sizeBytes)} just landed on IPFS — first playback can
+            take a minute while the gateway pulls and caches it. Give it a
+            moment, then hit play.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setDismissed(true)}
+          className="font-mono text-[10px] uppercase text-muted-foreground hover:text-foreground px-1"
+          aria-label="Dismiss"
+        >
+          ×
+        </button>
+      </div>
+    </div>
   );
 }
