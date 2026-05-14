@@ -23,7 +23,12 @@ import {
   stampEvent,
 } from "@/lib/txc.server";
 import { recordChainEvent } from "@/lib/chain-events.server";
-import { unpinByCid, pinJsonToIPFS } from "@/lib/pinata.server";
+import {
+  unpinByCid,
+  pinJsonToIPFS,
+  pinByCid,
+  headCidOnGateway,
+} from "@/lib/pinata.server";
 import { PAYMENT_GRACE_HOURS } from "@/lib/fees";
 import { sweepCommentPayout } from "@/lib/videos.functions";
 import { recordSplitPayout } from "@/lib/chain-events.server";
@@ -208,9 +213,8 @@ async function processVideos() {
   const { data: pending, error } = await supabaseAdmin
     .from("videos")
     .select(
-      "cid, owner_wallet, video_wallet, payment_required_txc, months_prepaid, created_at, paid_at, expires_at, payment_received_txc",
+      "cid, owner_wallet, video_wallet, payment_required_txc, months_prepaid, created_at, paid_at, expires_at, payment_received_txc, unpinned_at",
     )
-    .is("unpinned_at", null)
     .not("video_wallet", "is", null)
     .limit(100);
 
@@ -233,6 +237,78 @@ async function processVideos() {
     const extendedExpiresMs =
       new Date(v.created_at).getTime() + monthsCredited * 30 * 24 * 3_600_000;
     const extendedExpires = new Date(extendedExpiresMs).toISOString();
+
+    // Unpinned video: if a renewal payment landed (delta >= one month's worth),
+    // re-pin from IPFS, stamp R, reactivate. If the bytes are no longer
+    // fetchable from any peer the row stays unpinned and the owner re-seed
+    // flow takes over — but the payment is now tracked.
+    if (v.unpinned_at) {
+      const prevReceived = Number(v.payment_received_txc ?? 0);
+      const delta = received - prevReceived;
+      if (monthlyRate > 0 && delta >= monthlyRate - 0.00000001) {
+        try {
+          await pinByCid(v.cid, v.cid);
+          // Give Pinata a moment, then probe. Single attempt — cron retries.
+          const available = await headCidOnGateway(v.cid, 4000);
+          if (!available) {
+            results.push({
+              cid: v.cid,
+              action: "restore_pin_unavailable",
+              received,
+              delta,
+            });
+            continue;
+          }
+          const stamp = await recordChainEvent({
+            cid: v.cid,
+            videoWallet: v.video_wallet,
+            eventType: "R",
+            uploaderWallet: v.owner_wallet ?? "anon",
+            extra: delta.toFixed(4),
+          });
+          await supabaseAdmin
+            .from("videos")
+            .update({
+              unpinned_at: null,
+              status: "active",
+              paid_at: v.paid_at ?? new Date().toISOString(),
+              payment_received_txc: received,
+              payment_tx_hash: stamp.txid,
+              expires_at: extendedExpires,
+            })
+            .eq("cid", v.cid);
+          results.push({
+            cid: v.cid,
+            action: "restored",
+            received,
+            delta,
+            expires_at: extendedExpires,
+            txid: stamp.txid,
+          });
+        } catch (err) {
+          results.push({
+            cid: v.cid,
+            action: "restore_failed",
+            error: String(err),
+          });
+        }
+        continue;
+      }
+      // Track partial top-ups so the UI can show "renewal pending".
+      if (received > prevReceived + 0.00000001) {
+        await supabaseAdmin
+          .from("videos")
+          .update({ payment_received_txc: received })
+          .eq("cid", v.cid);
+      }
+      results.push({
+        cid: v.cid,
+        action: "unpinned_waiting",
+        received,
+        needed: monthlyRate,
+      });
+      continue;
+    }
 
     // Already-paid video: only update expires_at if more TXC arrived (top-ups extend life).
     if (v.paid_at) {
