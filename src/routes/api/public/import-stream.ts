@@ -111,10 +111,18 @@ export const Route = createFileRoute("/api/public/import-stream")({
           }
         })();
 
-        waitUntil(work);
+        const scheduled = waitUntil(work);
+
+        // Preview/dev can lack a working waitUntil context. In that case,
+        // detached background work gets dropped as soon as we return the
+        // response, leaving the row stuck at `streaming` with 0 bytes.
+        // Keep the request open and finish the import inline instead.
+        if (!scheduled) {
+          await work;
+        }
 
         return Response.json(
-          { id: importId, status: "queued" },
+          { id: importId, status: scheduled ? "queued" : "processing" },
           {
             status: 202,
             headers: { "Cache-Control": "no-store", "X-Import-Id": importId },
