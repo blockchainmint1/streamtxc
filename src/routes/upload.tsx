@@ -773,6 +773,15 @@ function UploadPage() {
                 />
               </div>
 
+              {/^(bafy|bafk|bafyb|Qm)/i.test(cidInput.trim()) &&
+                cidInput.trim().length >= 46 && (
+                  <ThumbnailPicker
+                    key={cidInput.trim()}
+                    videoSrc={`/api/stream/${cidInput.trim()}`}
+                    onChange={setCidThumbnailCid}
+                  />
+                )}
+
               {cidStage !== "idle" && (
                 <div className="border border-primary/40 bg-primary/5 rounded-sm p-4 space-y-2">
                   <div className="flex items-center gap-2 font-mono text-xs text-primary">
