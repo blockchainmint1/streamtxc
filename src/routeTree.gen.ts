@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ManageRouteImport } from './routes/manage'
+import { Route as BrandRouteImport } from './routes/brand'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VCidRouteImport } from './routes/v.$cid'
@@ -39,6 +40,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const ManageRoute = ManageRouteImport.update({
   id: '/manage',
   path: '/manage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BrandRoute = BrandRouteImport.update({
+  id: '/brand',
+  path: '/brand',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AboutRoute = AboutRouteImport.update({
@@ -113,6 +119,7 @@ const ApiPublicAdminRetryStampsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/brand': typeof BrandRoute
   '/manage': typeof ManageRoute
   '/privacy': typeof PrivacyRoute
   '/upload': typeof UploadRoute
@@ -131,6 +138,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/brand': typeof BrandRoute
   '/manage': typeof ManageRoute
   '/privacy': typeof PrivacyRoute
   '/upload': typeof UploadRoute
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/brand': typeof BrandRoute
   '/manage': typeof ManageRoute
   '/privacy': typeof PrivacyRoute
   '/upload': typeof UploadRoute
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
+    | '/brand'
     | '/manage'
     | '/privacy'
     | '/upload'
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
+    | '/brand'
     | '/manage'
     | '/privacy'
     | '/upload'
@@ -206,6 +217,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about'
+    | '/brand'
     | '/manage'
     | '/privacy'
     | '/upload'
@@ -225,6 +237,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  BrandRoute: typeof BrandRoute
   ManageRoute: typeof ManageRoute
   PrivacyRoute: typeof PrivacyRoute
   UploadRoute: typeof UploadRoute
@@ -261,6 +274,13 @@ declare module '@tanstack/react-router' {
       path: '/manage'
       fullPath: '/manage'
       preLoaderRoute: typeof ManageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/brand': {
+      id: '/brand'
+      path: '/brand'
+      fullPath: '/brand'
+      preLoaderRoute: typeof BrandRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/about': {
@@ -370,6 +390,7 @@ const VCidRouteWithChildren = VCidRoute._addFileChildren(VCidRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  BrandRoute: BrandRoute,
   ManageRoute: ManageRoute,
   PrivacyRoute: PrivacyRoute,
   UploadRoute: UploadRoute,
