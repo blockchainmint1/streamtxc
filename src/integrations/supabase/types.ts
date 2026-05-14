@@ -244,6 +244,48 @@ export type Database = {
         }
         Relationships: []
       }
+      imports: {
+        Row: {
+          bytes_total: number | null
+          bytes_uploaded: number
+          cid: string | null
+          created_at: string
+          error_message: string | null
+          filename: string
+          id: string
+          source: string
+          source_url: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          bytes_total?: number | null
+          bytes_uploaded?: number
+          cid?: string | null
+          created_at?: string
+          error_message?: string | null
+          filename: string
+          id?: string
+          source: string
+          source_url: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          bytes_total?: number | null
+          bytes_uploaded?: number
+          cid?: string | null
+          created_at?: string
+          error_message?: string | null
+          filename?: string
+          id?: string
+          source?: string
+          source_url?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           created_at: string
