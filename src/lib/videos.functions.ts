@@ -717,7 +717,7 @@ export const listVideosByOwner = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabaseAdmin
       .from("videos")
       .select(
-        "cid, title, owner_wallet, size_bytes, view_count, created_at, status, payment_required_txc, expires_at, thumbnail_cid, video_wallet, unpinned_at",
+        "cid, title, owner_wallet, size_bytes, view_count, created_at, status, payment_required_txc, payment_received_txc, expires_at, thumbnail_cid, video_wallet, unpinned_at",
       )
       .eq("owner_wallet", data.wallet)
       .in("status", ["active", "mempool", "unpinned"])
