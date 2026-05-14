@@ -111,12 +111,14 @@ function WalletPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((v) => (
+            {items.map((v) => {
+              const expired = (v as any).status === "unpinned";
+              return (
               <Link
                 key={v.cid}
                 to="/v/$cid"
                 params={{ cid: v.cid }}
-                className="group block bg-card border border-border rounded-sm overflow-hidden hover:border-primary transition-colors"
+                className={`group block bg-card border rounded-sm overflow-hidden transition-colors ${expired ? "border-destructive/40 hover:border-destructive opacity-70" : "border-border hover:border-primary"}`}
               >
                 <div className="relative aspect-video bg-secondary overflow-hidden">
                   {v.thumbnail_cid ? (
@@ -124,7 +126,7 @@ function WalletPage() {
                       src={ipfsThumbUrl(v.thumbnail_cid)}
                       alt={v.title}
                       loading="lazy"
-                      className="absolute inset-0 h-full w-full object-cover"
+                      className={`absolute inset-0 h-full w-full object-cover ${expired ? "grayscale" : ""}`}
                     />
                   ) : (
                     <video
@@ -132,8 +134,13 @@ function WalletPage() {
                       preload="metadata"
                       muted
                       playsInline
-                      className="absolute inset-0 h-full w-full object-cover"
+                      className={`absolute inset-0 h-full w-full object-cover ${expired ? "grayscale" : ""}`}
                     />
+                  )}
+                  {expired && (
+                    <div className="absolute top-2 left-2 px-2 py-0.5 bg-destructive text-destructive-foreground font-mono text-[10px] uppercase tracking-wider rounded-sm">
+                      expired
+                    </div>
                   )}
                   <div className="absolute inset-0 flex items-center justify-center bg-background/0 group-hover:bg-background/30 transition-colors">
                     <Play className="h-10 w-10 text-background opacity-0 group-hover:opacity-100 fill-background transition-opacity" />
@@ -148,9 +155,15 @@ function WalletPage() {
                   <div className="mt-1 font-mono text-[10px] text-muted-foreground/60 truncate">
                     {v.cid}
                   </div>
+                  {expired && (
+                    <div className="mt-2 font-mono text-[11px] text-destructive">
+                      hosting expired — renew to restore
+                    </div>
+                  )}
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         )}
 
