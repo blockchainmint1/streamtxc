@@ -47,6 +47,11 @@ import { parseDuplicateCidError } from "@/lib/duplicate-cid";
 interface Props {
   ownerWallet: string | null;
   onDuplicate: (info: ReturnType<typeof parseDuplicateCidError>) => void;
+  /**
+   * "url"     — paste a Dropbox/Drive/WeTransfer link (no Chooser button)
+   * "dropbox" — Dropbox Chooser only, no manual URL field
+   */
+  mode?: "url" | "dropbox";
 }
 
 type Stage =
@@ -69,7 +74,8 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
+export function UrlImportTab({ ownerWallet, onDuplicate, mode = "url" }: Props) {
+  const isDropbox = mode === "dropbox";
   const resolve = useServerFn(resolveImportUrl);
   const status = useServerFn(getImportStatus);
   const addCid = useServerFn(addByCid);
@@ -100,6 +106,7 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
 
   // Load the Dropbox Chooser SDK once, using the app key from the server.
   useEffect(() => {
+    if (!isDropbox) return; // only load SDK when the Dropbox tab needs it
     let cancelled = false;
     if (typeof window === "undefined") return;
     if ((window as any).Dropbox?.choose) {
@@ -134,7 +141,7 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [fetchDbxKey]);
+  }, [fetchDbxKey, isDropbox]);
 
   function handleDropboxChoose() {
     const Dropbox = (window as any).Dropbox;
@@ -298,6 +305,7 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
 
   return (
     <div className="space-y-6">
+      {!isDropbox && (
       <div className="space-y-2">
         <Label htmlFor="import-url" className="font-mono text-xs">
           DROPBOX, GOOGLE DRIVE, OR WETRANSFER URL
@@ -330,21 +338,6 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
             )}
           </Button>
         </div>
-        <div className="flex items-center gap-2 pt-1">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleDropboxChoose}
-            disabled={!dbxReady || stage === "resolving" || stage === "streaming"}
-            className="font-mono"
-          >
-            <Link2 className="mr-2 h-3 w-3" />
-            {dbxReady ? "Choose from Dropbox" : "Loading Dropbox…"}
-          </Button>
-          <span className="font-mono text-[11px] text-muted-foreground">
-            opens Dropbox's file picker — no need to copy a link
-          </span>
-        </div>
         <p className="font-mono text-[11px] text-muted-foreground">
           We'll find the actual file behind the share page and pin it
           straight to IPFS. Single-file transfers only, up to 10 GB.
@@ -352,6 +345,45 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
           WeTransfer links expire fast — resolve fresh ones.
         </p>
       </div>
+      )}
+
+      {isDropbox && (
+        <div className="space-y-2">
+          <Label className="font-mono text-xs">DROPBOX FILE</Label>
+          <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="lg"
+            onClick={handleDropboxChoose}
+            disabled={!dbxReady || stage === "resolving" || stage === "streaming"}
+            className="font-mono"
+          >
+            <Link2 className="mr-2 h-3 w-3" />
+            {dbxReady ? "Choose from Dropbox" : "Loading Dropbox…"}
+          </Button>
+          {stage === "resolving" && (
+            <span className="font-mono text-[11px] text-muted-foreground">
+              <Loader2 className="inline h-3 w-3 mr-1 animate-spin" />
+              Resolving…
+            </span>
+          )}
+          </div>
+          {/* hidden trigger reused by the Chooser callback to auto-resolve */}
+          <button
+            id="import-resolve-btn"
+            type="button"
+            onClick={handleResolve}
+            className="hidden"
+            tabIndex={-1}
+            aria-hidden
+          />
+          <p className="font-mono text-[11px] text-muted-foreground">
+            Opens Dropbox's native file picker — sign in with your Dropbox
+            account, choose a video, and we'll stream it straight to IPFS.
+            No need to copy a share link. Up to 10 GB.
+          </p>
+        </div>
+      )}
 
       {error && (
         <div className="border-2 border-destructive/60 bg-destructive/5 rounded-sm p-4">
@@ -492,6 +524,7 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
       )}
 
       {!resolved && stage === "idle" && (
+        !isDropbox && (
         <div className="border border-border rounded-sm p-4 bg-card/50">
           <div className="flex items-start gap-3">
             <Globe className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
@@ -515,6 +548,7 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
             </div>
           </div>
         </div>
+        )
       )}
     </div>
   );
