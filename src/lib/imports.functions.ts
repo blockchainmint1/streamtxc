@@ -6,6 +6,12 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { resolveImport } from "./import-sources.server";
 import { signImportToken, IMPORT_MAX_BYTES } from "./imports.server";
 
+export const getDropboxAppKey = createServerFn({ method: "GET" }).handler(
+  async () => {
+    return { appKey: process.env.dropbox_key ?? null };
+  },
+);
+
 export const resolveImportUrl = createServerFn({ method: "POST" })
   .inputValidator((input) =>
     z.object({ url: z.string().trim().min(1).max(2000) }).parse(input),
