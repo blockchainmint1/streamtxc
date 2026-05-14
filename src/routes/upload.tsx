@@ -28,6 +28,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Sparkles,
+  Cloud,
 } from "lucide-react";
 import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
 import { computeCids } from "@/lib/ipfs-cid";
@@ -148,7 +149,7 @@ function UploadPage() {
     "idle" | "fetching" | "registering"
   >("idle");
   const [cidNotFound, setCidNotFound] = useState<string | null>(null);
-  type TabKey = "file" | "cid" | "import";
+  type TabKey = "file" | "cid" | "dropbox" | "import";
   const [activeTab, setActiveTab] = useState<TabKey>("file");
   const tab = activeTab;
   const months = 1;
@@ -424,12 +425,15 @@ function UploadPage() {
               </div>
             </div>
           )}
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-4 mb-6">
             <TabsTrigger value="file" className="font-mono text-xs">
               <Upload className="mr-2 h-3 w-3" /> Upload file
             </TabsTrigger>
             <TabsTrigger value="cid" className="font-mono text-xs">
               <Link2 className="mr-2 h-3 w-3" /> Add by CID
+            </TabsTrigger>
+            <TabsTrigger value="dropbox" className="font-mono text-xs">
+              <Cloud className="mr-2 h-3 w-3" /> Dropbox
             </TabsTrigger>
             <TabsTrigger value="import" className="font-mono text-xs">
               <Sparkles className="mr-2 h-3 w-3" /> Import URL
@@ -822,6 +826,15 @@ function UploadPage() {
             <UrlImportTab
               ownerWallet={address ?? null}
               onDuplicate={(info) => setDuplicate(info)}
+              mode="url"
+            />
+          </TabsContent>
+
+          <TabsContent value="dropbox">
+            <UrlImportTab
+              ownerWallet={address ?? null}
+              onDuplicate={(info) => setDuplicate(info)}
+              mode="dropbox"
             />
           </TabsContent>
         </Tabs>
