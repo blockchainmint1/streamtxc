@@ -143,6 +143,7 @@ function UploadPage() {
   const [cidInput, setCidInput] = useState("");
   const [cidTitle, setCidTitle] = useState("");
   const [cidDescription, setCidDescription] = useState("");
+  const [cidThumbnailCid, setCidThumbnailCid] = useState<string | null>(null);
   const [cidStage, setCidStage] = useState<
     "idle" | "fetching" | "registering"
   >("idle");
@@ -342,6 +343,7 @@ function UploadPage() {
           title: cidTitle,
           description: cidDescription,
           months,
+          thumbnailCid: cidThumbnailCid ?? undefined,
         },
       });
       if (result.chainStatus === "stamp_failed") {
