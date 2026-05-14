@@ -136,8 +136,6 @@ function TermsPage() {
               first using the site by sending a signed TXC wallet message
               from the wallet you use with streamTXC, to that same wallet,
               containing the words &ldquo;arbitration opt-out.&rdquo;
-              Figuring out how to do that is left as an exercise for the
-              reader.
             </p>
           </Section>
 
