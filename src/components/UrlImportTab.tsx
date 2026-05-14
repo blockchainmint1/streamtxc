@@ -33,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 import {
   resolveImportUrl,
   getImportStatus,
@@ -52,6 +53,7 @@ type Stage =
   | "resolving"
   | "ready"
   | "streaming"
+  | "thumb"
   | "registering"
   | "done";
 
@@ -77,6 +79,8 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
   const [bytesUploaded, setBytesUploaded] = useState(0);
   const [importId, setImportId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pinnedCid, setPinnedCid] = useState<string | null>(null);
+  const [thumbnailCid, setThumbnailCid] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Stop polling on unmount.
@@ -166,25 +170,10 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
       if (finalErr) throw new Error(finalErr);
       if (!finalCid) throw new Error("Stream ended without a CID");
 
-      setStage("registering");
-      const result = await addCid({
-        data: {
-          wallet: ownerWallet ?? undefined,
-          cid: finalCid,
-          title,
-          description,
-          months: 1,
-        },
-      });
-      if (result.chainStatus === "stamp_failed") {
-        toast.error("Pinned to IPFS, but TXC stamp failed");
-      } else {
-        toast.success(`Imported from ${resolved.source} → IPFS`);
-      }
-      if (!ownerWallet) recordAnonUpload(result.cid, title);
-      qc.invalidateQueries({ queryKey: ["recent-videos"] });
-      setStage("done");
-      navigate({ to: "/v/$cid", params: { cid: result.cid } });
+      // Stream complete — let the user pick a thumbnail before we
+      // finalize. They can also skip.
+      setPinnedCid(finalCid);
+      setStage("thumb");
     } catch (err) {
       if (pollRef.current) {
         clearInterval(pollRef.current);
@@ -200,6 +189,43 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
         toast.error(msg);
       }
       setStage("ready");
+    }
+  }
+
+  async function handleRegister() {
+    if (!pinnedCid || !resolved) return;
+    setStage("registering");
+    try {
+      const result = await addCid({
+        data: {
+          wallet: ownerWallet ?? undefined,
+          cid: pinnedCid,
+          title,
+          description,
+          months: 1,
+          thumbnailCid: thumbnailCid ?? undefined,
+        },
+      });
+      if (result.chainStatus === "stamp_failed") {
+        toast.error("Pinned to IPFS, but TXC stamp failed");
+      } else {
+        toast.success(`Imported from ${resolved.source} → IPFS`);
+      }
+      if (!ownerWallet) recordAnonUpload(result.cid, title);
+      qc.invalidateQueries({ queryKey: ["recent-videos"] });
+      setStage("done");
+      navigate({ to: "/v/$cid", params: { cid: result.cid } });
+    } catch (err) {
+      const dup = parseDuplicateCidError(err);
+      if (dup) {
+        onDuplicate(dup);
+        toast.error("This video is already on stream.");
+      } else {
+        const msg = err instanceof Error ? err.message : "Register failed";
+        setError(msg);
+        toast.error(msg);
+      }
+      setStage("thumb");
     }
   }
 
