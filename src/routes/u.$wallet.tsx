@@ -63,7 +63,7 @@ function WalletPage() {
   const items = data?.items ?? [];
   const comments = commentsData ?? [];
   const expiredCount = items.filter(
-    (v) => (v as { status?: string }).status === "unpinned",
+    (v) => (v as { unpinned_at?: string | null }).unpinned_at != null,
   ).length;
 
   const handleRestore = async () => {
@@ -152,7 +152,16 @@ function WalletPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {items.map((v) => {
-              const expired = (v as any).status === "unpinned";
+              const vv = v as {
+                unpinned_at?: string | null;
+                payment_received_txc?: number | string | null;
+                payment_required_txc?: number | string | null;
+              };
+              const expired = vv.unpinned_at != null;
+              const received = Number(vv.payment_received_txc ?? 0);
+              const required = Number(vv.payment_required_txc ?? 0);
+              const renewing =
+                expired && required > 0 && received >= required;
               return (
               <Link
                 key={v.cid}
@@ -178,8 +187,10 @@ function WalletPage() {
                     />
                   )}
                   {expired && (
-                    <div className="absolute top-2 left-2 px-2 py-0.5 bg-destructive text-destructive-foreground font-mono text-[10px] uppercase tracking-wider rounded-sm">
-                      expired
+                    <div
+                      className={`absolute top-2 left-2 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider rounded-sm ${renewing ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground"}`}
+                    >
+                      {renewing ? "renewing" : "expired"}
                     </div>
                   )}
                   <div className="absolute inset-0 flex items-center justify-center bg-background/0 group-hover:bg-background/30 transition-colors">
@@ -196,8 +207,12 @@ function WalletPage() {
                     {v.cid}
                   </div>
                   {expired && (
-                    <div className="mt-2 font-mono text-[11px] text-destructive">
-                      hosting expired — renew to restore
+                    <div
+                      className={`mt-2 font-mono text-[11px] ${renewing ? "text-primary" : "text-destructive"}`}
+                    >
+                      {renewing
+                        ? "renewal received — restoring from IPFS…"
+                        : "hosting expired — renew to restore"}
                     </div>
                   )}
                 </div>
