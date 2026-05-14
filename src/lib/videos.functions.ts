@@ -545,7 +545,8 @@ export const listRecentVideos = createServerFn({ method: "POST" })
         { count: "exact" },
       )
       .in("status", ["active", "mempool"])
-      .is("hidden_at", null);
+      .is("hidden_at", null)
+      .eq("is_nsfw", false);
 
     if (sort === "expensive") {
       query = query.order("payment_required_txc", {
@@ -568,7 +569,8 @@ export const listRecentVideos = createServerFn({ method: "POST" })
         .from("videos")
         .select("cid")
         .in("status", ["active", "mempool"])
-        .is("hidden_at", null);
+        .is("hidden_at", null)
+        .eq("is_nsfw", false);
       const cids = (allRows ?? []).map((r) => r.cid);
       const { data: cmts } = await supabaseAdmin
         .from("comments")
