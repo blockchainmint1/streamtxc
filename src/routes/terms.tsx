@@ -133,10 +133,11 @@ function TermsPage() {
             </p>
             <p>
               You can opt out of this arbitration clause within 30 days of
-              first using the site by sending a signed TXC wallet message to
-              our opt-out address containing the words &ldquo;arbitration
-              opt-out&rdquo; and your wallet address. Figuring out how to do
-              that is left as an exercise for the reader.
+              first using the site by sending a signed TXC wallet message
+              from the wallet you use with streamTXC, to that same wallet,
+              containing the words &ldquo;arbitration opt-out.&rdquo;
+              Figuring out how to do that is left as an exercise for the
+              reader.
             </p>
           </Section>
 
