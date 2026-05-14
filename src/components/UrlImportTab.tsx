@@ -64,6 +64,10 @@ interface Resolved {
   token: string;
 }
 
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
   const resolve = useServerFn(resolveImportUrl);
   const status = useServerFn(getImportStatus);
