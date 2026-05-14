@@ -345,12 +345,14 @@ function ManagePageInner() {
                       <td className="px-4 py-3 font-mono text-xs">
                         <span
                           className={
-                            v.status === "active"
+                            v.hidden_at
+                              ? "text-muted-foreground"
+                              : v.status === "active"
                               ? "text-primary"
                               : "text-muted-foreground"
                           }
                         >
-                          {v.status}
+                          {v.hidden_at ? "hidden" : v.status}
                         </span>
                       </td>
                       <td className="px-4 py-3 font-mono text-xs">
