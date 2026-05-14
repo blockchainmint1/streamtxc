@@ -2,7 +2,21 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { Copy, Check, ExternalLink, Terminal, Zap, ShieldCheck, Film, Code2, Hash } from "lucide-react";
+import {
+  Copy,
+  Check,
+  ExternalLink,
+  Terminal,
+  Zap,
+  ShieldCheck,
+  Film,
+  Code2,
+  Hash,
+  KeyRound,
+  Anchor,
+  Fingerprint,
+  BookOpen,
+} from "lucide-react";
 
 export const Route = createFileRoute("/api")({
   head: () => ({
@@ -143,11 +157,156 @@ function ApiDocsPage() {
           </div>
         </header>
 
+        {/* Table of contents */}
+        <nav className="border border-border rounded-sm p-5 bg-card/30">
+          <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted-foreground mb-3">
+            <BookOpen className="h-3.5 w-3.5" /> [ contents ]
+          </div>
+          <ol className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 font-mono text-sm">
+            <li><a className="hover:text-primary transition-colors" href="#cid">01 · the CID is the truth</a></li>
+            <li><a className="hover:text-primary transition-colors" href="#chain">02 · on-chain proof &amp; OP_RETURN</a></li>
+            <li><a className="hover:text-primary transition-colors" href="#login">03 · login by signing</a></li>
+            <li><a className="hover:text-primary transition-colors" href="#stream">04 · stream a video</a></li>
+            <li><a className="hover:text-primary transition-colors" href="#embed">05 · embed the player</a></li>
+            <li><a className="hover:text-primary transition-colors" href="#verify">06 · verify a TXC signature</a></li>
+            <li><a className="hover:text-primary transition-colors" href="#health">07 · TXC node health</a></li>
+            <li><a className="hover:text-primary transition-colors" href="#mempool">08 · audit on mempool</a></li>
+          </ol>
+        </nav>
+
+        {/* CID importance */}
+        <section id="cid" className="scroll-mt-24 space-y-3">
+          <div className="flex items-center gap-2">
+            <Fingerprint className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-bold tracking-tight">
+              01 · the CID <span className="text-muted-foreground">is the truth</span>
+            </h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Every video on streamTXC is identified by its{" "}
+            <span className="text-foreground font-mono">IPFS CID</span> — a
+            cryptographic hash of the file's bytes. Same bytes →
+            same CID. Different bytes → different CID. Always.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            That makes the CID the only identifier that actually matters.
+            Our database row, our gateway URL, our chain timestamp, and any
+            third-party IPFS pinner anywhere in the world all reference the
+            exact same content via the exact same string. If we ever go dark,
+            you can re-pin any CID elsewhere and the link still resolves.
+          </p>
+          <Code>{`# A CID looks like this:
+bafybeigsqgnxogzyi7fdyogldjvia3juqkxnjv...
+
+# Anyone can fetch it from any IPFS gateway:
+curl -L https://ipfs.io/ipfs/{cid} -o video.mp4
+curl -L https://gateway.pinata.cloud/ipfs/{cid} -o video.mp4
+curl -L ${base}/api/stream/{cid}    -o video.mp4`}</Code>
+          <p className="text-xs text-muted-foreground">
+            Treat the CID as the canonical link to a video — pass it around,
+            stamp it on chain, embed it, archive it. Our{" "}
+            <code className="font-mono text-foreground">/v/{`{cid}`}</code>{" "}
+            page is just a friendly wrapper around it.
+          </p>
+        </section>
+
+        {/* On-chain proof */}
+        <section id="chain" className="scroll-mt-24 space-y-3">
+          <div className="flex items-center gap-2">
+            <Anchor className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-bold tracking-tight">
+              02 · on-chain proof <span className="text-muted-foreground">&amp; OP_RETURN</span>
+            </h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            When a video is claimed, paid for, renewed, taken down, or DMCA'd,
+            we broadcast a tiny TXC transaction whose{" "}
+            <code className="font-mono text-foreground">OP_RETURN</code>{" "}
+            output carries an ≤80-byte tag describing the event. Every event
+            is sent <em>to</em> a per-video deposit address, so a single
+            mempool address page is the entire public lifecycle of that
+            video — claim, payment, renewal, takedown, the whole thing.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Comments work the same way: the comment body is pinned to IPFS,
+            then its CID is stamped against the video's wallet via
+            OP_RETURN. The chain proves <em>when</em> something was said and{" "}
+            <em>by which wallet</em> — IPFS proves <em>what</em> was said.
+          </p>
+          <Code>{`event tags broadcast in OP_RETURN
+
+  C  claim          — first time a video lands on the network
+  P  payment        — hosting payment received
+  R  renewal        — hosting prepaid for another period
+  T  takedown       — uploader took it down
+  D  DMCA           — moderator pulled it
+  M  metadata       — title/description/uploader update
+  X  comment        — IPFS CID of a new comment body`}</Code>
+          <p className="text-xs text-muted-foreground">
+            Result: TXC proof is permanent — the timestamp does not expire
+            even if our gateway goes away. Anyone can decode the OP_RETURN
+            payloads against a video's deposit address and reconstruct its
+            full history without trusting us.
+          </p>
+        </section>
+
+        {/* Login by signing */}
+        <section id="login" className="scroll-mt-24 space-y-3">
+          <div className="flex items-center gap-2">
+            <KeyRound className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-bold tracking-tight">
+              03 · login <span className="text-muted-foreground">by signing</span>
+            </h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            streamTXC has no usernames or passwords. To prove you control a
+            wallet, you sign a one-time challenge message with TXC Core's{" "}
+            <span className="text-foreground font-mono">Sign Message</span>{" "}
+            tool (or any wallet that produces a base64 message signature for
+            a legacy "T…" address). We verify it server-side against the TXC
+            node — no transaction, no spend, no gas.
+          </p>
+          <Code>{`# Step 1 — request a challenge
+curl -X POST ${base}/_serverFn/requestWalletLogin \\
+  -H "content-type: application/json" \\
+  -d '{"data":{"wallet":"T9..."}}'
+
+# → { "message": "streamTXC — Sign in...", "challengeToken": "eyJhbGc..." }
+
+# Step 2 — sign \`message\` in TXC Core (File → Sign Message),
+# then hand the signature + challengeToken back:
+
+curl -X POST ${base}/_serverFn/completeWalletLogin \\
+  -H "content-type: application/json" \\
+  -d '{"data":{
+        "challengeToken": "eyJhbGc...",
+        "signature":      "H4r...=="
+      }}'
+
+# → session token (5 min challenge TTL, then verified)`}</Code>
+          <p className="text-xs text-muted-foreground">
+            The challenge message explicitly says{" "}
+            <em>"signing this does NOT authorize any transaction or spend
+            any TXC."</em>{" "}
+            That's true — message signing is a pure ECDSA proof of key
+            ownership. The wallet itself never moves.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Programmatic verification of any TXC-signed message — not just
+            ours — is also exposed as a one-shot endpoint, see{" "}
+            <a href="#verify" className="text-primary hover:underline">
+              §06
+            </a>
+            .
+          </p>
+        </section>
+
         {/* Stream */}
+        <div id="stream" className="scroll-mt-24" />
         <Endpoint
           method="GET"
           path="/api/stream/{cid}"
-          title="Stream a video"
+          title="04 · stream a video"
           icon={<Film className="h-5 w-5" />}
         >
           <p>
@@ -167,10 +326,11 @@ function ApiDocsPage() {
         </Endpoint>
 
         {/* Embed */}
+        <div id="embed" className="scroll-mt-24" />
         <Endpoint
           method="GET"
           path="/embed/{cid}"
-          title="Embeddable player"
+          title="05 · embed the player"
           icon={<Code2 className="h-5 w-5" />}
         >
           <p>
@@ -192,10 +352,11 @@ function ApiDocsPage() {
         </Endpoint>
 
         {/* Verify message */}
+        <div id="verify" className="scroll-mt-24" />
         <Endpoint
           method="POST"
           path="/api/public/txc-verify-message"
-          title="Verify a TXC signed message"
+          title="06 · verify a TXC signed message"
           icon={<ShieldCheck className="h-5 w-5" />}
         >
           <p>
@@ -215,10 +376,11 @@ function ApiDocsPage() {
         </Endpoint>
 
         {/* Health */}
+        <div id="health" className="scroll-mt-24" />
         <Endpoint
           method="GET"
           path="/api/public/txc-health"
-          title="TXC node health"
+          title="07 · TXC node health"
           icon={<Zap className="h-5 w-5" />}
         >
           <p>
@@ -231,9 +393,9 @@ function ApiDocsPage() {
         </Endpoint>
 
         {/* On-chain proof note */}
-        <section className="border border-primary/40 bg-primary/5 rounded-sm p-5 space-y-2">
+        <section id="mempool" className="scroll-mt-24 border border-primary/40 bg-primary/5 rounded-sm p-5 space-y-2">
           <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-primary">
-            <Hash className="h-4 w-4" /> on-chain proof
+            <Hash className="h-4 w-4" /> 08 · audit on mempool
           </div>
           <p className="text-sm text-muted-foreground">
             Every video, comment, and boost on streamTXC has its own TXC wallet
