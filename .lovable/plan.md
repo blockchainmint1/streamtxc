@@ -1,62 +1,67 @@
-## Goal
+## What's happening
 
-When a video's underlying IPFS content can't be served (unpinned, gateway 404, restore-from-IPFS didn't actually find peers), the watch page should clearly say so and give the owner a fast path to re-seed the **same CID** without re-doing wallet, title, description, payment address, or pricing.
+Your wallet `txc1qa8w…ntr` (video "Bobby's Goofy Disclaimer", CID `QmZj4N…6c3N`) has received **30.0003 TXC** total across 4 funding txs. Required to renew was **7.859 TXC**, so you're paid up ~3.8x over.
 
-## Two problems to solve
+The reason it still shows "payment due / expired":
 
-1. **Detection is unreliable today.** `videos.status` and `unpinned_at` get out of sync. The example CID `QmZj4...c3N` shows `status='active'` *and* `unpinned_at IS NOT NULL` — likely a side-effect of the Restore-from-IPFS button flipping status without verifying the file came back. The UI trusts `status` and shows a normal player that just spins.
-2. **No re-seed path.** The only recovery is a brand new upload, which mints a new CID, new video_wallet, new pricing quote, and breaks every existing share link / on-chain record.
+`processVideos()` in `payment-watcher.ts` filters with `.is("unpinned_at", null)`. Once a video is unpinned, the watcher stops looking at its wallet entirely — so any later payment is invisible to the system. Combined with the earlier bug where `restoreUnpinnedVideos` flips `status='active'` without clearing `unpinned_at`, the row is in a weird middle state: marked active, but excluded from the watcher.
 
 ## Plan
 
-### 1. Truthful availability signal
+Scope: payment-watcher only. UI/restore overlay is the previous plan.
 
-- Add a server fn `probeAvailability({ cid })` that does a **HEAD** request against our Pinata gateway (`gatewayUrl(cid)`) with a short timeout (~3s). Returns `{ available: boolean, checkedAt }`.
-- Call it from `/v/$cid` via `useQuery` with `staleTime: 60_000` after the main `getVideo` resolves. Don't block first paint.
-- Treat the video as unavailable when **either** `unpinned_at IS NOT NULL` **or** the live probe fails. This makes the UI honest even when `status` is stale.
-- Fix the inconsistent state going forward: the Restore-from-IPFS server fn should **not** clear `unpinned_at` or change `status` until a probe confirms the bytes are actually fetchable. Add a follow-up cron pass (or check inside `restoreUnpinnedVideos`) that probes each CID a few minutes after queuing the pin, and only then flips `unpinned_at = null` + `status = 'active'`.
+### 1. Watcher: handle unpinned videos as a renewal path
 
-### 2. "Video no longer on IPFS" overlay on `/v/$cid`
+In `src/routes/api/public/hooks/payment-watcher.ts → processVideos()`:
 
-- Replace the player with an overlay card when unavailable:
-  - Headline: "This video is no longer available on IPFS."
-  - Sub: "The hosting prepayment expired and our pinning node released the file. The on-chain record is permanent — the file just isn't being seeded anymore."
-  - Primary CTA (visible to everyone): **"Try to restore from IPFS peers"** → calls existing `pinByCid` for this single CID, then re-probes after a few seconds and reloads on success.
-  - Secondary CTA (gated to `owner_wallet`): **"Re-seed this video"** → opens the re-seed flow (see §3).
-  - Tertiary link: external IPFS gateway link (`https://ipfs.io/ipfs/<cid>`) so the owner can verify themselves.
-- Below the overlay, keep title, description, owner, comments, on-chain stamps visible — only the player area is replaced.
+- Drop the `.is("unpinned_at", null)` filter. Select unpinned rows too.
+- Add a new branch *before* the existing `paid_at` / `paid` / `grace` branches:
 
-### 3. Owner re-seed flow (`/v/$cid/restore`)
+  ```text
+  if (v.unpinned_at != null) {
+    received = getAddressReceived(wallet)
+    delta    = received - payment_received_txc
+    if (delta >= monthlyRate)  // at least 1 month of new funds since takedown
+      → re-pin via pinByCid(cid)
+      → probe gateway (HEAD, ~3s)
+      → if probe ok:
+          stamp "R" (renewal) OP_RETURN with delta
+          update videos: unpinned_at=null, status='active',
+                         paid_at=COALESCE(paid_at, now()),
+                         payment_received_txc=received,
+                         expires_at = created_at + (received/monthlyRate)*30d
+          result: { action: 'restored', received, delta, expires_at }
+        else:
+          result: { action: 'restore_pin_unavailable' }  // leave row unpinned
+    else:
+      result: { action: 'unpinned_waiting', received, needed: monthlyRate }
+  }
+  ```
 
-Re-seed = "I still have the original file. Re-upload it; if its CID matches the existing record, re-pin it and clear the unpinned flag." This is fundamentally different from a fresh upload because **everything except the bytes already exists**.
+  This makes a payment to an expired video's wallet automatically re-pin and reactivate it, with on-chain proof. No manual intervention.
 
-UI (new route `src/routes/v.$cid.restore.tsx`):
-- Wallet gate: must be connected as `owner_wallet`. Sign a short challenge so the server can verify ownership (same pattern as the existing owner verification).
-- Drag-and-drop dropzone (reuse the new dropzone component from the upload page) with a single file picker. No title / description / pricing fields — pulled from the existing row, shown read-only above the dropzone for confirmation.
-- Client-side: `computeCids(file)` to get the candidate CID, compare against `video.cid` before uploading. If mismatch → hard stop: "This file's CID is `bafy…xyz`, which doesn't match the original `Qm…c3N`. You need the exact original file." (Offer a "Upload as a new video" link to `/upload` as fallback.)
-- If match: stream to a new server fn `reseedVideo` (POST). Server fn:
-  1. `requireWalletSignature` — verify the connected wallet equals `owner_wallet`.
-  2. Re-run `computeCids` on the received bytes server-side and reject if it doesn't equal the row's `cid`.
-  3. Call `pinFileToIPFS(file, originalFilename)` — Pinata dedupes by CID, so this just re-pins the existing CID into our account.
-  4. Probe the gateway to confirm fetchable.
-  5. Update the row: `unpinned_at = null`, `status = 'active'`. Leave `expires_at` alone — renewal payment is a separate concern (the `/u/<wallet>` renewal banner already handles it). If `expires_at` is in the past, surface a warning on success: "Re-seeded, but hosting expires in X. Renew to keep it pinned."
-  6. Stamp a new chain event (`event_type = 'R'` for re-seed) so the timeline reflects what happened.
-- Toast + redirect back to `/v/$cid` on success.
+- Existing `paid_at` (top-up extension), fresh-paid, grace-expired, and waiting branches remain unchanged for `unpinned_at IS NULL` rows.
 
-### 4. Tighten the "expired" UI on `/u/<wallet>`
+### 2. Backfill the one stuck row
 
-Currently it filters on `status = 'unpinned'`, which misses rows like our example where status got flipped back. Change the expired-count + EXPIRED badge to use `unpinned_at IS NOT NULL OR availability-probe-failed` instead. (Probe is too expensive per-card on the listing — easiest is to trust `unpinned_at` here and let the watch page do the live probe.)
+After the deploy, the watcher's next tick will see `QmZj4N…6c3N` has 30.0003 TXC vs 7.859 required and:
+- re-pin from Pinata by CID (Pinata keeps the CID record; if peers still hold it, it comes back; if not, the probe fails and we surface that)
+- stamp R, set `unpinned_at=null`, `status='active'`, `expires_at ≈ created_at + (30.0003/7.859)*30d ≈ created_at + 114 days`
 
-## Files
+No manual SQL needed if the re-pin probe succeeds. If the probe fails (file genuinely gone from IPFS), the row stays unpinned and the owner re-seed flow from the previous plan kicks in — but the payment is now tracked, so the re-seed only has to upload bytes, not also pay again.
 
-- `src/lib/videos.functions.ts` — add `probeAvailability`, `reseedVideo`; tighten `restoreUnpinnedVideos` to not flip status until verified.
-- `src/routes/v.$cid.tsx` — add availability probe query + overlay card replacing the player when unavailable.
-- `src/routes/v.$cid.restore.tsx` — new route, owner-gated re-seed dropzone.
-- `src/routes/u.$wallet.tsx` — switch expired filter from `status=='unpinned'` to `unpinned_at != null`.
-- `src/lib/pinata.server.ts` — small helper `headCidOnGateway(cid)` for the probe.
+### 3. UI: show "renewal pending" vs "expired"
 
-## Out of scope (call out, don't build)
+In `/u/<wallet>` (and the video page overlay from the prior plan), when `unpinned_at IS NOT NULL` AND `payment_received_txc - (paid amount baseline) >= monthlyRate`, label as **"Renewal received — restoring…"** instead of **"Expired"**. Cosmetic; one extra branch in the existing badge logic.
 
-- Auto-marking videos unavailable across the whole site via a periodic probe sweep. We can add this later as a cron pass; for now the per-page probe is enough.
-- Renewal payments — already covered by the existing `/u/<wallet>` sendmany flow.
-- Reconciling the inconsistent rows that already exist (status='active' + unpinned_at set). Once §1 is in, the watch page will tell the truth about them; a one-shot SQL cleanup can follow.
+### Files to edit
+
+- `src/routes/api/public/hooks/payment-watcher.ts` — drop filter, add unpinned-renewal branch
+- `src/lib/pinata.server.ts` — re-export `pinByCid` if not already exported
+- `src/routes/u.$wallet.tsx` — add "renewal pending" badge state
+
+### Out of scope
+
+- The video-page overlay + owner re-seed flow (covered by the previous approved plan, partially implemented)
+- Reconciling other inconsistent rows (we'll let the watcher heal them naturally on next tick)
+- Refunding overpayment — the extra ~22 TXC on this wallet just buys ~85 extra days of hosting via the existing `expires_at` formula
