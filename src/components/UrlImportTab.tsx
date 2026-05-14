@@ -64,6 +64,10 @@ interface Resolved {
   token: string;
 }
 
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
   const resolve = useServerFn(resolveImportUrl);
   const status = useServerFn(getImportStatus);
@@ -116,59 +120,31 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
     setImportId(null);
 
     try {
-      // The endpoint streams NDJSON: first line is {id}, last line is
-      // {cid} on success or {error} on failure. We start polling for
-      // progress as soon as we have the id.
+      // Kick off the import. The endpoint returns 202 immediately with
+      // {id} and runs the upload in the background via ctx.waitUntil so
+      // multi-GB transfers aren't bound to the HTTP response lifetime.
       const res = await fetch("/api/public/import-stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: resolved.token }),
       });
-      if (!res.ok || !res.body) {
-        throw new Error(`Stream failed (${res.status})`);
-      }
-
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
-      let id: string | null = null;
-      let finalCid: string | null = null;
-      let finalErr: string | null = null;
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let nl: number;
-        while ((nl = buf.indexOf("\n")) !== -1) {
-          const line = buf.slice(0, nl).trim();
-          buf = buf.slice(nl + 1);
-          if (!line) continue;
-          try {
-            const obj = JSON.parse(line) as {
-              id?: string;
-              cid?: string;
-              error?: string;
-            };
-            if (obj.id && !id) {
-              id = obj.id;
-              setImportId(id);
-              startPolling(id);
-            }
-            if (obj.cid) finalCid = obj.cid;
-            if (obj.error) finalErr = obj.error;
-          } catch {
-            // ignore malformed line
-          }
+      if (!res.ok) {
+        let msg = `Failed to start import (${res.status})`;
+        try {
+          const j = (await res.json()) as { error?: string };
+          if (j.error) msg = j.error;
+        } catch {
+          /* ignore */
         }
+        throw new Error(msg);
       }
+      const { id } = (await res.json()) as { id: string };
+      setImportId(id);
 
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-      if (finalErr) throw new Error(finalErr);
-      if (!finalCid) throw new Error("Stream ended without a CID");
+      // Poll until done/failed. Server updates bytes_uploaded as bytes flow
+      // through, so we get a live progress bar without holding the response
+      // stream open.
+      const finalCid = await pollUntilDone(id);
 
       // Stream complete — let the user pick a thumbnail before we
       // finalize. They can also skip.
@@ -189,6 +165,31 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
         toast.error(msg);
       }
       setStage("ready");
+    }
+  }
+
+  async function pollUntilDone(id: string): Promise<string> {
+    // Poll ~once per second forever — large files can legitimately take
+    // many minutes. We watch bytes_uploaded too; if it stalls for too long
+    // and status is still 'streaming' we don't kill it (the upstream may
+    // just be slow), but we surface a hint in the UI.
+    while (true) {
+      let row;
+      try {
+        row = await status({ data: { id } });
+      } catch {
+        // transient errors — keep polling
+        await sleep(1500);
+        continue;
+      }
+      if (typeof row.bytes_uploaded === "number") {
+        setBytesUploaded(Number(row.bytes_uploaded));
+      }
+      if (row.status === "done" && row.cid) return row.cid;
+      if (row.status === "failed") {
+        throw new Error(row.error_message || "Import failed");
+      }
+      await sleep(1000);
     }
   }
 
@@ -227,20 +228,6 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
       }
       setStage("thumb");
     }
-  }
-
-  function startPolling(id: string) {
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(async () => {
-      try {
-        const row = await status({ data: { id } });
-        if (typeof row.bytes_uploaded === "number") {
-          setBytesUploaded(Number(row.bytes_uploaded));
-        }
-      } catch {
-        // poll errors are non-fatal — the stream itself is the source of truth.
-      }
-    }, 1000);
   }
 
   const pct = (() => {
