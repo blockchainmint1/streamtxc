@@ -109,51 +109,68 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
     setError(null);
     setStage("streaming");
     setBytesUploaded(0);
-
-    // Kick off the streaming pin.
-    const pinPromise = fetch("/api/public/import-stream", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: resolved.token }),
-    });
-
-    // Until we have an `id` to poll, the UI just shows "Connecting…". The
-    // server returns `{id, cid}` on success or `{id, error}` on failure;
-    // we poll for `id` from the response too. Since the response only
-    // arrives at the end, we have to poll a different way: the endpoint
-    // hasn't returned yet, but we don't know the `id`. Workaround: the
-    // server creates the row immediately, so we can poll the *latest*
-    // import row... but that's racy. Cleaner: have the endpoint stream
-    // back the id via a header we can't read, OR start polling once the
-    // pin has been in flight long enough that the row exists.
-    //
-    // Simplest reliable approach: optimistically poll every 1s for the
-    // most recent in-flight import for this URL. We do that by querying
-    // the import row by source_url after the pin has started.
-
-    // Wait briefly so the row exists, then start polling by source URL.
-    setTimeout(() => void startPolling(), 500);
+    setImportId(null);
 
     try {
-      const res = await pinPromise;
-      const json = (await res.json()) as {
-        id?: string;
-        cid?: string;
-        size?: number;
-        error?: string;
-      };
+      // The endpoint streams NDJSON: first line is {id}, last line is
+      // {cid} on success or {error} on failure. We start polling for
+      // progress as soon as we have the id.
+      const res = await fetch("/api/public/import-stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: resolved.token }),
+      });
+      if (!res.ok || !res.body) {
+        throw new Error(`Stream failed (${res.status})`);
+      }
+
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      let id: string | null = null;
+      let finalCid: string | null = null;
+      let finalErr: string | null = null;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buf.indexOf("\n")) !== -1) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line) continue;
+          try {
+            const obj = JSON.parse(line) as {
+              id?: string;
+              cid?: string;
+              error?: string;
+            };
+            if (obj.id && !id) {
+              id = obj.id;
+              setImportId(id);
+              startPolling(id);
+            }
+            if (obj.cid) finalCid = obj.cid;
+            if (obj.error) finalErr = obj.error;
+          } catch {
+            // ignore malformed line
+          }
+        }
+      }
+
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
       }
-      if (!res.ok || !json.cid) {
-        throw new Error(json.error || `Stream failed (${res.status})`);
-      }
+      if (finalErr) throw new Error(finalErr);
+      if (!finalCid) throw new Error("Stream ended without a CID");
+
       setStage("registering");
       const result = await addCid({
         data: {
           wallet: ownerWallet ?? undefined,
-          cid: json.cid,
+          cid: finalCid,
           title,
           description,
           months: 1,
@@ -186,29 +203,18 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
     }
   }
 
-  // We don't have the import id until the streaming POST returns. So we
-  // grab the *latest* import row matching this user's source URL via a
-  // tiny helper added to imports.functions — but to keep the surface
-  // small for v1, we instead embed the id in the response headers using
-  // a `Server-Timing` style trick. Simpler: just don't poll; show a
-  // bytes-known animation. Real progress comes back the moment the
-  // request resolves. UX-wise, for 1-5GB streams this isn't great.
-  //
-  // Workable middle-ground: open the streaming POST and a SECOND request
-  // 500ms later that asks the server "what's my latest import row" by
-  // source URL. The server-fn returns its progress, we update the bar.
-  async function startPolling() {
-    // Query the imports table directly via a side-channel server fn.
-    // We piggy-back on getImportStatus by asking the server to look up
-    // the latest row for this source_url. To avoid adding another
-    // server fn, we do a small inline poll using the same endpoint
-    // shape — but it requires an id. So we do the simpler thing:
-    // ask the streaming endpoint to issue an id up front.
-    //
-    // For now, fall back to an indeterminate spinner; real progress
-    // shows up at the end. (TODO: switch import-stream to chunked
-    // response that yields {id} first, then the final result.)
-    return;
+  function startPolling(id: string) {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const row = await status({ data: { id } });
+        if (typeof row.bytes_uploaded === "number") {
+          setBytesUploaded(Number(row.bytes_uploaded));
+        }
+      } catch {
+        // poll errors are non-fatal — the stream itself is the source of truth.
+      }
+    }, 1000);
   }
 
   const pct = (() => {

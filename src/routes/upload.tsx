@@ -147,9 +147,9 @@ function UploadPage() {
     "idle" | "fetching" | "registering"
   >("idle");
   const [cidNotFound, setCidNotFound] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"file" | "cid">("file");
   type TabKey = "file" | "cid" | "import";
-  const tab = activeTab as TabKey;
+  const [activeTab, setActiveTab] = useState<TabKey>("file");
+  const tab = activeTab;
   const months = 1;
   const [stage, setStage] = useState<
     "idle" | "hashing" | "checking" | "uploading" | "registering"
@@ -387,7 +387,7 @@ function UploadPage() {
 
         <Tabs
           value={tab}
-          onValueChange={(v) => setActiveTab(v as TabKey as "file" | "cid")}
+          onValueChange={(v) => setActiveTab(v as TabKey)}
           className="w-full"
         >
           {duplicate && (
@@ -805,6 +805,13 @@ function UploadPage() {
                 )}
               </Button>
             </form>
+          </TabsContent>
+
+          <TabsContent value="import">
+            <UrlImportTab
+              ownerWallet={address ?? null}
+              onDuplicate={(info) => setDuplicate(info)}
+            />
           </TabsContent>
         </Tabs>
       </main>

@@ -57,64 +57,76 @@ export const Route = createFileRoute("/api/public/import-stream")({
           bytesTotal: payload.sizeBytes,
         });
 
-        try {
-          // Open the upstream stream.
-          const upstream = await fetch(payload.directUrl);
-          if (!upstream.ok || !upstream.body) {
-            throw new Error(
-              `Upstream returned ${upstream.status} when fetching the file.`,
-            );
-          }
+        // Stream NDJSON back so the UI gets the import id immediately and
+        // can start polling getImportStatus(id) for progress, then receives
+        // the final {cid} or {error} line when the pin completes.
+        const enc = new TextEncoder();
+        const stream = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            const send = (obj: unknown) =>
+              controller.enqueue(enc.encode(JSON.stringify(obj) + "\n"));
 
-          // Trust upstream Content-Length when available; fall back to the
-          // size from the resolver. We need a known length to set the
-          // multipart Content-Length header.
-          const upstreamLen = Number(
-            upstream.headers.get("content-length") ?? "",
-          );
-          const sizeBytes =
-            Number.isFinite(upstreamLen) && upstreamLen > 0
-              ? upstreamLen
-              : payload.sizeBytes;
-          if (!sizeBytes) {
-            throw new Error(
-              "Couldn't determine file size from upstream — refusing to stream without a known length.",
-            );
-          }
-          if (sizeBytes > IMPORT_MAX_BYTES) {
-            throw new Error(
-              `File too large (${(sizeBytes / 1024 ** 3).toFixed(2)} GB) — cap is ${(IMPORT_MAX_BYTES / 1024 ** 3).toFixed(0)} GB.`,
-            );
-          }
+            // First line: hand the id to the client right away.
+            send({ id: importId });
 
-          const tracked = wrapWithProgress(upstream.body, (n) => {
-            // Fire-and-forget; never await inside the stream.
-            void markImportProgress(importId, n);
-          });
+            try {
+              const upstream = await fetch(payload.directUrl);
+              if (!upstream.ok || !upstream.body) {
+                throw new Error(
+                  `Upstream returned ${upstream.status} when fetching the file.`,
+                );
+              }
 
-          const pinned = await pinStreamToIPFS({
-            body: tracked,
-            filename: payload.filename,
-            sizeBytes,
-            mime: upstream.headers.get("content-type") ?? undefined,
-          });
+              const upstreamLen = Number(
+                upstream.headers.get("content-length") ?? "",
+              );
+              const sizeBytes =
+                Number.isFinite(upstreamLen) && upstreamLen > 0
+                  ? upstreamLen
+                  : payload.sizeBytes;
+              if (!sizeBytes) {
+                throw new Error(
+                  "Couldn't determine file size from upstream — refusing to stream without a known length.",
+                );
+              }
+              if (sizeBytes > IMPORT_MAX_BYTES) {
+                throw new Error(
+                  `File too large (${(sizeBytes / 1024 ** 3).toFixed(2)} GB) — cap is ${(IMPORT_MAX_BYTES / 1024 ** 3).toFixed(0)} GB.`,
+                );
+              }
 
-          await markImportDone(importId, pinned.cid, pinned.size);
+              const tracked = wrapWithProgress(upstream.body, (n) => {
+                void markImportProgress(importId, n);
+              });
 
-          return Response.json({
-            id: importId,
-            cid: pinned.cid,
-            size: pinned.size,
-          });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : "Import failed";
-          console.error("import-stream failed", err);
-          await markImportFailed(importId, msg);
-          return Response.json(
-            { id: importId, error: msg },
-            { status: 502 },
-          );
-        }
+              const pinned = await pinStreamToIPFS({
+                body: tracked,
+                filename: payload.filename,
+                sizeBytes,
+                mime: upstream.headers.get("content-type") ?? undefined,
+              });
+
+              await markImportDone(importId, pinned.cid, pinned.size);
+              send({ cid: pinned.cid, size: pinned.size, id: importId });
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : "Import failed";
+              console.error("import-stream failed", err);
+              await markImportFailed(importId, msg);
+              send({ error: msg, id: importId });
+            } finally {
+              controller.close();
+            }
+          },
+        });
+
+        return new Response(stream, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/x-ndjson",
+            "Cache-Control": "no-store",
+            "X-Import-Id": importId,
+          },
+        });
       },
     },
   },

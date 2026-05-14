@@ -3,10 +3,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { resolveImport, HOST_ALLOWLIST } from "./import-sources.server";
+import { resolveImport } from "./import-sources.server";
 import { signImportToken, IMPORT_MAX_BYTES } from "./imports.server";
-
-export const SUPPORTED_IMPORT_HOSTS = HOST_ALLOWLIST;
 
 export const resolveImportUrl = createServerFn({ method: "POST" })
   .inputValidator((input) =>
