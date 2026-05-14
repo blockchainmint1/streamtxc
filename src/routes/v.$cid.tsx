@@ -1014,3 +1014,58 @@ function LargeFileWarmupOverlay({
     </div>
   );
 }
+
+function ExpiringSoonOverlay({
+  expiresAt,
+  paymentRequired,
+  paymentReceived,
+  unpinnedAt,
+}: {
+  expiresAt: string;
+  paymentRequired: number;
+  paymentReceived: number;
+  unpinnedAt: string | null;
+}) {
+  const [dismissed, setDismissed] = useState(false);
+  if (unpinnedAt) return null; // already expired — different UI handles this
+  if (paymentRequired <= 0) return null;
+  if (paymentReceived >= paymentRequired) return null; // already paid
+  const msLeft = new Date(expiresAt).getTime() - Date.now();
+  const hoursLeft = msLeft / 3_600_000;
+  if (hoursLeft > 24 || hoursLeft <= 0) return null;
+  if (dismissed) return null;
+  const hoursStr =
+    hoursLeft >= 1
+      ? `${Math.floor(hoursLeft)}h`
+      : `${Math.max(1, Math.floor(hoursLeft * 60))}m`;
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-12 z-10 flex justify-center p-3">
+      <div className="pointer-events-auto max-w-md rounded-sm border border-destructive/60 bg-background/95 backdrop-blur px-3 py-2 flex items-start gap-2 shadow-lg">
+        <AlertTriangle className="h-3.5 w-3.5 mt-0.5 text-destructive shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="font-mono text-[10px] uppercase tracking-wider text-destructive">
+            [ expires in {hoursStr} ]
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Love this video? Keep it alive with a micropayment — unpaid videos
+            get unpinned from IPFS.
+          </p>
+          <a
+            href="#hosting-payment"
+            className="inline-block mt-1 font-mono text-[11px] uppercase tracking-wider text-primary hover:underline"
+          >
+            keep it alive →
+          </a>
+        </div>
+        <button
+          type="button"
+          onClick={() => setDismissed(true)}
+          className="font-mono text-[10px] uppercase text-muted-foreground hover:text-foreground px-1"
+          aria-label="Dismiss"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  );
+}
