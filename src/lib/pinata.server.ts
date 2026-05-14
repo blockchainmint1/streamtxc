@@ -99,13 +99,19 @@ export async function pinByCid(cid: string, name?: string): Promise<void> {
   const jwt = process.env.PINATA_JWT;
   if (!jwt) throw new Error("PINATA_JWT is not configured");
 
-  const res = await fetch(`${PINATA_API}/files/public/pin_by_cid`, {
+  // Use the legacy v1 pinByHash endpoint — the v3 `files/public/pin_by_cid`
+  // endpoint returns 400 for our account/payload shape, while pinByHash works
+  // reliably and queues the CID for asynchronous pinning.
+  const res = await fetch("https://api.pinata.cloud/pinning/pinByHash", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${jwt}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ cid, name: name ?? cid }),
+    body: JSON.stringify({
+      hashToPin: cid,
+      pinataMetadata: { name: name ?? cid },
+    }),
   });
 
   // 200/202 both acceptable; ignore "already pinned" style errors.
