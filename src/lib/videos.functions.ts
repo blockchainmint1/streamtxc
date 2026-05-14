@@ -134,6 +134,7 @@ export const registerUpload = createServerFn({ method: "POST" })
         mimeType: z.string().min(1).max(100),
         months: z.number().int().min(1).max(12).default(1),
         thumbnailCid: cidStringSchema.optional(),
+        nsfw: z.boolean().optional().default(false),
       })
       .parse(input),
   )
@@ -186,6 +187,7 @@ export const registerUpload = createServerFn({ method: "POST" })
       payment_required_txc: fee,
       metadata_cid: meta?.metaCid ?? null,
       thumbnail_cid: data.thumbnailCid ?? null,
+      is_nsfw: data.nsfw,
     });
     if (vErr) {
       // Race condition: someone registered the same CID between our check
@@ -230,6 +232,7 @@ export const finalizeUpload = createServerFn({ method: "POST" })
         filename: z.string().min(1).max(255),
         mimeType: z.string().min(1).max(100),
         thumbnailCid: cidStringSchema.optional(),
+        nsfw: z.boolean().optional().default(false),
       })
       .parse(input),
   )
@@ -296,6 +299,7 @@ export const finalizeUpload = createServerFn({ method: "POST" })
         payment_required_txc: fee,
         metadata_cid: meta?.metaCid ?? null,
         thumbnail_cid: data.thumbnailCid ?? null,
+        is_nsfw: data.nsfw,
       });
     if (vErr) {
       if (vErr.code === "23505") await assertCidUnclaimed(pin.cid);
@@ -379,6 +383,7 @@ export const addByCid = createServerFn({ method: "POST" })
         description: z.string().max(2000).optional().default(""),
         months: z.number().int().min(1).max(12).default(1),
         thumbnailCid: cidStringSchema.optional(),
+        nsfw: z.boolean().optional().default(false),
       })
       .parse(input),
   )
@@ -490,6 +495,7 @@ export const addByCid = createServerFn({ method: "POST" })
       payment_required_txc: fee,
       metadata_cid: meta?.metaCid ?? null,
       thumbnail_cid: data.thumbnailCid ?? null,
+      is_nsfw: data.nsfw,
     });
     if (vErr) {
       if (vErr.code === "23505") await assertCidUnclaimed(data.cid);
