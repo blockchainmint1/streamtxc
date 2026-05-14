@@ -26,6 +26,17 @@ export function runWithCfCtx<T>(ctx: unknown, fn: () => Promise<T> | T): Promise
  * caller must keep the request open and await the work inline.
  */
 export function waitUntil(p: Promise<unknown>): boolean {
+  // In the Vite preview/dev runtime, a request context can expose a
+  // waitUntil-shaped function without actually extending the request
+  // lifetime. That makes long imports look queued while the promise gets
+  // dropped immediately after the response finishes, leaving rows stuck at
+  // `streaming` with 0 bytes forever. Force callers onto the inline fallback
+  // in dev; production Worker requests still use the real runtime hook.
+  if (import.meta.env.DEV) {
+    void p;
+    return false;
+  }
+
   const store = als.getStore();
   const w = store?.ctx?.waitUntil;
   if (typeof w === "function") {
