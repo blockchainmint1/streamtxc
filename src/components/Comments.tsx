@@ -189,7 +189,7 @@ export function Comments({ cid }: { cid: string }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
             <div>
-              <Label className="font-mono text-xs">
+              <Label className="font-mono text-xs flex items-center gap-1 h-4 whitespace-nowrap">
                 Pay (TXC) — min {COMMENT_PRICING.minTxc}
               </Label>
               <input
@@ -214,7 +214,7 @@ export function Comments({ cid }: { cid: string }) {
               </div>
             </div>
             <div>
-              <Label className="font-mono text-xs flex items-center gap-1">
+              <Label className="font-mono text-xs flex items-center gap-1 h-4 whitespace-nowrap">
                 <Wallet className="h-3 w-3" /> Your wallet (optional)
               </Label>
               <input
