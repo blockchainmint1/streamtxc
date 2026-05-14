@@ -326,10 +326,11 @@ curl -X POST ${base}/_serverFn/completeWalletLogin \\
         </Endpoint>
 
         {/* Embed */}
+        <div id="embed" className="scroll-mt-24" />
         <Endpoint
           method="GET"
           path="/embed/{cid}"
-          title="Embeddable player"
+          title="05 · embed the player"
           icon={<Code2 className="h-5 w-5" />}
         >
           <p>
@@ -351,10 +352,11 @@ curl -X POST ${base}/_serverFn/completeWalletLogin \\
         </Endpoint>
 
         {/* Verify message */}
+        <div id="verify" className="scroll-mt-24" />
         <Endpoint
           method="POST"
           path="/api/public/txc-verify-message"
-          title="Verify a TXC signed message"
+          title="06 · verify a TXC signed message"
           icon={<ShieldCheck className="h-5 w-5" />}
         >
           <p>
@@ -374,10 +376,11 @@ curl -X POST ${base}/_serverFn/completeWalletLogin \\
         </Endpoint>
 
         {/* Health */}
+        <div id="health" className="scroll-mt-24" />
         <Endpoint
           method="GET"
           path="/api/public/txc-health"
-          title="TXC node health"
+          title="07 · TXC node health"
           icon={<Zap className="h-5 w-5" />}
         >
           <p>
@@ -390,9 +393,9 @@ curl -X POST ${base}/_serverFn/completeWalletLogin \\
         </Endpoint>
 
         {/* On-chain proof note */}
-        <section className="border border-primary/40 bg-primary/5 rounded-sm p-5 space-y-2">
+        <section id="mempool" className="scroll-mt-24 border border-primary/40 bg-primary/5 rounded-sm p-5 space-y-2">
           <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-primary">
-            <Hash className="h-4 w-4" /> on-chain proof
+            <Hash className="h-4 w-4" /> 08 · audit on mempool
           </div>
           <p className="text-sm text-muted-foreground">
             Every video, comment, and boost on streamTXC has its own TXC wallet
