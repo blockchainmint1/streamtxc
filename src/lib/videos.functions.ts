@@ -728,6 +728,40 @@ export const listVideosByOwner = createServerFn({ method: "POST" })
   });
 
 /**
+ * Best-effort: ask Pinata to re-pin every `unpinned` CID owned by `wallet`
+ * by fetching it from the public IPFS DHT. Pinata returns success even if
+ * the content isn't yet found — the actual fetch happens asynchronously.
+ * We don't flip the row back to `active` here; the payment-watcher does
+ * that once a renewal payment lands.
+ */
+export const restoreUnpinnedVideos = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({ wallet: walletSchema }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: rows, error } = await supabaseAdmin
+      .from("videos")
+      .select("cid, title")
+      .eq("owner_wallet", data.wallet)
+      .eq("status", "unpinned")
+      .limit(100);
+    if (error) throw new Error(error.message);
+    const items = rows ?? [];
+    let queued = 0;
+    let failed = 0;
+    for (const v of items) {
+      try {
+        await pinByCid(v.cid, v.title ?? v.cid);
+        queued += 1;
+      } catch (err) {
+        console.warn("restoreUnpinnedVideos pinByCid failed", v.cid, err);
+        failed += 1;
+      }
+    }
+    return { total: items.length, queued, failed };
+  });
+
+/**
  * Fetch a batch of videos by CID. Used by /manage to surface anonymous
  * uploads tracked in the browser's localStorage so the user can later
  * claim ownership of them.
