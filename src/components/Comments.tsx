@@ -220,9 +220,10 @@ export function Comments({ cid }: { cid: string }) {
               <input
                 value={wallet}
                 onChange={(e) => setWallet(e.target.value)}
-                placeholder="0x… (leave blank to post anon)"
+                placeholder="T… (leave blank to post anon)"
                 className="mt-1 w-full bg-input border border-border rounded-sm px-2 py-2 font-mono text-sm"
               />
+              <div className="h-[22px] mt-1" aria-hidden />
             </div>
           </div>
 
