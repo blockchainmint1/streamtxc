@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UploadRouteImport } from './routes/upload'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ManageRouteImport } from './routes/manage'
 import { Route as BrandRouteImport } from './routes/brand'
@@ -31,6 +32,11 @@ import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/publ
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
   path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -129,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/brand': typeof BrandRoute
   '/manage': typeof ManageRoute
   '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
@@ -149,6 +156,7 @@ export interface FileRoutesByTo {
   '/brand': typeof BrandRoute
   '/manage': typeof ManageRoute
   '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
@@ -170,6 +178,7 @@ export interface FileRoutesById {
   '/brand': typeof BrandRoute
   '/manage': typeof ManageRoute
   '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
@@ -192,6 +201,7 @@ export interface FileRouteTypes {
     | '/brand'
     | '/manage'
     | '/privacy'
+    | '/terms'
     | '/upload'
     | '/embed/$cid'
     | '/u/$wallet'
@@ -212,6 +222,7 @@ export interface FileRouteTypes {
     | '/brand'
     | '/manage'
     | '/privacy'
+    | '/terms'
     | '/upload'
     | '/embed/$cid'
     | '/u/$wallet'
@@ -232,6 +243,7 @@ export interface FileRouteTypes {
     | '/brand'
     | '/manage'
     | '/privacy'
+    | '/terms'
     | '/upload'
     | '/embed/$cid'
     | '/u/$wallet'
@@ -253,6 +265,7 @@ export interface RootRouteChildren {
   BrandRoute: typeof BrandRoute
   ManageRoute: typeof ManageRoute
   PrivacyRoute: typeof PrivacyRoute
+  TermsRoute: typeof TermsRoute
   UploadRoute: typeof UploadRoute
   EmbedCidRoute: typeof EmbedCidRoute
   UWalletRoute: typeof UWalletRoute
@@ -266,6 +279,13 @@ declare module '@tanstack/react-router' {
       path: '/upload'
       fullPath: '/upload'
       preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -429,6 +449,7 @@ const rootRouteChildren: RootRouteChildren = {
   BrandRoute: BrandRoute,
   ManageRoute: ManageRoute,
   PrivacyRoute: PrivacyRoute,
+  TermsRoute: TermsRoute,
   UploadRoute: UploadRoute,
   EmbedCidRoute: EmbedCidRoute,
   UWalletRoute: UWalletRoute,
