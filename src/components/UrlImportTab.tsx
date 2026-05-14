@@ -33,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 import {
   resolveImportUrl,
   getImportStatus,
@@ -52,6 +53,7 @@ type Stage =
   | "resolving"
   | "ready"
   | "streaming"
+  | "thumb"
   | "registering"
   | "done";
 
@@ -77,6 +79,8 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
   const [bytesUploaded, setBytesUploaded] = useState(0);
   const [importId, setImportId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pinnedCid, setPinnedCid] = useState<string | null>(null);
+  const [thumbnailCid, setThumbnailCid] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Stop polling on unmount.
@@ -166,25 +170,10 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
       if (finalErr) throw new Error(finalErr);
       if (!finalCid) throw new Error("Stream ended without a CID");
 
-      setStage("registering");
-      const result = await addCid({
-        data: {
-          wallet: ownerWallet ?? undefined,
-          cid: finalCid,
-          title,
-          description,
-          months: 1,
-        },
-      });
-      if (result.chainStatus === "stamp_failed") {
-        toast.error("Pinned to IPFS, but TXC stamp failed");
-      } else {
-        toast.success(`Imported from ${resolved.source} → IPFS`);
-      }
-      if (!ownerWallet) recordAnonUpload(result.cid, title);
-      qc.invalidateQueries({ queryKey: ["recent-videos"] });
-      setStage("done");
-      navigate({ to: "/v/$cid", params: { cid: result.cid } });
+      // Stream complete — let the user pick a thumbnail before we
+      // finalize. They can also skip.
+      setPinnedCid(finalCid);
+      setStage("thumb");
     } catch (err) {
       if (pollRef.current) {
         clearInterval(pollRef.current);
@@ -200,6 +189,43 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
         toast.error(msg);
       }
       setStage("ready");
+    }
+  }
+
+  async function handleRegister() {
+    if (!pinnedCid || !resolved) return;
+    setStage("registering");
+    try {
+      const result = await addCid({
+        data: {
+          wallet: ownerWallet ?? undefined,
+          cid: pinnedCid,
+          title,
+          description,
+          months: 1,
+          thumbnailCid: thumbnailCid ?? undefined,
+        },
+      });
+      if (result.chainStatus === "stamp_failed") {
+        toast.error("Pinned to IPFS, but TXC stamp failed");
+      } else {
+        toast.success(`Imported from ${resolved.source} → IPFS`);
+      }
+      if (!ownerWallet) recordAnonUpload(result.cid, title);
+      qc.invalidateQueries({ queryKey: ["recent-videos"] });
+      setStage("done");
+      navigate({ to: "/v/$cid", params: { cid: result.cid } });
+    } catch (err) {
+      const dup = parseDuplicateCidError(err);
+      if (dup) {
+        onDuplicate(dup);
+        toast.error("This video is already on stream.");
+      } else {
+        const msg = err instanceof Error ? err.message : "Register failed";
+        setError(msg);
+        toast.error(msg);
+      }
+      setStage("thumb");
     }
   }
 
@@ -226,14 +252,14 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
     <div className="space-y-6">
       <div className="space-y-2">
         <Label htmlFor="import-url" className="font-mono text-xs">
-          WETRANSFER OR DROPBOX URL
+          DROPBOX, GOOGLE DRIVE, OR WETRANSFER URL
         </Label>
         <div className="flex gap-2">
           <Input
             id="import-url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://wetransfer.com/downloads/…  or  https://www.dropbox.com/s/…"
+            placeholder="dropbox.com/s/…  ·  drive.google.com/file/d/…  ·  wetransfer.com/downloads/…"
             disabled={stage === "resolving" || stage === "streaming"}
             className="font-mono"
           />
@@ -258,7 +284,8 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
         <p className="font-mono text-[11px] text-muted-foreground">
           We'll find the actual file behind the share page and pin it
           straight to IPFS. Single-file transfers only, up to 10 GB.
-          WeTransfer links expire — resolve fresh ones.
+          Google Drive files must be shared as "Anyone with the link".
+          WeTransfer links expire fast — resolve fresh ones.
         </p>
       </div>
 
@@ -352,10 +379,27 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
             </div>
           )}
 
+          {stage === "thumb" && pinnedCid && (
+            <div className="border border-primary/40 bg-primary/5 rounded-sm p-4 space-y-3">
+              <div className="font-mono text-xs text-primary">
+                [ PINNED TO IPFS · PICK A THUMBNAIL ]
+              </div>
+              <ThumbnailPicker
+                key={pinnedCid}
+                videoSrc={`/api/stream/${pinnedCid}`}
+                onChange={setThumbnailCid}
+              />
+              <p className="font-mono text-[11px] text-muted-foreground">
+                Optional — you can skip this and add one later from the
+                video page.
+              </p>
+            </div>
+          )}
+
           <Button
             type="button"
             size="lg"
-            onClick={handlePin}
+            onClick={stage === "thumb" ? handleRegister : handlePin}
             disabled={
               !title ||
               stage === "streaming" ||
@@ -368,6 +412,11 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 {stage === "streaming" ? "Streaming…" : "Finalizing…"}
+              </>
+            ) : stage === "thumb" ? (
+              <>
+                <Rocket className="mr-2 h-4 w-4" />
+                {thumbnailCid ? "Register with thumbnail" : "Skip thumbnail & register"}
               </>
             ) : (
               <>
@@ -388,12 +437,15 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
               </div>
               <ul className="text-sm text-muted-foreground space-y-0.5">
                 <li>
-                  <Link2 className="inline h-3 w-3 mr-1" /> WeTransfer
-                  share links (single-file)
+                  <Link2 className="inline h-3 w-3 mr-1" /> Dropbox share links
                 </li>
                 <li>
-                  <Link2 className="inline h-3 w-3 mr-1" /> Dropbox
-                  share links (any file)
+                  <Link2 className="inline h-3 w-3 mr-1" /> Google Drive
+                  ("Anyone with the link")
+                </li>
+                <li>
+                  <Link2 className="inline h-3 w-3 mr-1" /> WeTransfer
+                  share links (single-file, flaky)
                 </li>
               </ul>
             </div>

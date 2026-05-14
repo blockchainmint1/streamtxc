@@ -143,6 +143,7 @@ function UploadPage() {
   const [cidInput, setCidInput] = useState("");
   const [cidTitle, setCidTitle] = useState("");
   const [cidDescription, setCidDescription] = useState("");
+  const [cidThumbnailCid, setCidThumbnailCid] = useState<string | null>(null);
   const [cidStage, setCidStage] = useState<
     "idle" | "fetching" | "registering"
   >("idle");
@@ -342,6 +343,7 @@ function UploadPage() {
           title: cidTitle,
           description: cidDescription,
           months,
+          thumbnailCid: cidThumbnailCid ?? undefined,
         },
       });
       if (result.chainStatus === "stamp_failed") {
@@ -770,6 +772,15 @@ function UploadPage() {
                   rows={3}
                 />
               </div>
+
+              {/^(bafy|bafk|bafyb|Qm)/i.test(cidInput.trim()) &&
+                cidInput.trim().length >= 46 && (
+                  <ThumbnailPicker
+                    key={cidInput.trim()}
+                    videoSrc={`/api/stream/${cidInput.trim()}`}
+                    onChange={setCidThumbnailCid}
+                  />
+                )}
 
               {cidStage !== "idle" && (
                 <div className="border border-primary/40 bg-primary/5 rounded-sm p-4 space-y-2">

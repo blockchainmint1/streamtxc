@@ -26,6 +26,7 @@ export const resolveImportUrl = createServerFn({ method: "POST" })
       filename: resolved.filename,
       sizeBytes: resolved.sizeBytes,
       sourceUrl: data.url,
+      fetchHeaders: resolved.fetchHeaders,
       exp: Date.now() + 15 * 60_000,
     });
 

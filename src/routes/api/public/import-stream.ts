@@ -70,7 +70,10 @@ export const Route = createFileRoute("/api/public/import-stream")({
             send({ id: importId });
 
             try {
-              const upstream = await fetch(payload.directUrl);
+              const upstream = await fetch(payload.directUrl, {
+                headers: payload.fetchHeaders,
+                redirect: "follow",
+              });
               if (!upstream.ok || !upstream.body) {
                 throw new Error(
                   `Upstream returned ${upstream.status} when fetching the file.`,
