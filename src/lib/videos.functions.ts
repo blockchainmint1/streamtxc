@@ -8,6 +8,7 @@ import {
   pinFileToIPFS,
   createPresignedUploadUrl,
   pinByCid,
+  headCidOnGateway,
 } from "./pinata.server";
 import { mockPaymentTx } from "./chain";
 import { getTxStatus, explorerTxUrl } from "./txc.server";
