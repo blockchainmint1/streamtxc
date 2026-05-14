@@ -123,6 +123,30 @@ export function gatewayUrl(cid: string): string {
 }
 
 /**
+ * HEAD-probe the gateway for a CID. Returns true if the bytes are
+ * fetchable right now (200 OK). Short timeout so we never block the UI
+ * on a slow gateway. Best-effort — a `false` doesn't strictly prove the
+ * CID is gone from IPFS as a whole, only that our gateway can't serve
+ * it within the timeout window.
+ */
+export async function headCidOnGateway(
+  cid: string,
+  timeoutMs = 4000,
+): Promise<boolean> {
+  const url = gatewayUrl(cid);
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { method: "HEAD", signal: ctrl.signal });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/**
  * Best-effort unpin. Looks up the file by CID in our Pinata account, then
  * deletes it. Used by the payment watcher when a video's 24h grace expires
  * without funds landing.
