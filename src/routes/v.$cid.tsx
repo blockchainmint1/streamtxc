@@ -344,25 +344,7 @@ function WatchPage() {
 
           {/* Sidebar: chain info + embed */}
           <div className="space-y-4">
-            {video.video_wallet && video.payment_required_txc != null && (
-              <CollapsibleSection
-                title="[ HOSTING PAYMENT ]"
-                icon={<Wallet className="h-3.5 w-3.5" />}
-                defaultOpen={!video.paid_at}
-              >
-                <PaymentPanel
-                  required={Number(video.payment_required_txc)}
-                  received={Number(video.payment_received_txc ?? 0)}
-                  wallet={video.video_wallet}
-                  paidAt={video.paid_at ?? null}
-                  createdAt={video.created_at}
-                  expiresAt={video.expires_at}
-                  monthsPrepaid={video.months_prepaid ?? 1}
-                  onCopy={copy}
-                />
-              </CollapsibleSection>
-            )}
-            <CollapsibleSection title="[ ON-CHAIN PROOF ]" defaultOpen={false}>
+            <CollapsibleSection title="[ ON-CHAIN PROOF ]" defaultOpen={true}>
               <Field label="IPFS CID" value={video.cid} onCopy={copy} mono />
               {video.video_wallet && (
                 <Field
@@ -429,6 +411,24 @@ function WatchPage() {
                 TXC proof is permanent — timestamped proof on TXC does not expire.
               </p>
             </CollapsibleSection>
+            {video.video_wallet && video.payment_required_txc != null && (
+              <CollapsibleSection
+                title="[ HOSTING PAYMENT ]"
+                icon={<Wallet className="h-3.5 w-3.5" />}
+                defaultOpen={!video.paid_at}
+              >
+                <PaymentPanel
+                  required={Number(video.payment_required_txc)}
+                  received={Number(video.payment_received_txc ?? 0)}
+                  wallet={video.video_wallet}
+                  paidAt={video.paid_at ?? null}
+                  createdAt={video.created_at}
+                  expiresAt={video.expires_at}
+                  monthsPrepaid={video.months_prepaid ?? 1}
+                  onCopy={copy}
+                />
+              </CollapsibleSection>
+            )}
 
             <CollapsibleSection
               title="[ EMBED ]"
