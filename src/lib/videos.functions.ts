@@ -781,12 +781,20 @@ export const probeAvailability = createServerFn({ method: "POST" })
       .eq("cid", data.cid)
       .maybeSingle();
     const unpinnedFlag = !!row?.unpinned_at;
-    const reachable = await headCidOnGateway(data.cid);
+    // Trust the DB. The payment-watcher only sets `unpinned_at` after it
+    // actually unpins from Pinata, and only clears it after re-pinning AND
+    // verifying the gateway can serve the bytes again. A live HEAD probe
+    // here was producing false negatives (Worker→dedicated-gateway HEAD
+    // requests occasionally fail / time out even when the bytes are fine),
+    // which painted the "no longer on IPFS" overlay over healthy videos.
+    // If a CID does go missing, the watcher flips `unpinned_at` on the
+    // next tick and the overlay appears then.
+    const reachable = !unpinnedFlag;
     return {
       cid: data.cid,
       reachable,
       unpinnedFlag,
-      available: reachable && !unpinnedFlag,
+      available: !unpinnedFlag,
       checkedAt: new Date().toISOString(),
     };
   });
