@@ -464,7 +464,7 @@ export function UrlImportTab({ ownerWallet, onDuplicate, mode = "url" }: Props) 
                   <div className="font-mono text-[11px] text-muted-foreground">
                     {bytesUploaded > 0
                       ? `${formatBytes(bytesUploaded)} / ${formatBytes(resolved.sizeBytes)} (${pct.toFixed(0)}%)`
-                      : "Connecting to source…"}
+                      : `Copying from ${resolved.source} to IPFS… (large files can take several minutes)`}
                   </div>
                 </>
               ) : (
