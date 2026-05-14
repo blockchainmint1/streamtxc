@@ -41,8 +41,6 @@ import {
   Upload as UploadIcon,
 } from "lucide-react";
 import { useWallet } from "@/lib/wallet";
-import { gatewayUrl as ipfsGatewayUrl } from "@/lib/ipfs-gateway";
-import { pinByCid as _unused } from "@/lib/videos.functions";
 import { toast } from "sonner";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
