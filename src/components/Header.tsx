@@ -131,6 +131,13 @@ export function Header() {
             about
           </Link>
           <Link
+            to="/manifesto"
+            className="px-3 py-1.5 hover:text-primary transition-colors"
+            activeProps={{ className: "px-3 py-1.5 text-primary" }}
+          >
+            manifesto
+          </Link>
+          <Link
             to="/upload"
             className="px-3 py-1.5 hover:text-primary transition-colors"
             activeProps={{ className: "px-3 py-1.5 text-primary" }}
