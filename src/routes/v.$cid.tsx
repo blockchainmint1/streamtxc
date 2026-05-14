@@ -13,7 +13,7 @@ import {
   probeAvailability,
   restoreOneFromIpfs,
 } from "@/lib/videos.functions";
-import { formatBytes, formatTxc, formatDate } from "@/lib/fees";
+import { formatBytes, formatTxc, formatDate, PAYMENT_GRACE_HOURS } from "@/lib/fees";
 import { shortWalletId } from "@/lib/wallet";
 import {
   Copy,
@@ -652,7 +652,7 @@ function PaymentPanel({
   const partial = !paid && received > 0;
   const remaining = Math.max(0, +(required - received).toFixed(8));
   const ageHrs = (Date.now() - new Date(createdAt).getTime()) / 3_600_000;
-  const graceLeft = Math.max(0, 24 - ageHrs);
+  const graceLeft = Math.max(0, PAYMENT_GRACE_HOURS - ageHrs);
   const [showQr, setShowQr] = useState(false);
   const monthlyRate = monthsPrepaid > 0 ? required / monthsPrepaid : required;
   // BIP-21 style URI so wallet apps that scan can pre-fill the amount.
@@ -782,7 +782,11 @@ function PaymentPanel({
             automatic — your video stays live as soon as the payment lands.
             Unpaid videos are unpinned after{" "}
             <span className="text-foreground">
-              {graceLeft > 0 ? `${graceLeft.toFixed(1)}h` : "0h"}
+              {graceLeft <= 0
+                ? "0h"
+                : graceLeft >= 48
+                  ? `${(graceLeft / 24).toFixed(1)} days`
+                  : `${graceLeft.toFixed(1)}h`}
             </span>
             .
           </p>
