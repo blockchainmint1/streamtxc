@@ -792,6 +792,32 @@ export const probeAvailability = createServerFn({ method: "POST" })
   });
 
 /**
+ * Public single-CID restore. Asks Pinata to re-fetch this CID from the
+ * IPFS DHT. Best-effort — Pinata may say "queued" even if no peer is
+ * actually seeding it. Status is not flipped here; the watch page's
+ * probeAvailability call decides truth from the live gateway HEAD.
+ */
+export const restoreOneFromIpfs = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({ cid: cidStringSchema }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: row } = await supabaseAdmin
+      .from("videos")
+      .select("cid, title")
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (!row) throw new Error("Video not found.");
+    try {
+      await pinByCid(row.cid, row.title ?? row.cid);
+      return { ok: true };
+    } catch (err) {
+      console.warn("restoreOneFromIpfs failed", row.cid, err);
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+/**
  * Owner-only re-seed. Called after the browser has re-uploaded the
  * original file via /api/public/upload — that endpoint already pinned
  * the bytes to our Pinata account, so by the time we get here the CID
