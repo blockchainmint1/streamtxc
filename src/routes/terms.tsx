@@ -121,9 +121,10 @@ function TermsPage() {
               If we have a disagreement we can&rsquo;t resolve informally,
               both sides agree to settle it through binding individual
               arbitration &mdash; not a court, not a jury, and not a class
-              action. Arbitration will be administered by a recognized
-              arbitration body (such as the AAA) under its consumer rules,
-              and held remotely or in a venue mutually agreed upon.
+              action. Arbitration will be administered by the Singapore
+              International Arbitration Centre (SIAC) under its rules then
+              in force, seated in Singapore, and held remotely or in a venue
+              mutually agreed upon.
             </p>
             <p>
               You give up the right to participate in a class action,
@@ -140,10 +141,10 @@ function TermsPage() {
 
           <Section title="Governing law">
             <p>
-              These terms are governed by the laws of the State of Texas,
-              USA, without regard to its conflict-of-laws rules. Any dispute
-              not subject to arbitration goes to the state or federal courts
-              located in Texas, and you consent to that jurisdiction.
+              These terms are governed by the laws of Singapore, without
+              regard to its conflict-of-laws rules. Any dispute not subject
+              to arbitration goes to the courts of Singapore, and you
+              consent to that jurisdiction.
             </p>
           </Section>
 
