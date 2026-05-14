@@ -324,7 +324,7 @@ export function UrlImportTab({ ownerWallet, onDuplicate, mode = "url" }: Props) 
             id="import-resolve-btn"
             type="button"
             variant="outline"
-            onClick={handleResolve}
+            onClick={() => handleResolve()}
             disabled={!url.trim() || stage === "resolving" || stage === "streaming"}
             className="font-mono shrink-0"
           >
