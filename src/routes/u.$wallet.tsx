@@ -4,12 +4,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { listVideosByOwner } from "@/lib/videos.functions";
+import { listVideosByOwner, restoreUnpinnedVideos } from "@/lib/videos.functions";
 import { listCommentsByWallet } from "@/lib/comments.functions";
 import { formatBytes } from "@/lib/fees";
 import { shortWalletId } from "@/lib/wallet";
 import { ipfsThumbUrl } from "@/lib/ipfs-gateway";
-import { Copy, Check, Play, MessageSquare } from "lucide-react";
+import { Copy, Check, Play, MessageSquare, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/u/$wallet")({
   head: ({ params }) => ({
@@ -41,7 +42,9 @@ function WalletPage() {
   const { wallet } = Route.useParams();
   const fetchByOwner = useServerFn(listVideosByOwner);
   const fetchComments = useServerFn(listCommentsByWallet);
+  const restoreFn = useServerFn(restoreUnpinnedVideos);
   const [copied, setCopied] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["videos-by-owner", wallet],
@@ -59,6 +62,25 @@ function WalletPage() {
 
   const items = data?.items ?? [];
   const comments = commentsData ?? [];
+  const expiredCount = items.filter(
+    (v) => (v as { status?: string }).status === "unpinned",
+  ).length;
+
+  const handleRestore = async () => {
+    setRestoring(true);
+    try {
+      const res = await restoreFn({ data: { wallet } });
+      toast.success(
+        `Asked Pinata to re-fetch ${res.queued}/${res.total} CID${res.total === 1 ? "" : "s"} from IPFS. Restoration runs asynchronously — check back in a few minutes.`,
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Restore request failed",
+      );
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   const copy = async () => {
     try {
@@ -101,6 +123,24 @@ function WalletPage() {
         <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-3">
           videos
         </h2>
+        {expiredCount > 0 && (
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border border-destructive/40 bg-destructive/5 rounded-sm p-4">
+            <div className="font-mono text-xs text-muted-foreground">
+              <span className="text-destructive font-bold">{expiredCount}</span>{" "}
+              video{expiredCount === 1 ? "" : "s"} expired and got unpinned.
+              Once renewal payment confirms, click below to ask IPFS peers to
+              re-seed them into our pinning service.
+            </div>
+            <button
+              onClick={handleRestore}
+              disabled={restoring}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-mono text-xs uppercase tracking-wider rounded-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${restoring ? "animate-spin" : ""}`} />
+              {restoring ? "requesting…" : "restore from IPFS"}
+            </button>
+          </div>
+        )}
         {isLoading ? (
           <div className="font-mono text-sm text-muted-foreground">
             loading…
