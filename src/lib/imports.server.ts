@@ -290,7 +290,10 @@ export async function pinStreamToIPFS(args: {
             "Content-Type": "application/offset+octet-stream",
             "Content-Length": String(chunk.byteLength),
           },
-          body: chunk,
+          body: chunk.buffer.slice(
+            chunk.byteOffset,
+            chunk.byteOffset + chunk.byteLength,
+          ) as ArrayBuffer,
         });
         if (patchRes.status === 204 || patchRes.status === 200) {
           const newOffset = Number(
