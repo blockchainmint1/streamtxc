@@ -2,11 +2,13 @@ import { Link } from "@tanstack/react-router";
 import { Play, Coins, ExternalLink, Wallet, Copy } from "lucide-react";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { useWallet, shortWalletId, isSignableOwnershipTxcAddress } from "@/lib/wallet";
 import {
   requestWalletLogin,
   completeWalletLogin,
 } from "@/lib/wallet-auth.functions";
+import { getWalletBalance } from "@/lib/wallet-balance.functions";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +36,22 @@ export function Header() {
 
   const requestLogin = useServerFn(requestWalletLogin);
   const completeLoginFn = useServerFn(completeWalletLogin);
+  const fetchBalance = useServerFn(getWalletBalance);
+
+  const balanceQuery = useQuery({
+    queryKey: ["wallet-balance", address],
+    queryFn: () => fetchBalance({ data: { wallet: address! } }),
+    enabled: !!address,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
+  const balance = balanceQuery.data?.balance ?? null;
+  const balanceLabel =
+    balance !== null
+      ? `${balance.toLocaleString(undefined, { maximumFractionDigits: 4 })} TXC`
+      : balanceQuery.isLoading
+        ? "…"
+        : null;
 
   function normalizeSignatureInput(value: string) {
     return value.replace(/\s+/g, "");
@@ -124,9 +142,16 @@ export function Header() {
               to="/manage"
               className="px-3 py-1.5 hover:text-primary transition-colors"
               activeProps={{ className: "px-3 py-1.5 text-primary" }}
-              title={address}
+              title={`${address}${balance !== null ? ` · ${balance} TXC` : ""}`}
             >
-              manage [<span className="text-primary">{shortWalletId(address)}</span>]
+              manage [<span className="text-primary">{shortWalletId(address)}</span>
+              {balanceLabel && (
+                <>
+                  {" · "}
+                  <span className="text-primary/80">{balanceLabel}</span>
+                </>
+              )}
+              ]
             </Link>
           ) : (
             <Link
