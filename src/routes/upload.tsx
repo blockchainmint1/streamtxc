@@ -33,6 +33,7 @@ import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/li
 import { computeCids } from "@/lib/ipfs-cid";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 import { recordAnonUpload } from "@/lib/anon-uploads";
+import { UrlImportTab } from "@/components/UrlImportTab";
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
@@ -147,6 +148,8 @@ function UploadPage() {
   >("idle");
   const [cidNotFound, setCidNotFound] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"file" | "cid">("file");
+  type TabKey = "file" | "cid" | "import";
+  const tab = activeTab as TabKey;
   const months = 1;
   const [stage, setStage] = useState<
     "idle" | "hashing" | "checking" | "uploading" | "registering"
@@ -383,8 +386,8 @@ function UploadPage() {
         </p>
 
         <Tabs
-          value={activeTab}
-          onValueChange={(v) => setActiveTab(v as "file" | "cid")}
+          value={tab}
+          onValueChange={(v) => setActiveTab(v as TabKey as "file" | "cid")}
           className="w-full"
         >
           {duplicate && (
@@ -419,12 +422,15 @@ function UploadPage() {
               </div>
             </div>
           )}
-          <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="file" className="font-mono text-xs">
               <Upload className="mr-2 h-3 w-3" /> Upload file
             </TabsTrigger>
             <TabsTrigger value="cid" className="font-mono text-xs">
               <Link2 className="mr-2 h-3 w-3" /> Add by CID
+            </TabsTrigger>
+            <TabsTrigger value="import" className="font-mono text-xs">
+              <Sparkles className="mr-2 h-3 w-3" /> Import URL
             </TabsTrigger>
           </TabsList>
 
