@@ -277,10 +277,14 @@ function WatchPage() {
                 </div>
               </div>
             ) : (
-              <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden">
+              <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden relative">
                 <VideoPlayer
                   src={streamUrl}
                   poster={ipfsThumbUrl(video.thumbnail_cid)}
+                />
+                <LargeFileWarmupOverlay
+                  sizeBytes={video.size_bytes}
+                  createdAt={video.created_at}
                 />
               </div>
             )}
