@@ -369,15 +369,6 @@ export function UrlImportTab({ ownerWallet, onDuplicate, mode = "url" }: Props) 
             </span>
           )}
           </div>
-          {/* hidden trigger reused by the Chooser callback to auto-resolve */}
-          <button
-            id="import-resolve-btn"
-            type="button"
-            onClick={handleResolve}
-            className="hidden"
-            tabIndex={-1}
-            aria-hidden
-          />
           <p className="font-mono text-[11px] text-muted-foreground">
             Opens Dropbox's native file picker — sign in with your Dropbox
             account, choose a video, and we'll stream it straight to IPFS.
