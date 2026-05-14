@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -11,6 +11,7 @@ import {
   pollTxStatus,
   reportVideo,
   probeAvailability,
+  restoreOneFromIpfs,
 } from "@/lib/videos.functions";
 import { formatBytes, formatTxc, formatDate } from "@/lib/fees";
 import { shortWalletId } from "@/lib/wallet";
@@ -77,8 +78,12 @@ export const Route = createFileRoute("/v/$cid")({
 
 function WatchPage() {
   const { cid } = Route.useParams();
+  const navigate = useNavigate();
+  const { address } = useWallet();
   const fetchVideo = useServerFn(getVideo);
   const pollTx = useServerFn(pollTxStatus);
+  const probe = useServerFn(probeAvailability);
+  const restoreOne = useServerFn(restoreOneFromIpfs);
   const { data: video, isLoading } = useQuery({
     queryKey: ["video", cid],
     queryFn: () => fetchVideo({ data: { cid } }),
@@ -100,6 +105,42 @@ function WatchPage() {
   const txHash = chain?.txHash ?? video?.tx_hash ?? null;
   const confirmed = status === "active" && !!blockNumber;
   const stampFailed = status === "stamp_failed";
+
+  // Live availability — true when bytes can be served from our gateway
+  // and the row isn't flagged as unpinned. Runs after `getVideo` resolves
+  // and won't block first paint.
+  const { data: avail, refetch: refetchAvail } = useQuery({
+    queryKey: ["video-availability", cid],
+    queryFn: () => probe({ data: { cid } }),
+    enabled: !!video,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+  const unavailable = !!avail && !avail.available;
+  const isOwner =
+    !!address &&
+    !!video?.owner_wallet &&
+    address.toLowerCase() === video.owner_wallet.toLowerCase();
+  const [restoring, setRestoring] = useState(false);
+
+  const handleRestoreFromIpfs = async () => {
+    setRestoring(true);
+    try {
+      const res = await restoreOne({ data: { cid } });
+      if (res.ok) {
+        toast.success(
+          "Asked Pinata to re-fetch from IPFS. Re-checking in 10s…",
+        );
+        setTimeout(() => void refetchAvail(), 10_000);
+      } else {
+        toast.error(res.error || "Restore request failed.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Restore failed");
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   const [embedW, setEmbedW] = useState(640);
   const [embedH, setEmbedH] = useState(360);
