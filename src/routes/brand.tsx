@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/brand")({
   head: () => ({
     meta: [
-      { title: "Brand assets — StreamTXC" },
+      { title: "Brand assets — streamTXC" },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
@@ -15,7 +15,7 @@ function BrandPage() {
     <main className="min-h-screen bg-background text-foreground p-12">
       <div className="mx-auto max-w-3xl space-y-12">
         <header>
-          <h1 className="text-4xl font-bold tracking-tight">StreamTXC — brand assets</h1>
+          <h1 className="text-4xl font-bold tracking-tight">streamTXC — brand assets</h1>
           <p className="mt-2 font-mono text-sm text-muted-foreground">
             Right-click each icon and &ldquo;Save image as&hellip;&rdquo; to upload to Dropbox / app stores.
           </p>
@@ -27,7 +27,7 @@ function BrandPage() {
             <div className="bg-white p-4 border border-border rounded">
               <img
                 src="/brand/streamtxc-icon-256.png"
-                alt="StreamTXC icon 256"
+                alt="streamTXC icon 256"
                 width={256}
                 height={256}
                 style={{ imageRendering: "auto" }}
@@ -49,7 +49,7 @@ function BrandPage() {
             <div className="bg-white p-4 border border-border rounded">
               <img
                 src="/brand/streamtxc-icon-64.png"
-                alt="StreamTXC icon 64"
+                alt="streamTXC icon 64"
                 width={64}
                 height={64}
               />
