@@ -149,11 +149,17 @@ export function UrlImportTab({ ownerWallet, onDuplicate, mode = "url" }: Props) 
     Dropbox.choose({
       success: (files: Array<{ link: string; name: string; bytes: number }>) => {
         if (!files?.[0]) return;
-        const link = files[0].link;
-        setUrl(link);
-        // Resolve directly with the link — don't rely on state, the click
-        // handler would read a stale (empty) `url` from closure.
-        void handleResolve(link);
+        const f = files[0];
+        setUrl(f.link);
+        // The Chooser's `link` is a ONE-SHOT direct URL — if our resolver
+        // burns it on a HEAD probe, the streaming GET that follows will
+        // hang forever. Pass the SDK's filename + bytes through so the
+        // server can skip the probe entirely.
+        void handleResolve(f.link, {
+          source: "dropbox",
+          filename: f.name,
+          sizeBytes: f.bytes,
+        });
       },
       cancel: () => {},
       linkType: "direct",
@@ -162,14 +168,17 @@ export function UrlImportTab({ ownerWallet, onDuplicate, mode = "url" }: Props) 
     });
   }
 
-  async function handleResolve(overrideUrl?: string) {
+  async function handleResolve(
+    overrideUrl?: string,
+    prefetched?: { source: "dropbox"; filename: string; sizeBytes: number },
+  ) {
     const target = (overrideUrl ?? url).trim();
     if (!target) return;
     setError(null);
     setStage("resolving");
     setResolved(null);
     try {
-      const r = await resolve({ data: { url: target } });
+      const r = await resolve({ data: { url: target, prefetched } });
       setResolved(r);
       // Default title from the filename, minus extension.
       if (!title) setTitle(r.filename.replace(/\.[^.]+$/, ""));
