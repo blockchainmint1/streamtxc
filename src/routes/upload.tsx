@@ -19,6 +19,7 @@ import {
 } from "@/lib/videos.functions";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   Upload,
@@ -145,6 +146,8 @@ function UploadPage() {
   const [cidTitle, setCidTitle] = useState("");
   const [cidDescription, setCidDescription] = useState("");
   const [cidThumbnailCid, setCidThumbnailCid] = useState<string | null>(null);
+  const [nsfw, setNsfw] = useState(false);
+  const [cidNsfw, setCidNsfw] = useState(false);
   const [cidStage, setCidStage] = useState<
     "idle" | "fetching" | "registering"
   >("idle");
@@ -273,6 +276,7 @@ function UploadPage() {
             description,
             months,
             thumbnailCid: thumbnailCid ?? undefined,
+            nsfw,
           },
         });
         if (result.chainStatus === "stamp_failed") {
@@ -305,6 +309,7 @@ function UploadPage() {
           mimeType: file.type || "video/mp4",
           months,
           thumbnailCid: thumbnailCid ?? undefined,
+          nsfw,
         },
       });
 
@@ -345,6 +350,7 @@ function UploadPage() {
           description: cidDescription,
           months,
           thumbnailCid: cidThumbnailCid ?? undefined,
+          nsfw: cidNsfw,
         },
       });
       if (result.chainStatus === "stamp_failed") {
