@@ -8,7 +8,10 @@ import { Loader2, ImageIcon, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Props {
-  file: File;
+  /** Provide a local File (upload tab) — fastest, no network. */
+  file?: File;
+  /** OR provide a URL (CID/import tabs) — pulled via crossOrigin="anonymous". */
+  videoSrc?: string;
   onChange: (cid: string | null) => void;
 }
 
@@ -19,7 +22,7 @@ interface Props {
  * onChange). Auto-captures the frame at ~1s when the file changes so the
  * user always has a reasonable default without clicking anything.
  */
-export function ThumbnailPicker({ file, onChange }: Props) {
+export function ThumbnailPicker({ file, videoSrc, onChange }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -31,24 +34,30 @@ export function ThumbnailPicker({ file, onChange }: Props) {
   const [thumbCid, setThumbCid] = useState<string | null>(null);
   const [stage, setStage] = useState<"idle" | "capturing" | "pinning">("idle");
 
-  // Build & tear down the video object URL when the file changes.
+  // Build & tear down the video source when file/url changes.
   useEffect(() => {
-    const url = URL.createObjectURL(file);
-    objectUrlRef.current = url;
+    let url: string | null = null;
     const v = videoRef.current;
-    if (v) {
-      v.src = url;
+    if (file) {
+      url = URL.createObjectURL(file);
+      objectUrlRef.current = url;
+      if (v) {
+        v.src = url;
+        v.load();
+      }
+    } else if (videoSrc && v) {
+      v.src = videoSrc;
       v.load();
     }
     setThumbCid(null);
     onChange(null);
     setPreviewUrl(null);
     return () => {
-      URL.revokeObjectURL(url);
+      if (url) URL.revokeObjectURL(url);
       objectUrlRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [file]);
+  }, [file, videoSrc]);
 
   // When metadata loads, default the seek time to ~1s (or 10% if very short).
   function handleLoaded() {
@@ -127,6 +136,7 @@ export function ThumbnailPicker({ file, onChange }: Props) {
             muted
             playsInline
             preload="metadata"
+            crossOrigin="anonymous"
             onLoadedMetadata={handleLoaded}
             className="absolute inset-0 h-full w-full object-contain"
           />
