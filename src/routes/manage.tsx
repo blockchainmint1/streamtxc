@@ -294,7 +294,13 @@ function ManagePageInner() {
                 </tr>
               </thead>
               <tbody>
-                {videos.map((v) => {
+                {[...videos]
+                  .sort(
+                    (a, b) =>
+                      new Date(a.expires_at).getTime() -
+                      new Date(b.expires_at).getTime(),
+                  )
+                  .map((v) => {
                   const exp = new Date(v.expires_at);
                   const daysLeft = Math.ceil(
                     (exp.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
