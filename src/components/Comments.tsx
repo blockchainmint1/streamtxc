@@ -500,7 +500,7 @@ function CommentItem({
         </div>
         <div className="text-right">
           <div className="font-mono text-sm text-primary font-bold">
-            {formatTxc(Number(c.boost_total_txc))} TXC
+            {formatTxc(Number(c.boost_total_txc))}
           </div>
           <div className="text-[10px] font-mono text-muted-foreground">
             boost total
