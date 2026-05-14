@@ -42,6 +42,7 @@ export function Footer() {
             secured by TXC
           </a>
           <Link to="/privacy" className="hover:text-foreground transition-colors">privacy</Link>
+          <Link to="/api" className="hover:text-foreground transition-colors">api</Link>
         </div>
       </div>
     </footer>

@@ -13,6 +13,7 @@ import { Route as UploadRouteImport } from './routes/upload'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ManageRouteImport } from './routes/manage'
 import { Route as BrandRouteImport } from './routes/brand'
+import { Route as ApiRouteImport } from './routes/api'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VCidRouteImport } from './routes/v.$cid'
@@ -47,6 +48,11 @@ const BrandRoute = BrandRouteImport.update({
   path: '/brand',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRoute = ApiRouteImport.update({
+  id: '/api',
+  path: '/api',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
@@ -78,47 +84,48 @@ const VCidRestoreRoute = VCidRestoreRouteImport.update({
   getParentRoute: () => VCidRoute,
 } as any)
 const ApiStreamCidRoute = ApiStreamCidRouteImport.update({
-  id: '/api/stream/$cid',
-  path: '/api/stream/$cid',
-  getParentRoute: () => rootRouteImport,
+  id: '/stream/$cid',
+  path: '/stream/$cid',
+  getParentRoute: () => ApiRoute,
 } as any)
 const ApiPublicUploadRoute = ApiPublicUploadRouteImport.update({
-  id: '/api/public/upload',
-  path: '/api/public/upload',
-  getParentRoute: () => rootRouteImport,
+  id: '/public/upload',
+  path: '/public/upload',
+  getParentRoute: () => ApiRoute,
 } as any)
 const ApiPublicTxcVerifyMessageRoute =
   ApiPublicTxcVerifyMessageRouteImport.update({
-    id: '/api/public/txc-verify-message',
-    path: '/api/public/txc-verify-message',
-    getParentRoute: () => rootRouteImport,
+    id: '/public/txc-verify-message',
+    path: '/public/txc-verify-message',
+    getParentRoute: () => ApiRoute,
   } as any)
 const ApiPublicTxcHealthRoute = ApiPublicTxcHealthRouteImport.update({
-  id: '/api/public/txc-health',
-  path: '/api/public/txc-health',
-  getParentRoute: () => rootRouteImport,
+  id: '/public/txc-health',
+  path: '/public/txc-health',
+  getParentRoute: () => ApiRoute,
 } as any)
 const ApiPublicImportStreamRoute = ApiPublicImportStreamRouteImport.update({
-  id: '/api/public/import-stream',
-  path: '/api/public/import-stream',
-  getParentRoute: () => rootRouteImport,
+  id: '/public/import-stream',
+  path: '/public/import-stream',
+  getParentRoute: () => ApiRoute,
 } as any)
 const ApiPublicHooksPaymentWatcherRoute =
   ApiPublicHooksPaymentWatcherRouteImport.update({
-    id: '/api/public/hooks/payment-watcher',
-    path: '/api/public/hooks/payment-watcher',
-    getParentRoute: () => rootRouteImport,
+    id: '/public/hooks/payment-watcher',
+    path: '/public/hooks/payment-watcher',
+    getParentRoute: () => ApiRoute,
   } as any)
 const ApiPublicAdminRetryStampsRoute =
   ApiPublicAdminRetryStampsRouteImport.update({
-    id: '/api/public/admin/retry-stamps',
-    path: '/api/public/admin/retry-stamps',
-    getParentRoute: () => rootRouteImport,
+    id: '/public/admin/retry-stamps',
+    path: '/public/admin/retry-stamps',
+    getParentRoute: () => ApiRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/api': typeof ApiRouteWithChildren
   '/brand': typeof BrandRoute
   '/manage': typeof ManageRoute
   '/privacy': typeof PrivacyRoute
@@ -138,6 +145,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/api': typeof ApiRouteWithChildren
   '/brand': typeof BrandRoute
   '/manage': typeof ManageRoute
   '/privacy': typeof PrivacyRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/api': typeof ApiRouteWithChildren
   '/brand': typeof BrandRoute
   '/manage': typeof ManageRoute
   '/privacy': typeof PrivacyRoute
@@ -179,6 +188,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
+    | '/api'
     | '/brand'
     | '/manage'
     | '/privacy'
@@ -198,6 +208,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
+    | '/api'
     | '/brand'
     | '/manage'
     | '/privacy'
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about'
+    | '/api'
     | '/brand'
     | '/manage'
     | '/privacy'
@@ -237,6 +249,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  ApiRoute: typeof ApiRouteWithChildren
   BrandRoute: typeof BrandRoute
   ManageRoute: typeof ManageRoute
   PrivacyRoute: typeof PrivacyRoute
@@ -244,13 +257,6 @@ export interface RootRouteChildren {
   EmbedCidRoute: typeof EmbedCidRoute
   UWalletRoute: typeof UWalletRoute
   VCidRoute: typeof VCidRouteWithChildren
-  ApiPublicImportStreamRoute: typeof ApiPublicImportStreamRoute
-  ApiPublicTxcHealthRoute: typeof ApiPublicTxcHealthRoute
-  ApiPublicTxcVerifyMessageRoute: typeof ApiPublicTxcVerifyMessageRoute
-  ApiPublicUploadRoute: typeof ApiPublicUploadRoute
-  ApiStreamCidRoute: typeof ApiStreamCidRoute
-  ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
-  ApiPublicHooksPaymentWatcherRoute: typeof ApiPublicHooksPaymentWatcherRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -281,6 +287,13 @@ declare module '@tanstack/react-router' {
       path: '/brand'
       fullPath: '/brand'
       preLoaderRoute: typeof BrandRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api': {
+      id: '/api'
+      path: '/api'
+      fullPath: '/api'
+      preLoaderRoute: typeof ApiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/about': {
@@ -327,55 +340,77 @@ declare module '@tanstack/react-router' {
     }
     '/api/stream/$cid': {
       id: '/api/stream/$cid'
-      path: '/api/stream/$cid'
+      path: '/stream/$cid'
       fullPath: '/api/stream/$cid'
       preLoaderRoute: typeof ApiStreamCidRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiRoute
     }
     '/api/public/upload': {
       id: '/api/public/upload'
-      path: '/api/public/upload'
+      path: '/public/upload'
       fullPath: '/api/public/upload'
       preLoaderRoute: typeof ApiPublicUploadRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiRoute
     }
     '/api/public/txc-verify-message': {
       id: '/api/public/txc-verify-message'
-      path: '/api/public/txc-verify-message'
+      path: '/public/txc-verify-message'
       fullPath: '/api/public/txc-verify-message'
       preLoaderRoute: typeof ApiPublicTxcVerifyMessageRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiRoute
     }
     '/api/public/txc-health': {
       id: '/api/public/txc-health'
-      path: '/api/public/txc-health'
+      path: '/public/txc-health'
       fullPath: '/api/public/txc-health'
       preLoaderRoute: typeof ApiPublicTxcHealthRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiRoute
     }
     '/api/public/import-stream': {
       id: '/api/public/import-stream'
-      path: '/api/public/import-stream'
+      path: '/public/import-stream'
       fullPath: '/api/public/import-stream'
       preLoaderRoute: typeof ApiPublicImportStreamRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiRoute
     }
     '/api/public/hooks/payment-watcher': {
       id: '/api/public/hooks/payment-watcher'
-      path: '/api/public/hooks/payment-watcher'
+      path: '/public/hooks/payment-watcher'
       fullPath: '/api/public/hooks/payment-watcher'
       preLoaderRoute: typeof ApiPublicHooksPaymentWatcherRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiRoute
     }
     '/api/public/admin/retry-stamps': {
       id: '/api/public/admin/retry-stamps'
-      path: '/api/public/admin/retry-stamps'
+      path: '/public/admin/retry-stamps'
       fullPath: '/api/public/admin/retry-stamps'
       preLoaderRoute: typeof ApiPublicAdminRetryStampsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiRoute
     }
   }
 }
+
+interface ApiRouteChildren {
+  ApiPublicImportStreamRoute: typeof ApiPublicImportStreamRoute
+  ApiPublicTxcHealthRoute: typeof ApiPublicTxcHealthRoute
+  ApiPublicTxcVerifyMessageRoute: typeof ApiPublicTxcVerifyMessageRoute
+  ApiPublicUploadRoute: typeof ApiPublicUploadRoute
+  ApiStreamCidRoute: typeof ApiStreamCidRoute
+  ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
+  ApiPublicHooksPaymentWatcherRoute: typeof ApiPublicHooksPaymentWatcherRoute
+}
+
+const ApiRouteChildren: ApiRouteChildren = {
+  ApiPublicImportStreamRoute: ApiPublicImportStreamRoute,
+  ApiPublicTxcHealthRoute: ApiPublicTxcHealthRoute,
+  ApiPublicTxcVerifyMessageRoute: ApiPublicTxcVerifyMessageRoute,
+  ApiPublicUploadRoute: ApiPublicUploadRoute,
+  ApiStreamCidRoute: ApiStreamCidRoute,
+  ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
+  ApiPublicHooksPaymentWatcherRoute: ApiPublicHooksPaymentWatcherRoute,
+}
+
+const ApiRouteWithChildren = ApiRoute._addFileChildren(ApiRouteChildren)
 
 interface VCidRouteChildren {
   VCidRestoreRoute: typeof VCidRestoreRoute
@@ -390,6 +425,7 @@ const VCidRouteWithChildren = VCidRoute._addFileChildren(VCidRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  ApiRoute: ApiRouteWithChildren,
   BrandRoute: BrandRoute,
   ManageRoute: ManageRoute,
   PrivacyRoute: PrivacyRoute,
@@ -397,13 +433,6 @@ const rootRouteChildren: RootRouteChildren = {
   EmbedCidRoute: EmbedCidRoute,
   UWalletRoute: UWalletRoute,
   VCidRoute: VCidRouteWithChildren,
-  ApiPublicImportStreamRoute: ApiPublicImportStreamRoute,
-  ApiPublicTxcHealthRoute: ApiPublicTxcHealthRoute,
-  ApiPublicTxcVerifyMessageRoute: ApiPublicTxcVerifyMessageRoute,
-  ApiPublicUploadRoute: ApiPublicUploadRoute,
-  ApiStreamCidRoute: ApiStreamCidRoute,
-  ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
-  ApiPublicHooksPaymentWatcherRoute: ApiPublicHooksPaymentWatcherRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
