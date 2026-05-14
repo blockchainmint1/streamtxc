@@ -27,6 +27,7 @@ export interface ImportTokenPayload {
   filename: string;
   sizeBytes: number | null;
   sourceUrl: string;
+  fetchHeaders?: Record<string, string>;
   exp: number;
 }
 
