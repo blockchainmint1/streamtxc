@@ -6,7 +6,12 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { Button } from "@/components/ui/button";
-import { getVideo, pollTxStatus, reportVideo } from "@/lib/videos.functions";
+import {
+  getVideo,
+  pollTxStatus,
+  reportVideo,
+  probeAvailability,
+} from "@/lib/videos.functions";
 import { formatBytes, formatTxc, formatDate } from "@/lib/fees";
 import { shortWalletId } from "@/lib/wallet";
 import {
@@ -31,7 +36,13 @@ import {
   Send,
   MessageCircle,
   Link as LinkIcon,
+  CloudOff,
+  RefreshCw,
+  Upload as UploadIcon,
 } from "lucide-react";
+import { useWallet } from "@/lib/wallet";
+import { gatewayUrl as ipfsGatewayUrl } from "@/lib/ipfs-gateway";
+import { pinByCid as _unused } from "@/lib/videos.functions";
 import { toast } from "sonner";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
