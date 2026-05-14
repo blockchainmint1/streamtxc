@@ -149,12 +149,11 @@ export function UrlImportTab({ ownerWallet, onDuplicate, mode = "url" }: Props) 
     Dropbox.choose({
       success: (files: Array<{ link: string; name: string; bytes: number }>) => {
         if (!files?.[0]) return;
-        setUrl(files[0].link);
-        // Auto-resolve immediately so the user only clicks once.
-        setTimeout(() => {
-          const btn = document.getElementById("import-resolve-btn");
-          (btn as HTMLButtonElement | null)?.click();
-        }, 0);
+        const link = files[0].link;
+        setUrl(link);
+        // Resolve directly with the link — don't rely on state, the click
+        // handler would read a stale (empty) `url` from closure.
+        void handleResolve(link);
       },
       cancel: () => {},
       linkType: "direct",
@@ -163,12 +162,14 @@ export function UrlImportTab({ ownerWallet, onDuplicate, mode = "url" }: Props) 
     });
   }
 
-  async function handleResolve() {
+  async function handleResolve(overrideUrl?: string) {
+    const target = (overrideUrl ?? url).trim();
+    if (!target) return;
     setError(null);
     setStage("resolving");
     setResolved(null);
     try {
-      const r = await resolve({ data: { url: url.trim() } });
+      const r = await resolve({ data: { url: target } });
       setResolved(r);
       // Default title from the filename, minus extension.
       if (!title) setTitle(r.filename.replace(/\.[^.]+$/, ""));
@@ -323,7 +324,7 @@ export function UrlImportTab({ ownerWallet, onDuplicate, mode = "url" }: Props) 
             id="import-resolve-btn"
             type="button"
             variant="outline"
-            onClick={handleResolve}
+            onClick={() => handleResolve()}
             disabled={!url.trim() || stage === "resolving" || stage === "streaming"}
             className="font-mono shrink-0"
           >
@@ -368,15 +369,6 @@ export function UrlImportTab({ ownerWallet, onDuplicate, mode = "url" }: Props) 
             </span>
           )}
           </div>
-          {/* hidden trigger reused by the Chooser callback to auto-resolve */}
-          <button
-            id="import-resolve-btn"
-            type="button"
-            onClick={handleResolve}
-            className="hidden"
-            tabIndex={-1}
-            aria-hidden
-          />
           <p className="font-mono text-[11px] text-muted-foreground">
             Opens Dropbox's native file picker — sign in with your Dropbox
             account, choose a video, and we'll stream it straight to IPFS.
