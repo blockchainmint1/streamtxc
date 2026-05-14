@@ -17,9 +17,30 @@ export function Footer() {
           ecosystem
         </div>
         <div className="flex gap-4">
-          <span>pinned via pinata</span>
-          <span>powered by IPFS</span>
-          <span>secured by TXC</span>
+          <a
+            href="https://pinata.cloud"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-foreground transition-colors"
+          >
+            pinned via pinata
+          </a>
+          <a
+            href="https://ipfs.io"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-foreground transition-colors"
+          >
+            powered by IPFS
+          </a>
+          <a
+            href="https://texitcoin.org"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-foreground transition-colors"
+          >
+            secured by TXC
+          </a>
           <Link to="/privacy" className="hover:text-foreground transition-colors">privacy</Link>
         </div>
       </div>
