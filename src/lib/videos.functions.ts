@@ -17,7 +17,7 @@ import { recordChainEvent, recordMetadataAnchor } from "./chain-events.server";
 import { recordOwnershipAnchor, recordSplitPayout } from "./chain-events.server";
 import { verifyMessage, sendToAddress, getPlatformAddress } from "./txc.server";
 import { retryStuckStampForVideo } from "./stamp-retry.server";
-import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES } from "./fees";
+import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES, PAYMENT_GRACE_HOURS } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
 
 // Accepts either an EVM-style 0x… (legacy mock-wallet rows) or a real TXC
@@ -165,8 +165,9 @@ export const registerUpload = createServerFn({ method: "POST" })
       thumbnailCid: data.thumbnailCid ?? null,
     });
 
-    const expires = new Date();
-    expires.setMonth(expires.getMonth() + data.months);
+    // New uploads get a 7-day free grace window. Payment extends from created_at
+    // by `monthsCredited * 30 days` (handled by the payment watcher).
+    const expires = new Date(Date.now() + PAYMENT_GRACE_HOURS * 3_600_000);
 
     const { error: vErr } = await supabaseAdmin.from("videos").insert({
       cid: data.cid,
@@ -273,9 +274,8 @@ export const finalizeUpload = createServerFn({ method: "POST" })
       thumbnailCid: data.thumbnailCid ?? null,
     });
 
-    // 3. Persist
-    const expires = new Date();
-    expires.setMonth(expires.getMonth() + data.months);
+    // 3. Persist — 7-day free grace; payment extends from created_at.
+    const expires = new Date(Date.now() + PAYMENT_GRACE_HOURS * 3_600_000);
 
     const { error: vErr } = await supabaseAdmin
       .from("videos")
@@ -470,8 +470,8 @@ export const addByCid = createServerFn({ method: "POST" })
       thumbnailCid: data.thumbnailCid ?? null,
     });
 
-    const expires = new Date();
-    expires.setMonth(expires.getMonth() + data.months);
+    // 7-day free grace; payment extends from created_at.
+    const expires = new Date(Date.now() + PAYMENT_GRACE_HOURS * 3_600_000);
 
     const { error: vErr } = await supabaseAdmin.from("videos").insert({
       cid: data.cid,
