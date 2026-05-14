@@ -806,6 +806,13 @@ function UploadPage() {
               </Button>
             </form>
           </TabsContent>
+
+          <TabsContent value="import">
+            <UrlImportTab
+              ownerWallet={address ?? null}
+              onDuplicate={(info) => setDuplicate(info)}
+            />
+          </TabsContent>
         </Tabs>
       </main>
       <Footer />
