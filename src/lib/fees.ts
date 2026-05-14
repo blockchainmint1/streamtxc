@@ -12,6 +12,14 @@ export const VIEW_DEBOUNCE_SECONDS = 30;
 export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 export const PAYMENT_GRACE_HOURS = 24 * 7; // unpaid videos are unpinned after this (1 week free)
 
+/**
+ * Dust threshold for incoming TXC. Platform-originated stamp outputs
+ * (claim, renewal, takedown OP_RETURN dust) land at the video wallet
+ * for ~0.0002–0.0003 TXC each. Anything below this is NOT a real user
+ * payment — minimum hosting fee is 0.01 TXC and minimum comment is 0.01.
+ */
+export const PAYMENT_DUST_TXC = 0.001;
+
 /** Quote in USD — pure, no network. */
 export function quoteUsd(sizeBytes: number, months = 1): number {
   const sizeMB = sizeBytes / (1024 * 1024);

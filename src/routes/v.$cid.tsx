@@ -13,7 +13,13 @@ import {
   probeAvailability,
   restoreOneFromIpfs,
 } from "@/lib/videos.functions";
-import { formatBytes, formatTxc, formatDate, PAYMENT_GRACE_HOURS } from "@/lib/fees";
+import {
+  formatBytes,
+  formatTxc,
+  formatDate,
+  PAYMENT_GRACE_HOURS,
+  PAYMENT_DUST_TXC,
+} from "@/lib/fees";
 import { shortWalletId } from "@/lib/wallet";
 import {
   Copy,
@@ -648,9 +654,11 @@ function PaymentPanel({
   monthsPrepaid: number;
   onCopy: (s: string) => void;
 }) {
-  const paid = paidAt != null || received >= required;
-  const partial = !paid && received > 0;
-  const remaining = Math.max(0, +(required - received).toFixed(8));
+  // Filter out platform stamp dust so it doesn't masquerade as a partial user payment.
+  const effectiveReceived = received >= PAYMENT_DUST_TXC ? received : 0;
+  const paid = paidAt != null || effectiveReceived >= required;
+  const partial = !paid && effectiveReceived > 0;
+  const remaining = Math.max(0, +(required - effectiveReceived).toFixed(8));
   const ageHrs = (Date.now() - new Date(createdAt).getTime()) / 3_600_000;
   const graceLeft = Math.max(0, PAYMENT_GRACE_HOURS - ageHrs);
   const [showQr, setShowQr] = useState(false);
@@ -667,7 +675,7 @@ function PaymentPanel({
         <>
           <div className="flex items-center gap-1.5 text-xs text-primary font-mono">
             <CheckCircle2 className="h-3.5 w-3.5" />
-            paid · {formatTxc(received)}
+            paid · {formatTxc(effectiveReceived)}
           </div>
           <div className="font-mono text-[11px] text-muted-foreground">
             stays live until{" "}
@@ -725,7 +733,7 @@ function PaymentPanel({
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
                 received
               </div>
-              <div>{formatTxc(received)}</div>
+              <div>{formatTxc(effectiveReceived)}</div>
             </div>
           </div>
           {partial && (
