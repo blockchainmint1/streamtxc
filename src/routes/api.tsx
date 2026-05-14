@@ -2,7 +2,21 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import { Copy, Check, ExternalLink, Terminal, Zap, ShieldCheck, Film, Code2, Hash } from "lucide-react";
+import {
+  Copy,
+  Check,
+  ExternalLink,
+  Terminal,
+  Zap,
+  ShieldCheck,
+  Film,
+  Code2,
+  Hash,
+  KeyRound,
+  Anchor,
+  Fingerprint,
+  BookOpen,
+} from "lucide-react";
 
 export const Route = createFileRoute("/api")({
   head: () => ({
