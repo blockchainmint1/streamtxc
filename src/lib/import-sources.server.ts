@@ -226,6 +226,139 @@ async function resolveDropbox(url: URL): Promise<ResolvedImport> {
 
 // --- helpers -------------------------------------------------------------
 
+// --- Google Drive --------------------------------------------------------
+//
+// Public share URLs come in a few flavors:
+//   https://drive.google.com/file/d/<FILE_ID>/view?usp=sharing
+//   https://drive.google.com/open?id=<FILE_ID>
+//   https://drive.google.com/uc?id=<FILE_ID>&export=download
+//
+// To stream the bytes we hit:
+//   https://drive.google.com/uc?export=download&id=<FILE_ID>&confirm=t
+//
+// For files >100 MB Google interstitials a "can't scan for viruses" page
+// and stashes a `confirm` token in either the redirect URL or a cookie.
+// We follow that: parse the HTML for a confirm form action / token and
+// re-fetch with it. The file MUST be shared as "Anyone with the link" —
+// otherwise we'll get an HTML login page instead of the file.
+
+async function resolveGoogleDrive(url: URL): Promise<ResolvedImport> {
+  const fileId = extractDriveFileId(url);
+  if (!fileId) {
+    throw new Error(
+      "Couldn't find a Drive file ID in that URL. Use a /file/d/<id>/view link.",
+    );
+  }
+
+  const initialUrl = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}&confirm=t`;
+
+  // First HEAD attempt — if the file is small, Google serves it directly
+  // and we get Content-Length + Content-Disposition right away.
+  let attempt = await fetch(initialUrl, {
+    method: "GET",
+    redirect: "follow",
+    headers: { "User-Agent": UA },
+  });
+
+  // Big-file path: Google returns an HTML interstitial. Detect by
+  // content-type and parse out the confirm form.
+  const ct = (attempt.headers.get("content-type") || "").toLowerCase();
+  let cookieHeader = collectSetCookies(attempt.headers);
+
+  if (ct.startsWith("text/html")) {
+    const html = await attempt.text();
+    const formAction = html.match(/action="(https:\/\/[^"]+download[^"]*)"/i)?.[1];
+    const confirm = html.match(/name="confirm"\s+value="([^"]+)"/i)?.[1];
+    const uuid = html.match(/name="uuid"\s+value="([^"]+)"/i)?.[1];
+
+    if (!formAction) {
+      // Most common cause: file isn't publicly shared.
+      throw new Error(
+        "Google Drive returned a login page. Make sure the file is shared as \"Anyone with the link\" — Viewer access.",
+      );
+    }
+    const confirmUrl = new URL(formAction.replace(/&amp;/g, "&"));
+    if (confirm) confirmUrl.searchParams.set("confirm", confirm);
+    if (uuid) confirmUrl.searchParams.set("uuid", uuid);
+
+    attempt = await fetch(confirmUrl.toString(), {
+      method: "GET",
+      redirect: "follow",
+      headers: {
+        "User-Agent": UA,
+        ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+      },
+    });
+    cookieHeader = mergeCookies(cookieHeader, collectSetCookies(attempt.headers));
+  }
+
+  if (!attempt.ok) {
+    throw new Error(
+      `Google Drive returned ${attempt.status}. The file may be private or quota-limited for the day.`,
+    );
+  }
+  if ((attempt.headers.get("content-type") || "").toLowerCase().startsWith("text/html")) {
+    // Still HTML after confirm — likely auth-walled or quota-exceeded.
+    throw new Error(
+      "Google Drive didn't serve the file (got HTML). Confirm the link is set to \"Anyone with the link\" and try again later if today's quota is exhausted.",
+    );
+  }
+
+  const sizeBytes = parseSize(attempt.headers.get("content-length"));
+  const filename =
+    parseFilenameFromContentDisposition(attempt.headers.get("content-disposition")) ||
+    `gdrive-${fileId}.bin`;
+
+  // We need to release the body — we'll re-open a fresh fetch from the
+  // streaming endpoint. Cancel the reader so we don't leak.
+  try {
+    await attempt.body?.cancel();
+  } catch {
+    /* noop */
+  }
+
+  return {
+    source: "google-drive",
+    directUrl: attempt.url,
+    filename,
+    sizeBytes,
+    fetchHeaders: cookieHeader ? { Cookie: cookieHeader, "User-Agent": UA } : { "User-Agent": UA },
+  };
+}
+
+function extractDriveFileId(url: URL): string | null {
+  // /file/d/<id>/...
+  const m = url.pathname.match(/\/file\/d\/([^/]+)/);
+  if (m) return m[1];
+  // ?id=<id>
+  const id = url.searchParams.get("id");
+  if (id) return id;
+  // /uc?id=<id>
+  const uc = url.pathname.match(/\/uc\b.*$/);
+  if (uc) {
+    const qid = url.searchParams.get("id");
+    if (qid) return qid;
+  }
+  return null;
+}
+
+function collectSetCookies(h: Headers): string {
+  const sc = h.get("set-cookie") ?? "";
+  return sc
+    .split(/,(?=[^ ;]+=)/)
+    .map((c) => c.split(";")[0].trim())
+    .filter(Boolean)
+    .join("; ");
+}
+
+function mergeCookies(a: string, b: string): string {
+  if (!a) return b;
+  if (!b) return a;
+  return `${a}; ${b}`;
+}
+
+// --- generic helpers -----------------------------------------------------
+
 function parseSize(value: string | null): number | null {
   if (!value) return null;
   const n = Number(value);
