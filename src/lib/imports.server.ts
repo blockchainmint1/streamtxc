@@ -171,7 +171,9 @@ export async function pinStreamToIPFS(args: {
     },
   });
 
-  const res = await fetch(`${PINATA_UPLOADS}/files`, {
+  // Cloudflare Workers / undici require `duplex: "half"` for streamed
+  // request bodies; lib.dom's RequestInit doesn't type it yet.
+  const init = {
     method: "POST",
     headers: {
       Authorization: `Bearer ${jwt}`,
@@ -179,10 +181,9 @@ export async function pinStreamToIPFS(args: {
       "Content-Length": String(totalLength),
     },
     body: stitched,
-    // Cloudflare Workers fetch needs this for streaming request bodies.
     duplex: "half",
-    // @ts-expect-error — `duplex` isn't in lib.dom but is required at runtime.
-  });
+  } as RequestInit;
+  const res = await fetch(`${PINATA_UPLOADS}/files`, init);
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
