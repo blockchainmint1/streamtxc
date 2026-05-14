@@ -27,7 +27,10 @@ const optionalWalletSchema = z
   .optional()
   .transform((v) => (v && v.length > 0 ? v : undefined))
   .refine(
-    (v) => v === undefined || /^0x[a-fA-F0-9]{40}$/.test(v),
+    (v) =>
+      v === undefined ||
+      /^0x[a-fA-F0-9]{40}$/.test(v) ||
+      /^[a-zA-Z0-9]{20,90}$/.test(v),
     "Invalid wallet address",
   );
 
