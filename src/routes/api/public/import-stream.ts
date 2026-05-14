@@ -21,7 +21,6 @@ import {
   markImportDone,
   markImportFailed,
   pinStreamToIPFS,
-  wrapWithProgress,
   IMPORT_MAX_BYTES,
 } from "@/lib/imports.server";
 import { waitUntil } from "@/lib/cf-context.server";
@@ -94,15 +93,14 @@ export const Route = createFileRoute("/api/public/import-stream")({
               );
             }
 
-            const tracked = wrapWithProgress(upstream.body, (n) => {
-              void markImportProgress(importId, n);
-            });
-
             const pinned = await pinStreamToIPFS({
-              body: tracked,
+              body: upstream.body,
               filename: payload.filename,
               sizeBytes,
               mime: upstream.headers.get("content-type") ?? undefined,
+              onProgress: (n) => {
+                void markImportProgress(importId, n);
+              },
             });
 
             await markImportDone(importId, pinned.cid, pinned.size);
