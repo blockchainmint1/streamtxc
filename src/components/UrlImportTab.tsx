@@ -230,20 +230,6 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
     }
   }
 
-  function startPolling(id: string) {
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(async () => {
-      try {
-        const row = await status({ data: { id } });
-        if (typeof row.bytes_uploaded === "number") {
-          setBytesUploaded(Number(row.bytes_uploaded));
-        }
-      } catch {
-        // poll errors are non-fatal — the stream itself is the source of truth.
-      }
-    }, 1000);
-  }
-
   const pct = (() => {
     if (!resolved?.sizeBytes || !bytesUploaded) return 0;
     return Math.min(100, (bytesUploaded / resolved.sizeBytes) * 100);
