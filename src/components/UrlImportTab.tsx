@@ -437,12 +437,15 @@ export function UrlImportTab({ ownerWallet, onDuplicate }: Props) {
               </div>
               <ul className="text-sm text-muted-foreground space-y-0.5">
                 <li>
-                  <Link2 className="inline h-3 w-3 mr-1" /> WeTransfer
-                  share links (single-file)
+                  <Link2 className="inline h-3 w-3 mr-1" /> Dropbox share links
                 </li>
                 <li>
-                  <Link2 className="inline h-3 w-3 mr-1" /> Dropbox
-                  share links (any file)
+                  <Link2 className="inline h-3 w-3 mr-1" /> Google Drive
+                  ("Anyone with the link")
+                </li>
+                <li>
+                  <Link2 className="inline h-3 w-3 mr-1" /> WeTransfer
+                  share links (single-file, flaky)
                 </li>
               </ul>
             </div>
