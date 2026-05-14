@@ -327,8 +327,13 @@ function ManagePageInner() {
                             <div className="h-10 w-16 rounded-sm border border-dashed border-border bg-secondary shrink-0" />
                           )}
                           <div className="min-w-0">
-                            <div className="font-bold truncate max-w-xs">
-                              {v.title}
+                            <div className="font-bold truncate max-w-xs flex items-center gap-2">
+                              <span className="truncate">{v.title}</span>
+                              {v.is_nsfw && (
+                                <span className="shrink-0 rounded-sm border border-destructive px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider text-destructive">
+                                  NSFW
+                                </span>
+                              )}
                             </div>
                             <div className="font-mono text-[10px] text-muted-foreground truncate max-w-xs">
                               {v.cid}
