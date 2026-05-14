@@ -19,6 +19,7 @@ import {
 } from "@/lib/videos.functions";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   Upload,
@@ -145,6 +146,8 @@ function UploadPage() {
   const [cidTitle, setCidTitle] = useState("");
   const [cidDescription, setCidDescription] = useState("");
   const [cidThumbnailCid, setCidThumbnailCid] = useState<string | null>(null);
+  const [nsfw, setNsfw] = useState(false);
+  const [cidNsfw, setCidNsfw] = useState(false);
   const [cidStage, setCidStage] = useState<
     "idle" | "fetching" | "registering"
   >("idle");
@@ -273,6 +276,7 @@ function UploadPage() {
             description,
             months,
             thumbnailCid: thumbnailCid ?? undefined,
+            nsfw,
           },
         });
         if (result.chainStatus === "stamp_failed") {
@@ -305,6 +309,7 @@ function UploadPage() {
           mimeType: file.type || "video/mp4",
           months,
           thumbnailCid: thumbnailCid ?? undefined,
+          nsfw,
         },
       });
 
@@ -345,6 +350,7 @@ function UploadPage() {
           description: cidDescription,
           months,
           thumbnailCid: cidThumbnailCid ?? undefined,
+          nsfw: cidNsfw,
         },
       });
       if (result.chainStatus === "stamp_failed") {
@@ -624,6 +630,25 @@ function UploadPage() {
               <ThumbnailPicker file={file} onChange={setThumbnailCid} />
             )}
 
+            <label className="flex items-start gap-3 border border-border bg-card rounded-sm p-4 cursor-pointer hover:border-primary/60 transition-colors">
+              <Checkbox
+                checked={nsfw}
+                onCheckedChange={(v) => setNsfw(v === true)}
+                className="mt-0.5"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="font-mono text-xs text-foreground">
+                  [ NSFW / ADULT CONTENT ]
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Mark this if your video contains nudity, sexual content, or
+                  other adult material. NSFW videos are hidden from the
+                  homepage and public listings — only people with the direct
+                  link (or your <span className="font-mono text-foreground">/u/</span> page) can find them.
+                </p>
+              </div>
+            </label>
+
             {file && !tooBig && (
               <div className="border border-border bg-card rounded-sm p-4 space-y-3 font-mono text-sm">
                 <div className="flex justify-between items-start gap-4">
@@ -776,6 +801,23 @@ function UploadPage() {
                   rows={3}
                 />
               </div>
+
+              <label className="flex items-start gap-3 border border-border bg-card rounded-sm p-4 cursor-pointer hover:border-primary/60 transition-colors">
+                <Checkbox
+                  checked={cidNsfw}
+                  onCheckedChange={(v) => setCidNsfw(v === true)}
+                  className="mt-0.5"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="font-mono text-xs text-foreground">
+                    [ NSFW / ADULT CONTENT ]
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                    Hide this video from the homepage and public listings.
+                    Direct links still work.
+                  </p>
+                </div>
+              </label>
 
               {/^(bafy|bafk|bafyb|Qm)/i.test(cidInput.trim()) &&
                 cidInput.trim().length >= 46 && (

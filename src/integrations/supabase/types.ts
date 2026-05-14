@@ -376,6 +376,7 @@ export type Database = {
           hidden_at: string | null
           hidden_reason: string | null
           hosting_credit_txc: number
+          is_nsfw: boolean
           metadata_cid: string | null
           mime_type: string | null
           months_prepaid: number
@@ -415,6 +416,7 @@ export type Database = {
           hidden_at?: string | null
           hidden_reason?: string | null
           hosting_credit_txc?: number
+          is_nsfw?: boolean
           metadata_cid?: string | null
           mime_type?: string | null
           months_prepaid?: number
@@ -454,6 +456,7 @@ export type Database = {
           hidden_at?: string | null
           hidden_reason?: string | null
           hosting_credit_txc?: number
+          is_nsfw?: boolean
           metadata_cid?: string | null
           mime_type?: string | null
           months_prepaid?: number

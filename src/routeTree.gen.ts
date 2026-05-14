@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ManifestoRouteImport } from './routes/manifesto'
 import { Route as ManageRouteImport } from './routes/manage'
 import { Route as BrandRouteImport } from './routes/brand'
 import { Route as ApiRouteImport } from './routes/api'
@@ -42,6 +43,11 @@ const TermsRoute = TermsRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ManifestoRoute = ManifestoRouteImport.update({
+  id: '/manifesto',
+  path: '/manifesto',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ManageRoute = ManageRouteImport.update({
@@ -134,6 +140,7 @@ export interface FileRoutesByFullPath {
   '/api': typeof ApiRouteWithChildren
   '/brand': typeof BrandRoute
   '/manage': typeof ManageRoute
+  '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
@@ -155,6 +162,7 @@ export interface FileRoutesByTo {
   '/api': typeof ApiRouteWithChildren
   '/brand': typeof BrandRoute
   '/manage': typeof ManageRoute
+  '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
@@ -177,6 +185,7 @@ export interface FileRoutesById {
   '/api': typeof ApiRouteWithChildren
   '/brand': typeof BrandRoute
   '/manage': typeof ManageRoute
+  '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
@@ -200,6 +209,7 @@ export interface FileRouteTypes {
     | '/api'
     | '/brand'
     | '/manage'
+    | '/manifesto'
     | '/privacy'
     | '/terms'
     | '/upload'
@@ -221,6 +231,7 @@ export interface FileRouteTypes {
     | '/api'
     | '/brand'
     | '/manage'
+    | '/manifesto'
     | '/privacy'
     | '/terms'
     | '/upload'
@@ -242,6 +253,7 @@ export interface FileRouteTypes {
     | '/api'
     | '/brand'
     | '/manage'
+    | '/manifesto'
     | '/privacy'
     | '/terms'
     | '/upload'
@@ -264,6 +276,7 @@ export interface RootRouteChildren {
   ApiRoute: typeof ApiRouteWithChildren
   BrandRoute: typeof BrandRoute
   ManageRoute: typeof ManageRoute
+  ManifestoRoute: typeof ManifestoRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
   UploadRoute: typeof UploadRoute
@@ -293,6 +306,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/manifesto': {
+      id: '/manifesto'
+      path: '/manifesto'
+      fullPath: '/manifesto'
+      preLoaderRoute: typeof ManifestoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/manage': {
@@ -448,6 +468,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiRoute: ApiRouteWithChildren,
   BrandRoute: BrandRoute,
   ManageRoute: ManageRoute,
+  ManifestoRoute: ManifestoRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
   UploadRoute: UploadRoute,
