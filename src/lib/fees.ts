@@ -10,7 +10,7 @@ export const VIEW_DEBOUNCE_SECONDS = 30;
 // allowlist off the critical path. Larger files? Pin to IPFS first
 // (e.g. pinata.cloud) and use the "Add by CID" flow.
 export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
-export const PAYMENT_GRACE_HOURS = 24; // unpaid videos are unpinned after this
+export const PAYMENT_GRACE_HOURS = 24 * 7; // unpaid videos are unpinned after this (1 week free)
 
 /** Quote in USD — pure, no network. */
 export function quoteUsd(sizeBytes: number, months = 1): number {
