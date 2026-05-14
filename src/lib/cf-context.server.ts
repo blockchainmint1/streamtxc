@@ -21,21 +21,20 @@ export function runWithCfCtx<T>(ctx: unknown, fn: () => Promise<T> | T): Promise
 }
 
 /**
- * Hand a promise to Cloudflare's waitUntil if available; otherwise fall back
- * to a detached promise (which will be cancelled when the response finishes
- * on Workers but works fine in dev/Node).
+ * Hand a promise to Cloudflare's waitUntil if available.
+ * Returns true when the runtime accepted the background task; false when the
+ * caller must keep the request open and await the work inline.
  */
-export function waitUntil(p: Promise<unknown>): void {
+export function waitUntil(p: Promise<unknown>): boolean {
   const store = als.getStore();
   const w = store?.ctx?.waitUntil;
   if (typeof w === "function") {
     try {
       w(p);
-      return;
+      return true;
     } catch {
       /* fall through */
     }
   }
-  // best-effort fallback
-  void p.catch(() => undefined);
+  return false;
 }
