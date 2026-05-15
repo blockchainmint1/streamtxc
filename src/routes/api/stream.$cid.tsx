@@ -26,10 +26,17 @@ export const Route = createFileRoute("/api/stream/$cid")({
           "unknown";
         const ipHash = await hashIp(ip);
 
-        // Fire-and-forget view tracking (debounced server-side).
-        recordView(cid, ipHash).catch((e) =>
-          console.error("view tracking failed", e),
-        );
+        // Track the view BEFORE returning. On Cloudflare Workers, any
+        // promise that isn't awaited (or wrapped in ctx.waitUntil) gets
+        // killed the moment the Response is sent — which means a naive
+        // fire-and-forget recordView() silently drops most views. The
+        // debounce + insert + counter update is two quick round-trips, so
+        // awaiting it adds only a few ms to the redirect.
+        try {
+          await recordView(cid, ipHash);
+        } catch (e) {
+          console.error("view tracking failed", e);
+        }
 
         // Redirect the browser straight to our dedicated Pinata gateway.
         // Streaming through the Worker added a hop and CPU/subrequest cost;
