@@ -79,6 +79,59 @@ import { Comments } from "@/components/Comments";
 import { ipfsThumbUrl } from "@/lib/ipfs-gateway";
 
 export const Route = createFileRoute("/v/$cid")({
+  loader: async ({ params }) => {
+    // Fetch the video server-side so social-media scrapers (Telegram,
+    // Twitter, Facebook, Discord, iMessage) get a per-video og:image and
+    // title in the SSR'd HTML — they don't run client JS, so a useQuery
+    // alone can't populate share previews.
+    try {
+      const video = await getVideo({ data: { cid: params.cid } });
+      return { video };
+    } catch {
+      return { video: null };
+    }
+  },
+  head: ({ loaderData, params }) => {
+    const video = loaderData?.video;
+    const SITE = "https://streamtxc.com";
+    if (!video) {
+      return { meta: [{ title: "Video not found · streamTXC" }] };
+    }
+    const title = `${video.title} · streamTXC`;
+    const description =
+      (video.description?.trim() ||
+        "TEXITcoin-stamped video on streamTXC — proof of ownership on IPFS.").slice(0, 280);
+    const pageUrl = `${SITE}/v/${params.cid}`;
+    const image = video.thumbnail_cid
+      ? `${SITE}/api/stream/${video.thumbnail_cid}`
+      : null;
+    const meta: Array<Record<string, string>> = [
+      { title },
+      { name: "description", content: description },
+      { property: "og:title", content: title },
+      { property: "og:description", content: description },
+      { property: "og:type", content: "video.other" },
+      { property: "og:url", content: pageUrl },
+      { name: "twitter:card", content: image ? "summary_large_image" : "summary" },
+      { name: "twitter:title", content: title },
+      { name: "twitter:description", content: description },
+    ];
+    if (image) {
+      meta.push(
+        { property: "og:image", content: image },
+        { property: "og:image:alt", content: video.title },
+        { name: "twitter:image", content: image },
+        { property: "og:video", content: `${SITE}/api/stream/${params.cid}` },
+        { property: "og:video:url", content: `${SITE}/api/stream/${params.cid}` },
+        { property: "og:video:secure_url", content: `${SITE}/api/stream/${params.cid}` },
+        { property: "og:video:type", content: "video/mp4" },
+      );
+    }
+    return {
+      meta,
+      links: [{ rel: "canonical", href: pageUrl }],
+    };
+  },
   component: WatchPage,
 });
 
