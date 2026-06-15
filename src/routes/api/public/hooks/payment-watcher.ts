@@ -152,7 +152,15 @@ export const Route = createFileRoute("/api/public/hooks/payment-watcher")({
   },
 });
 
-async function handler() {
+async function handler({ request }: { request: Request }) {
+  // Guard with the same x-admin-token / TXC_RPC_PASS pattern used by
+  // /api/public/admin/retry-stamps. Stops anonymous callers from triggering
+  // expensive blockchain RPCs, payout splits, and unpins.
+  const expected = process.env.TXC_RPC_PASS;
+  const provided = request.headers.get("x-admin-token");
+  if (!expected || provided !== expected) {
+    return new Response("Unauthorized", { status: 401 });
+  }
   const videoResults = await processVideos();
   const commentResults = await processPendingComments();
   const boostResults = await processPendingBoosts();
