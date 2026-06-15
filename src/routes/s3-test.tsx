@@ -132,8 +132,27 @@ function S3Test() {
     setBusy(true);
     try {
       push(`POST /api/public/hooks/mediaconvert?dryRun=1`);
-      const r = await simulateHook({ data: { cid, jobId } });
+      const r = await simulateHook({ data: { cid, jobId, dryRun: true } });
       push(`webhook → ${r.status}`);
+      push(r.body.slice(0, 2000));
+    } catch (err) {
+      push(`💥 ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runFullWebhook() {
+    const cid = cidFromKey();
+    if (!cid || !jobId) return;
+    if (!confirm("This will fetch all HLS outputs from S3 and pin them to IPFS via Pinata. Continue?")) return;
+    setBusy(true);
+    try {
+      push(`POST /api/public/hooks/mediaconvert (REAL — pins to IPFS)`);
+      const t0 = performance.now();
+      const r = await simulateHook({ data: { cid, jobId, dryRun: false } });
+      const ms = Math.round(performance.now() - t0);
+      push(`webhook → ${r.status} in ${ms}ms`);
       push(r.body.slice(0, 2000));
     } catch (err) {
       push(`💥 ${err instanceof Error ? err.message : String(err)}`);
@@ -190,6 +209,13 @@ function S3Test() {
           className="bg-secondary text-secondary-foreground px-4 py-2 rounded disabled:opacity-50"
         >
           5. Simulate webhook (dry-run)
+        </button>
+        <button
+          onClick={runFullWebhook}
+          disabled={!jobId || busy}
+          className="bg-destructive text-destructive-foreground px-4 py-2 rounded disabled:opacity-50"
+        >
+          6. Full webhook (pin to IPFS)
         </button>
       </div>
 
