@@ -173,31 +173,92 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
     return d;
   })
   .handler(async ({ data }) => {
-    const secret = process.env.MEDIACONVERT_WEBHOOK_SECRET;
-    if (!secret) throw new Error("MEDIACONVERT_WEBHOOK_SECRET not set");
-    const { createHmac } = await import("crypto");
+    // Dry-run path: still exercise the real webhook (signature + parsing)
+    // via a self-fetch. Cheap enough — no pinning, no big payloads.
+    if (data.dryRun) {
+      const secret = process.env.MEDIACONVERT_WEBHOOK_SECRET;
+      if (!secret) throw new Error("MEDIACONVERT_WEBHOOK_SECRET not set");
+      const { createHmac } = await import("crypto");
+      const event = {
+        source: "aws.mediaconvert",
+        "detail-type": "MediaConvert Job State Change",
+        detail: {
+          jobId: data.jobId,
+          status: "COMPLETE",
+          userMetadata: { videoId: data.cid },
+        },
+      };
+      const body = JSON.stringify(event);
+      const sig = createHmac("sha256", secret).update(body).digest("hex");
+      const { getRequest } = await import("@tanstack/react-start/server");
+      const origin = new URL(getRequest().url).origin;
+      const url = `${origin}/api/public/hooks/mediaconvert?dryRun=1`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-webhook-signature": sig },
+        body,
+      });
+      return { status: res.status, body: await res.text(), url };
+    }
 
-    const event = {
-      source: "aws.mediaconvert",
-      "detail-type": "MediaConvert Job State Change",
-      detail: {
-        jobId: data.jobId,
-        status: "COMPLETE",
-        userMetadata: { videoId: data.cid },
-      },
-    };
-    const body = JSON.stringify(event);
-    const sig = createHmac("sha256", secret).update(body).digest("hex");
+    // Full path: run the pin-to-IPFS work directly in this server fn instead
+    // of self-fetching the webhook. Self-fetch doubles request time on
+    // Cloudflare and was timing out for ~40 MB transfers.
+    const e = transcodeEnv();
+    if (!e.outputBucket) throw new Error("AWS_S3_OUTPUT_BUCKET not set");
 
-    const { getRequest } = await import("@tanstack/react-start/server");
-    const origin = new URL(getRequest().url).origin;
-    const url = `${origin}/api/public/hooks/mediaconvert${data.dryRun ? "?dryRun=1" : ""}`;
+    const { listObjects, getObjectBlob } = await import("./aws-s3.server");
+    const { pinDirectoryToIPFS } = await import("./pinata.server");
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-webhook-signature": sig },
-      body,
+    const prefix = `hls/${data.cid}/`;
+    const t0 = Date.now();
+    const keys = await listObjects(e.outputBucket, prefix);
+    if (keys.length === 0) throw new Error(`No outputs at s3://${e.outputBucket}/${prefix}`);
+    const tList = Date.now() - t0;
+
+    // Parallelize the S3 GETs (bounded concurrency, not Promise.all-all to
+    // avoid blowing the Worker's subrequest budget all at once).
+    const t1 = Date.now();
+    const files = await mapWithConcurrency(keys, 8, async (key) => {
+      const blob = await getObjectBlob(e.outputBucket!, key);
+      return {
+        path: key.slice(prefix.length),
+        body: blob,
+        contentType: blob.type || undefined,
+      };
     });
-    const text = await res.text();
-    return { status: res.status, body: text, url };
+    const tFetch = Date.now() - t1;
+
+    const t2 = Date.now();
+    const pinned = await pinDirectoryToIPFS(files, `hls-${data.cid}`);
+    const tPin = Date.now() - t2;
+
+    return {
+      status: 200,
+      body: JSON.stringify({
+        pinnedCid: pinned.cid,
+        size: pinned.size,
+        keys: keys.length,
+        timings: { listMs: tList, fetchMs: tFetch, pinMs: tPin },
+      }),
+      url: `inline://${data.cid}`,
+    };
   });
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let i = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (true) {
+      const idx = i++;
+      if (idx >= items.length) return;
+      out[idx] = await fn(items[idx]);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
