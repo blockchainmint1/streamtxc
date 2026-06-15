@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Lambda (in VPC) that streams S3 -> IPFS, fronted by API Gateway w/ bearer auth
+
+Parameters:
+  VpcId:               { Type: AWS::EC2::VPC::Id }
+  PrivateSubnetId:     { Type: AWS::EC2::Subnet::Id }
+  IpfsSecurityGroupId: { Type: AWS::EC2::SecurityGroup::Id }
+  IpfsPrivateIp:       { Type: String }
+  S3BucketName:        { Type: String }
+  BearerToken:         { Type: String, NoEcho: true }
+
+Resources:
+  LambdaSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: IPFS pinner lambda
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  # allow this lambda -> ipfs node on 5001
+  IpfsIngressFromLambda:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref IpfsSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 5001
+      ToPort: 5001
+      SourceSecurityGroupId: !Ref LambdaSg
+
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: s3-read
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:ListBucket]
+                Resource:
+                  - !Sub arn:aws:s3:::${S3BucketName}
+                  - !Sub arn:aws:s3:::${S3BucketName}/*
+
+  PinnerFn:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: txc-ipfs-pinner
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt LambdaRole.Arn
+      Timeout: 900
+      MemorySize: 1024
+      Environment:
+        Variables:
+          IPFS_API: !Sub "http://${IpfsPrivateIp}:5001"
+          BEARER_TOKEN: !Ref BearerToken
+      VpcConfig:
+        SecurityGroupIds: [!Ref LambdaSg]
+        SubnetIds: [!Ref PrivateSubnetId]
+      Code:
+        ZipFile: |
+          exports.handler = async () => ({ statusCode: 200, body: "placeholder — run update-function-code with the real zip" });
+
+  Api:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: txc-ipfs-pinner
+      ProtocolType: HTTP
+  Integration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref Api
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt PinnerFn.Arn
+      PayloadFormatVersion: "2.0"
+  Route:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref Api
+      RouteKey: "POST /pin"
+      Target: !Sub "integrations/${Integration}"
+  Stage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref Api
+      StageName: prod
+      AutoDeploy: true
+  Permission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PinnerFn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*"
+
+Outputs:
+  ApiUrl:        { Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/prod" }
+  LambdaName:    { Value: !Ref PinnerFn }
+  LambdaSgId:    { Value: !Ref LambdaSg }
