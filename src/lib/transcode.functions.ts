@@ -71,7 +71,7 @@ export const startTranscode = createServerFn({ method: "POST" })
 
     const { data: video, error: vErr } = await supabaseAdmin
       .from("videos")
-      .select("id, cid")
+      .select("cid")
       .eq("cid", data.cid)
       .maybeSingle();
     if (vErr) throw vErr;
@@ -80,7 +80,7 @@ export const startTranscode = createServerFn({ method: "POST" })
     const { jobId } = await startHlsTranscode({
       inputUri: `s3://${e.inputBucket}/inputs/${data.cid}`,
       outputPrefix: `s3://${e.outputBucket}/hls/${data.cid}/`,
-      videoId: String(video.id),
+      videoId: data.cid,
     });
 
     await supabaseAdmin
@@ -91,7 +91,7 @@ export const startTranscode = createServerFn({ method: "POST" })
         transcode_started_at: new Date().toISOString(),
         transcode_error: null,
       })
-      .eq("id", video.id);
+      .eq("cid", data.cid);
 
     return { jobId };
   });
