@@ -32,10 +32,15 @@ import {
   Cloud,
 } from "lucide-react";
 import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
-import { computeCids } from "@/lib/cid-client";
+import { computeCids } from "@/lib/ipfs-cid";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 import { recordAnonUpload } from "@/lib/anon-uploads";
 import { UrlImportTab } from "@/components/UrlImportTab";
+import {
+  getTranscodeUploadUrl,
+  startTranscode,
+  isTranscodeConfigured,
+} from "@/lib/transcode.functions";
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
@@ -125,6 +130,9 @@ function UploadPage() {
   const addCid = useServerFn(addByCid);
   const quoteFn = useServerFn(getQuote);
   const lookupCid = useServerFn(lookupPinnedCid);
+  const getS3Url = useServerFn(getTranscodeUploadUrl);
+  const startTx = useServerFn(startTranscode);
+  const checkTxConfig = useServerFn(isTranscodeConfigured);
 
   // No auto-connect: anonymous uploads are allowed. Users can paste a TXC
   // address (and optionally a signature) to claim ownership.
@@ -168,10 +176,6 @@ function UploadPage() {
   function acceptFile(f: File) {
     setFile(f);
     setCodecWarning(checkCodec(f));
-    setLocalCids(null);
-    setMatchedCid(null);
-    setCidProbe("checking");
-    setQuote(null);
     if (!title) setTitle(f.name.replace(/\.[^.]+$/, ""));
     setThumbnailCid(null);
   }
@@ -193,9 +197,13 @@ function UploadPage() {
     (async () => {
       try {
         setCidProbe("checking");
-        const cids = await computeCids(file);
+        const [cids, q] = await Promise.all([
+          computeCids(file),
+          quoteFn({ data: { sizeBytes: file.size, months: 1 } }),
+        ]);
         if (cancelled) return;
         setLocalCids(cids);
+        setQuote({ txcAmount: q.txcAmount, usdAmount: q.usdAmount, txcUsd: q.txcUsd });
         const hit = await lookupCid({
           data: { cidV1: cids.v1, cidV0: cids.v0 },
         });
@@ -204,15 +212,6 @@ function UploadPage() {
         setCidProbe(hit ? "on-ipfs" : "off-ipfs");
       } catch (err) {
         if (!cancelled) setCidProbe("off-ipfs");
-      }
-    })();
-    (async () => {
-      try {
-        const q = await quoteFn({ data: { sizeBytes: file.size, months: 1 } });
-        if (cancelled) return;
-        setQuote({ txcAmount: q.txcAmount, usdAmount: q.usdAmount, txcUsd: q.txcUsd });
-      } catch (err) {
-        console.warn("upload quote failed", err);
       }
     })();
     return () => {
@@ -266,22 +265,12 @@ function UploadPage() {
       //    background probe finished.
       setStage("hashing");
       setProgress(0);
-      let cids = localCids;
-      if (!cids) {
-        try {
-          cids = await computeCids(file);
-          setLocalCids(cids);
-        } catch (err) {
-          console.warn("CID pre-hash failed; continuing with upload", err);
-        }
-      }
-
+      const cids = localCids ?? (await computeCids(file));
       setStage("checking");
-      const hit = cids
-        ? matchedCid
+      const hit =
+        matchedCid
           ? { cid: matchedCid }
-          : await lookupCid({ data: { cidV1: cids.v1, cidV0: cids.v0 } })
-        : null;
+          : await lookupCid({ data: { cidV1: cids.v1, cidV0: cids.v0 } });
       if (hit) {
         toast("Found this file on IPFS — skipping upload", {
           description: "Registering existing CID instead.",
@@ -339,6 +328,31 @@ function UploadPage() {
       }
       if (!address) recordAnonUpload(result.cid, title);
       qc.invalidateQueries({ queryKey: ["recent-videos"] });
+
+      // Fire-and-forget: kick off the adaptive HLS transcode if AWS is wired
+      // up. We don't block navigation on this — playback falls back to the
+      // original MP4 until the webhook lands the HLS bundle.
+      try {
+        const { configured } = await checkTxConfig();
+        if (configured) {
+          const { url } = await getS3Url({
+            data: { cid: pinResult.cid, contentType: file.type || "video/mp4" },
+          });
+          const putRes = await fetch(url, {
+            method: "PUT",
+            headers: { "content-type": file.type || "video/mp4" },
+            body: file,
+          });
+          if (!putRes.ok) {
+            console.warn("S3 upload failed", putRes.status);
+          } else {
+            await startTx({ data: { cid: pinResult.cid } });
+          }
+        }
+      } catch (err) {
+        console.warn("transcode kickoff skipped:", err);
+      }
+
       navigate({ to: "/v/$cid", params: { cid: result.cid } });
     } catch (err) {
       console.error(err);

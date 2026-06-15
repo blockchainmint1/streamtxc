@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as UploadAwsRouteImport } from './routes/upload-aws'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as PrivacyRouteImport } from './routes/privacy'
@@ -28,17 +27,11 @@ import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
 import { Route as ApiPublicTxcVerifyMessageRouteImport } from './routes/api/public/txc-verify-message'
 import { Route as ApiPublicTxcHealthRouteImport } from './routes/api/public/txc-health'
 import { Route as ApiPublicImportStreamRouteImport } from './routes/api/public/import-stream'
-import { Route as ApiPublicCidRouteImport } from './routes/api/public/cid'
 import { Route as ApiStreamCidSplatRouteImport } from './routes/api/stream.$cid.$'
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
 import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
 
-const UploadAwsRoute = UploadAwsRouteImport.update({
-  id: '/upload-aws',
-  path: '/upload-aws',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
   path: '/upload',
@@ -130,11 +123,6 @@ const ApiPublicImportStreamRoute = ApiPublicImportStreamRouteImport.update({
   path: '/public/import-stream',
   getParentRoute: () => ApiRoute,
 } as any)
-const ApiPublicCidRoute = ApiPublicCidRouteImport.update({
-  id: '/public/cid',
-  path: '/public/cid',
-  getParentRoute: () => ApiRoute,
-} as any)
 const ApiStreamCidSplatRoute = ApiStreamCidSplatRouteImport.update({
   id: '/$',
   path: '/$',
@@ -169,11 +157,9 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
-  '/upload-aws': typeof UploadAwsRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
-  '/api/public/cid': typeof ApiPublicCidRoute
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
@@ -195,11 +181,9 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
-  '/upload-aws': typeof UploadAwsRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
-  '/api/public/cid': typeof ApiPublicCidRoute
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
@@ -222,11 +206,9 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
-  '/upload-aws': typeof UploadAwsRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
-  '/api/public/cid': typeof ApiPublicCidRoute
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
@@ -250,11 +232,9 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/upload'
-    | '/upload-aws'
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
-    | '/api/public/cid'
     | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
@@ -276,11 +256,9 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/upload'
-    | '/upload-aws'
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
-    | '/api/public/cid'
     | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
@@ -302,11 +280,9 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/upload'
-    | '/upload-aws'
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
-    | '/api/public/cid'
     | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
@@ -329,7 +305,6 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
   UploadRoute: typeof UploadRoute
-  UploadAwsRoute: typeof UploadAwsRoute
   EmbedCidRoute: typeof EmbedCidRoute
   UWalletRoute: typeof UWalletRoute
   VCidRoute: typeof VCidRouteWithChildren
@@ -337,13 +312,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/upload-aws': {
-      id: '/upload-aws'
-      path: '/upload-aws'
-      fullPath: '/upload-aws'
-      preLoaderRoute: typeof UploadAwsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/upload': {
       id: '/upload'
       path: '/upload'
@@ -470,13 +438,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicImportStreamRouteImport
       parentRoute: typeof ApiRoute
     }
-    '/api/public/cid': {
-      id: '/api/public/cid'
-      path: '/public/cid'
-      fullPath: '/api/public/cid'
-      preLoaderRoute: typeof ApiPublicCidRouteImport
-      parentRoute: typeof ApiRoute
-    }
     '/api/stream/$cid/$': {
       id: '/api/stream/$cid/$'
       path: '/$'
@@ -521,7 +482,6 @@ const ApiStreamCidRouteWithChildren = ApiStreamCidRoute._addFileChildren(
 )
 
 interface ApiRouteChildren {
-  ApiPublicCidRoute: typeof ApiPublicCidRoute
   ApiPublicImportStreamRoute: typeof ApiPublicImportStreamRoute
   ApiPublicTxcHealthRoute: typeof ApiPublicTxcHealthRoute
   ApiPublicTxcVerifyMessageRoute: typeof ApiPublicTxcVerifyMessageRoute
@@ -533,7 +493,6 @@ interface ApiRouteChildren {
 }
 
 const ApiRouteChildren: ApiRouteChildren = {
-  ApiPublicCidRoute: ApiPublicCidRoute,
   ApiPublicImportStreamRoute: ApiPublicImportStreamRoute,
   ApiPublicTxcHealthRoute: ApiPublicTxcHealthRoute,
   ApiPublicTxcVerifyMessageRoute: ApiPublicTxcVerifyMessageRoute,
@@ -566,7 +525,6 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
   UploadRoute: UploadRoute,
-  UploadAwsRoute: UploadAwsRoute,
   EmbedCidRoute: EmbedCidRoute,
   UWalletRoute: UWalletRoute,
   VCidRoute: VCidRouteWithChildren,
