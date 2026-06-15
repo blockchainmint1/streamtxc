@@ -12,6 +12,13 @@ import {
 } from "@/lib/transcode.functions";
 import { VideoPlayer } from "@/components/VideoPlayer";
 
+function fmtBytes(n: number): string {
+  if (n < 1024) return `${n.toFixed(0)} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
 export const Route = createFileRoute("/s3-test")({
   head: () => ({ meta: [{ title: "S3 PUT test" }] }),
   component: S3Test,
