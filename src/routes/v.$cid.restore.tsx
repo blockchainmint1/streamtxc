@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useWallet } from "@/lib/wallet";
 import { getVideo, reseedVideo } from "@/lib/videos.functions";
-import { computeCids } from "@/lib/ipfs-cid";
+import { computeCids } from "@/lib/cid-client";
 import { formatBytes, MAX_UPLOAD_BYTES } from "@/lib/fees";
 import { shortWalletId } from "@/lib/wallet";
 import {
