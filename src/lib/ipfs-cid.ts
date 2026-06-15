@@ -1,10 +1,3 @@
-import { Buffer } from "buffer";
-
-if (typeof globalThis !== "undefined") {
-  const globalWithBuffer = globalThis as typeof globalThis & { Buffer?: typeof Buffer };
-  globalWithBuffer.Buffer ??= Buffer;
-}
-
 // Browser-side CID computation. Mirrors Pinata's defaults:
 //   cidVersion: 1, rawLeaves: true, chunker: 256 KiB.
 // Lets us check "is this file already on IPFS?" before uploading the bytes.
@@ -15,12 +8,31 @@ if (typeof globalThis !== "undefined") {
 // client (or by `ipfs add` with default flags) will only resolve under v0.
 import Hash from "ipfs-only-hash";
 
+// `ipfs-only-hash` calls `Buffer.from` internally. Node/SSR has Buffer
+// globally; in the browser we lazy-load the `buffer` polyfill and install
+// it on globalThis the first time we need to hash. Done inside a function
+// (not module scope) so the SSR bundler doesn't try to resolve the
+// browser polyfill at build time.
+let bufferPolyfillPromise: Promise<void> | null = null;
+async function ensureBuffer(): Promise<void> {
+  const g = globalThis as typeof globalThis & { Buffer?: unknown };
+  if (g.Buffer) return;
+  if (!bufferPolyfillPromise) {
+    bufferPolyfillPromise = import("buffer").then((mod) => {
+      g.Buffer = mod.Buffer;
+    });
+  }
+  await bufferPolyfillPromise;
+}
+
 export async function computeCidV1(file: File | Blob): Promise<string> {
+  await ensureBuffer();
   const buf = new Uint8Array(await file.arrayBuffer());
   return Hash.of(buf, { cidVersion: 1, rawLeaves: true });
 }
 
 export async function computeCidV0(file: File | Blob): Promise<string> {
+  await ensureBuffer();
   const buf = new Uint8Array(await file.arrayBuffer());
   return Hash.of(buf, { cidVersion: 0, rawLeaves: false });
 }
@@ -29,6 +41,7 @@ export async function computeCidV0(file: File | Blob): Promise<string> {
 export async function computeCids(
   file: File | Blob,
 ): Promise<{ v1: string; v0: string }> {
+  await ensureBuffer();
   const buf = new Uint8Array(await file.arrayBuffer());
   const [v1, v0] = await Promise.all([
     Hash.of(buf, { cidVersion: 1, rawLeaves: true }),
