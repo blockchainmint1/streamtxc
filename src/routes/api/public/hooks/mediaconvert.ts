@@ -119,7 +119,7 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
 
         const pinned = await pinDirectoryToIPFS(files, `hls-${cid}`);
 
-        await supabaseAdmin
+        const { error: updErr, count } = await supabaseAdmin
           .from("videos")
           .update({
             hls_cid: pinned.cid,
@@ -127,9 +127,15 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
             transcode_status: "ready",
             transcode_completed_at: new Date().toISOString(),
             transcode_error: null,
-          })
+          }, { count: "exact" })
           .eq("cid", cid)
           .eq("transcode_job_id", jobId);
+        if (updErr) {
+          return new Response(
+            JSON.stringify({ pinnedCid: pinned.cid, dbError: updErr.message }),
+            { status: 500, headers: { "content-type": "application/json" } },
+          );
+        }
 
         // Note: re-stamping the chain with the new hls_cid is intentionally
         // a follow-up task (Phase 4b). The existing stamp pipeline anchors a
@@ -137,7 +143,15 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
         // calling it from here. For now the new hls_cid lives in the videos
         // row and powers playback; the chain still anchors the original CID.
 
-        return new Response("ok");
+        return new Response(
+          JSON.stringify({
+            pinnedCid: pinned.cid,
+            renditions,
+            keys: keys.length,
+            rowsUpdated: count ?? 0,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
       },
     },
   },
