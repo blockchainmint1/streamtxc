@@ -393,7 +393,15 @@ export function explorerTxUrl(txid: string): string {
   return `${base}/tx/${txid}`;
 }
 
-const TXC_SIGNED_MESSAGE_PREFIX = "\u0019Texitcoin Signed Message:\n";
+// NOTE: just the prefix string. Do NOT bake a length byte in here —
+// we prepend a proper Bitcoin varint of the prefix length below, which
+// for "Texitcoin Signed Message:\n" (26 bytes) is 0x1a. The old
+// "\x19Texitcoin Signed Message:\n" form hardcoded 0x19 (= 25), which
+// happened to match the legacy TXC Core wallet's buggy/identical
+// encoding but does NOT match the new TXC Web Wallet, which follows
+// the standard Bitcoin convention (varint(prefixLen) + prefix +
+// varint(msgLen) + msg).
+const TXC_SIGNED_MESSAGE_PREFIX = "Texitcoin Signed Message:\n";
 
 function encodeBitcoinVarInt(value: number): Uint8Array {
   if (value < 0xfd) return Uint8Array.from([value]);
@@ -444,6 +452,7 @@ async function verifyLegacyTMessage(
   const prefixBytes = Buffer.from(TXC_SIGNED_MESSAGE_PREFIX, "utf8");
   const messageBytes = Buffer.from(message, "utf8");
   const payload = Buffer.concat([
+    Buffer.from(encodeBitcoinVarInt(prefixBytes.length)),
     prefixBytes,
     Buffer.from(encodeBitcoinVarInt(messageBytes.length)),
     messageBytes,
