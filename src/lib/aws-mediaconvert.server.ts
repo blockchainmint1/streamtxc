@@ -141,7 +141,6 @@ export interface JobDescription {
     errorMessage?: string;
     createdAt?: string;
     timing?: { submitTime?: string; startTime?: string; finishTime?: string };
-    outputGroupDetails?: unknown;
   };
 }
 
