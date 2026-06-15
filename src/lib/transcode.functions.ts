@@ -163,7 +163,7 @@ export const listTranscodeOutputs = createServerFn({ method: "POST" })
   });
 
 export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
-  .inputValidator((d: { cid: string; jobId: string }) => {
+  .inputValidator((d: { cid: string; jobId: string; dryRun?: boolean }) => {
     if (!d.cid || d.cid.length > 200) throw new Error("Invalid cid");
     if (!d.jobId || d.jobId.length > 200) throw new Error("Invalid jobId");
     return d;
@@ -187,7 +187,7 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
 
     const { getRequest } = await import("@tanstack/react-start/server");
     const origin = new URL(getRequest().url).origin;
-    const url = `${origin}/api/public/hooks/mediaconvert?dryRun=1`;
+    const url = `${origin}/api/public/hooks/mediaconvert${data.dryRun ? "?dryRun=1" : ""}`;
 
     const res = await fetch(url, {
       method: "POST",
