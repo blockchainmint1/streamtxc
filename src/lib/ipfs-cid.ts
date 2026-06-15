@@ -1,3 +1,10 @@
+import { Buffer } from "buffer";
+
+if (typeof globalThis !== "undefined") {
+  const globalWithBuffer = globalThis as typeof globalThis & { Buffer?: typeof Buffer };
+  globalWithBuffer.Buffer ??= Buffer;
+}
+
 // Browser-side CID computation. Mirrors Pinata's defaults:
 //   cidVersion: 1, rawLeaves: true, chunker: 256 KiB.
 // Lets us check "is this file already on IPFS?" before uploading the bytes.
