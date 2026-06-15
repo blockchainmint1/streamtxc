@@ -6,6 +6,8 @@ import {
   isTranscodeConfigured,
   startTranscodeTest,
   getMediaConvertJob,
+  listTranscodeOutputs,
+  simulateMediaConvertWebhook,
 } from "@/lib/transcode.functions";
 
 export const Route = createFileRoute("/s3-test")({
@@ -18,6 +20,8 @@ function S3Test() {
   const checkCfg = useServerFn(isTranscodeConfigured);
   const startJob = useServerFn(startTranscodeTest);
   const describeJob = useServerFn(getMediaConvertJob);
+  const listOutputs = useServerFn(listTranscodeOutputs);
+  const simulateHook = useServerFn(simulateMediaConvertWebhook);
   const [file, setFile] = useState<File | null>(null);
   const [log, setLog] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -102,6 +106,42 @@ function S3Test() {
     }
   }
 
+  function cidFromKey(): string | null {
+    if (!lastKey) return null;
+    return lastKey.split("/").pop() ?? null;
+  }
+
+  async function runListOutputs() {
+    const cid = cidFromKey();
+    if (!cid) return;
+    setBusy(true);
+    try {
+      const r = await listOutputs({ data: { cid } });
+      push(`s3 ls s3://${r.bucket}/${r.prefix} → ${r.keys.length} keys`);
+      for (const k of r.keys) push(`  ${k}`);
+    } catch (err) {
+      push(`💥 ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runSimulateWebhook() {
+    const cid = cidFromKey();
+    if (!cid || !jobId) return;
+    setBusy(true);
+    try {
+      push(`POST /api/public/hooks/mediaconvert?dryRun=1`);
+      const r = await simulateHook({ data: { cid, jobId } });
+      push(`webhook → ${r.status}`);
+      push(r.body.slice(0, 2000));
+    } catch (err) {
+      push(`💥 ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <main className="mx-auto max-w-2xl px-6 py-12 font-mono text-sm">
       <h1 className="text-2xl font-bold mb-2">S3 PUT test</h1>
@@ -136,6 +176,20 @@ function S3Test() {
           className="bg-secondary text-secondary-foreground px-4 py-2 rounded disabled:opacity-50"
         >
           3. Poll job status
+        </button>
+        <button
+          onClick={runListOutputs}
+          disabled={!lastKey || busy}
+          className="bg-secondary text-secondary-foreground px-4 py-2 rounded disabled:opacity-50"
+        >
+          4. List S3 outputs
+        </button>
+        <button
+          onClick={runSimulateWebhook}
+          disabled={!jobId || busy}
+          className="bg-secondary text-secondary-foreground px-4 py-2 rounded disabled:opacity-50"
+        >
+          5. Simulate webhook (dry-run)
         </button>
       </div>
 
