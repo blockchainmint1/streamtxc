@@ -3,6 +3,7 @@
 
 const PINATA_UPLOADS = "https://uploads.pinata.cloud/v3";
 const PINATA_API = "https://api.pinata.cloud/v3";
+const PINATA_LEGACY = "https://api.pinata.cloud";
 
 export interface PinResult {
   cid: string;
@@ -41,6 +42,71 @@ export async function pinFileToIPFS(
     cid: json.data.cid,
     size: json.data.size,
     pinataId: json.data.id,
+  };
+}
+
+/**
+ * Pin a directory of files to IPFS as a single directory CID. Used for HLS
+ * bundles where the master playlist references rendition playlists, which in
+ * turn reference .ts segments by relative path. The directory CID becomes the
+ * stable handle: `https://{gateway}/ipfs/{dirCid}/master.m3u8`.
+ *
+ * Uses the legacy v1 `pinFileToIPFS` endpoint because it natively supports
+ * directory uploads: each FormData `file` entry's filename can contain a path
+ * (e.g. `bundle/720p/index.m3u8`) and Pinata wraps them into a single
+ * directory whose CID is returned.
+ */
+export async function pinDirectoryToIPFS(
+  files: Array<{ path: string; body: Blob | Uint8Array; contentType?: string }>,
+  dirName: string,
+): Promise<PinResult> {
+  const jwt = process.env.PINATA_JWT;
+  if (!jwt) throw new Error("PINATA_JWT is not configured");
+  if (files.length === 0) throw new Error("pinDirectoryToIPFS: no files");
+
+  const form = new FormData();
+  let totalSize = 0;
+  for (const f of files) {
+    const blob =
+      f.body instanceof Blob
+        ? f.body
+        : new Blob([f.body], { type: f.contentType ?? "application/octet-stream" });
+    totalSize += blob.size;
+    // Filename MUST start with a directory name; Pinata uses the path to build
+    // the directory tree. Strip any leading slashes from the caller's path.
+    const cleanPath = f.path.replace(/^\/+/, "");
+    form.append("file", blob, `${dirName}/${cleanPath}`);
+  }
+  form.append(
+    "pinataOptions",
+    JSON.stringify({ cidVersion: 1, wrapWithDirectory: false }),
+  );
+  form.append(
+    "pinataMetadata",
+    JSON.stringify({ name: dirName }),
+  );
+
+  const res = await fetch(`${PINATA_LEGACY}/pinning/pinFileToIPFS`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${jwt}` },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Pinata directory pin failed [${res.status}]: ${text}`);
+  }
+
+  const json = (await res.json()) as {
+    IpfsHash: string;
+    PinSize: number;
+    Timestamp: string;
+    ID?: string;
+  };
+  return {
+    cid: json.IpfsHash,
+    size: json.PinSize ?? totalSize,
+    pinataId: json.ID ?? json.IpfsHash,
   };
 }
 
