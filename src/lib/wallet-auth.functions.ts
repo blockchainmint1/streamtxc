@@ -26,7 +26,7 @@ function buildLoginMessage(args: {
   expiresAt: string;
 }): string {
   return [
-    "streamTXC — Sign in to prove wallet ownership",
+    "streamTXC - Sign in to prove wallet ownership",
     "",
     `Domain: streamtxc.com`,
     `Address: ${args.wallet}`,
