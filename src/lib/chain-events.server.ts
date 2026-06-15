@@ -99,20 +99,26 @@ export async function recordMetadataAnchor(input: {
   title: string;
   description: string;
   thumbnailCid?: string | null;
+  hlsCid?: string | null;
+  renditions?: Array<{ height: number | null; playlist: string }>;
 }): Promise<{ metaCid: string; stamp: StampResult } | null> {
   // Build the canonical metadata blob. Field order matters for the CID, so
   // keep it stable across versions — bump `v` if the schema ever changes.
   // v2 adds optional `thumbnailCid` so creators can ship (and later edit)
-  // a poster image without re-uploading the video. Older v1 readers can
-  // safely ignore the new field.
+  // a poster image without re-uploading the video.
+  // v3 adds `hlsCid` + `renditions` so the chain-anchored blob captures the
+  // full playback bundle alongside the original. Older readers ignore the
+  // new fields and fall back to `videoCid` for single-MP4 playback.
   const meta = {
-    v: 2,
+    v: 3,
     videoCid: input.videoCid,
     videoWallet: input.videoWallet,
     uploader: input.uploaderWallet,
     title: input.title,
     description: input.description ?? "",
     thumbnailCid: input.thumbnailCid ?? null,
+    hlsCid: input.hlsCid ?? null,
+    renditions: input.renditions ?? [],
     ts: new Date().toISOString(),
   };
 

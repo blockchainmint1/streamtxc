@@ -205,19 +205,24 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
     // of self-fetching the webhook. Self-fetch doubles request time on
     // Cloudflare and was timing out for ~40 MB transfers.
     const e = transcodeEnv();
-    if (!e.outputBucket) throw new Error("AWS_S3_OUTPUT_BUCKET not set");
+    if (!e.inputBucket || !e.outputBucket) throw new Error("AWS buckets not set");
 
     const { listObjects, getObjectBlob } = await import("./aws-s3.server");
-    const { pinDirectoryToIPFS } = await import("./pinata.server");
+    const { pinDirectoryToIPFS, pinFileToIPFS, pinJsonToIPFS } = await import("./pinata.server");
 
+    // 1. Pin the ORIGINAL file (still living in the input bucket) to IPFS.
+    const tOrig0 = Date.now();
+    const origBlob = await getObjectBlob(e.inputBucket, `inputs/${data.cid}`);
+    const origPin = await pinFileToIPFS(origBlob, `${data.cid}.original`);
+    const tOrig = Date.now() - tOrig0;
+
+    // 2. Pin the HLS bundle as a single directory.
     const prefix = `hls/${data.cid}/`;
     const t0 = Date.now();
     const keys = await listObjects(e.outputBucket, prefix);
     if (keys.length === 0) throw new Error(`No outputs at s3://${e.outputBucket}/${prefix}`);
     const tList = Date.now() - t0;
 
-    // Parallelize the S3 GETs (bounded concurrency, not Promise.all-all to
-    // avoid blowing the Worker's subrequest budget all at once).
     const t1 = Date.now();
     const files = await mapWithConcurrency(keys, 8, async (key) => {
       const blob = await getObjectBlob(e.outputBucket!, key);
@@ -233,13 +238,41 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
     const pinned = await pinDirectoryToIPFS(files, `hls-${data.cid}`);
     const tPin = Date.now() - t2;
 
+    // 3. Derive a rendition manifest (mirrors what the real webhook builds).
+    const renditions = keys
+      .filter((k) => k.endsWith(".m3u8") && !k.endsWith("/master.m3u8"))
+      .map((k) => {
+        const rel = k.slice(prefix.length);
+        const m = rel.match(/(\d+)p/);
+        return { height: m ? Number(m[1]) : null, playlist: rel };
+      });
+
+    // 4. Build the canonical metadata JSON (v3 — what would be anchored to
+    //    chain in production) and pin it. Mirrors recordMetadataAnchor's
+    //    schema so the test path proves the exact blob shape.
+    const meta = {
+      v: 3,
+      videoCid: origPin.cid,
+      videoWallet: "<test>",
+      uploader: "<test>",
+      title: `s3-test ${data.cid}`,
+      description: "Test bundle pinned from /s3-test",
+      thumbnailCid: null,
+      hlsCid: pinned.cid,
+      renditions,
+      ts: new Date().toISOString(),
+    };
+    const metaPin = await pinJsonToIPFS(meta, `${data.cid}.meta.json`);
+
     return {
       status: 200,
       body: JSON.stringify({
-        pinnedCid: pinned.cid,
-        size: pinned.size,
+        originalCid: origPin.cid,
+        hlsCid: pinned.cid,
+        metadataCid: metaPin.cid,
+        metadata: meta,
         keys: keys.length,
-        timings: { listMs: tList, fetchMs: tFetch, pinMs: tPin },
+        timings: { originalMs: tOrig, listMs: tList, fetchMs: tFetch, pinMs: tPin },
       }),
       url: `inline://${data.cid}`,
     };
