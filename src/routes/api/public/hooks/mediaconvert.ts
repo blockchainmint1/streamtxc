@@ -119,6 +119,35 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
 
         const pinned = await pinDirectoryToIPFS(files, `hls-${cid}`);
 
+        // Look up the videos row so we can re-anchor full metadata (v3
+        // adds hlsCid + renditions) to IPFS and the chain. Best-effort —
+        // if the row doesn't exist (e.g. /s3-test), skip re-anchor.
+        const { data: row } = await supabaseAdmin
+          .from("videos")
+          .select("video_wallet, owner_wallet, title, description, thumbnail_cid")
+          .eq("cid", cid)
+          .maybeSingle();
+
+        let newMetaCid: string | null = null;
+        let newMetaTx: string | null = null;
+        if (row) {
+          const { recordMetadataAnchor } = await import("@/lib/chain-events.server");
+          const anchored = await recordMetadataAnchor({
+            videoCid: cid,
+            videoWallet: row.video_wallet,
+            uploaderWallet: row.owner_wallet,
+            title: row.title ?? "",
+            description: row.description ?? "",
+            thumbnailCid: row.thumbnail_cid ?? null,
+            hlsCid: pinned.cid,
+            renditions,
+          });
+          if (anchored) {
+            newMetaCid = anchored.metaCid;
+            newMetaTx = anchored.stamp.real ? anchored.stamp.txid : null;
+          }
+        }
+
         const { error: updErr, count } = await supabaseAdmin
           .from("videos")
           .update({
@@ -127,6 +156,8 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
             transcode_status: "ready",
             transcode_completed_at: new Date().toISOString(),
             transcode_error: null,
+            ...(newMetaCid ? { metadata_cid: newMetaCid } : {}),
+            ...(newMetaTx ? { tx_hash: newMetaTx } : {}),
           }, { count: "exact" })
           .eq("cid", cid)
           .eq("transcode_job_id", jobId);
@@ -149,6 +180,8 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
             renditions,
             keys: keys.length,
             rowsUpdated: count ?? 0,
+            metadataCid: newMetaCid,
+            metadataTx: newMetaTx,
           }),
           { status: 200, headers: { "content-type": "application/json" } },
         );
