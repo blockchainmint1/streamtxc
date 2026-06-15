@@ -176,6 +176,10 @@ function UploadPage() {
   function acceptFile(f: File) {
     setFile(f);
     setCodecWarning(checkCodec(f));
+    setLocalCids(null);
+    setMatchedCid(null);
+    setCidProbe("checking");
+    setQuote(null);
     if (!title) setTitle(f.name.replace(/\.[^.]+$/, ""));
     setThumbnailCid(null);
   }
@@ -197,13 +201,9 @@ function UploadPage() {
     (async () => {
       try {
         setCidProbe("checking");
-        const [cids, q] = await Promise.all([
-          computeCids(file),
-          quoteFn({ data: { sizeBytes: file.size, months: 1 } }),
-        ]);
+        const cids = await computeCids(file);
         if (cancelled) return;
         setLocalCids(cids);
-        setQuote({ txcAmount: q.txcAmount, usdAmount: q.usdAmount, txcUsd: q.txcUsd });
         const hit = await lookupCid({
           data: { cidV1: cids.v1, cidV0: cids.v0 },
         });
@@ -212,6 +212,15 @@ function UploadPage() {
         setCidProbe(hit ? "on-ipfs" : "off-ipfs");
       } catch (err) {
         if (!cancelled) setCidProbe("off-ipfs");
+      }
+    })();
+    (async () => {
+      try {
+        const q = await quoteFn({ data: { sizeBytes: file.size, months: 1 } });
+        if (cancelled) return;
+        setQuote({ txcAmount: q.txcAmount, usdAmount: q.usdAmount, txcUsd: q.txcUsd });
+      } catch (err) {
+        console.warn("upload quote failed", err);
       }
     })();
     return () => {
