@@ -425,6 +425,22 @@ async function verifyLegacyTMessage(
   signature: string,
   message: string,
 ): Promise<boolean> {
+  // Try the standard encoding first (new TXC Web Wallet, BIP-style
+  // varint(prefixLen) + prefix + varint(msgLen) + msg). If that fails,
+  // fall back to the legacy TXC Core encoding which hardcoded a single
+  // 0x19 byte in front of the prefix instead of a real varint.
+  if (await verifyLegacyTMessageWith(address, signature, message, "standard")) {
+    return true;
+  }
+  return await verifyLegacyTMessageWith(address, signature, message, "legacy-core");
+}
+
+async function verifyLegacyTMessageWith(
+  address: string,
+  signature: string,
+  message: string,
+  mode: "standard" | "legacy-core",
+): Promise<boolean> {
   const [{ sha256 }, { ripemd160 }, { secp256k1 }, bs58checkModule] = await Promise.all([
     import("@noble/hashes/sha256"),
     import("@noble/hashes/ripemd160"),
@@ -451,8 +467,12 @@ async function verifyLegacyTMessage(
 
   const prefixBytes = Buffer.from(TXC_SIGNED_MESSAGE_PREFIX, "utf8");
   const messageBytes = Buffer.from(message, "utf8");
+  const prefixHeader =
+    mode === "standard"
+      ? Buffer.from(encodeBitcoinVarInt(prefixBytes.length))
+      : Buffer.from([0x19]); // legacy TXC Core hardcoded byte
   const payload = Buffer.concat([
-    Buffer.from(encodeBitcoinVarInt(prefixBytes.length)),
+    prefixHeader,
     prefixBytes,
     Buffer.from(encodeBitcoinVarInt(messageBytes.length)),
     messageBytes,
