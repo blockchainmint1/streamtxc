@@ -28,6 +28,7 @@ import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
 import { Route as ApiPublicTxcVerifyMessageRouteImport } from './routes/api/public/txc-verify-message'
 import { Route as ApiPublicTxcHealthRouteImport } from './routes/api/public/txc-health'
 import { Route as ApiPublicImportStreamRouteImport } from './routes/api/public/import-stream'
+import { Route as ApiPublicCidRouteImport } from './routes/api/public/cid'
 import { Route as ApiStreamCidSplatRouteImport } from './routes/api/stream.$cid.$'
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
 import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
@@ -129,6 +130,11 @@ const ApiPublicImportStreamRoute = ApiPublicImportStreamRouteImport.update({
   path: '/public/import-stream',
   getParentRoute: () => ApiRoute,
 } as any)
+const ApiPublicCidRoute = ApiPublicCidRouteImport.update({
+  id: '/public/cid',
+  path: '/public/cid',
+  getParentRoute: () => ApiRoute,
+} as any)
 const ApiStreamCidSplatRoute = ApiStreamCidSplatRouteImport.update({
   id: '/$',
   path: '/$',
@@ -167,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
+  '/api/public/cid': typeof ApiPublicCidRoute
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
@@ -192,6 +199,7 @@ export interface FileRoutesByTo {
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
+  '/api/public/cid': typeof ApiPublicCidRoute
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
@@ -218,6 +226,7 @@ export interface FileRoutesById {
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
+  '/api/public/cid': typeof ApiPublicCidRoute
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
@@ -245,6 +254,7 @@ export interface FileRouteTypes {
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
+    | '/api/public/cid'
     | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
@@ -270,6 +280,7 @@ export interface FileRouteTypes {
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
+    | '/api/public/cid'
     | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
@@ -295,6 +306,7 @@ export interface FileRouteTypes {
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
+    | '/api/public/cid'
     | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
@@ -458,6 +470,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicImportStreamRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/public/cid': {
+      id: '/api/public/cid'
+      path: '/public/cid'
+      fullPath: '/api/public/cid'
+      preLoaderRoute: typeof ApiPublicCidRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/stream/$cid/$': {
       id: '/api/stream/$cid/$'
       path: '/$'
@@ -502,6 +521,7 @@ const ApiStreamCidRouteWithChildren = ApiStreamCidRoute._addFileChildren(
 )
 
 interface ApiRouteChildren {
+  ApiPublicCidRoute: typeof ApiPublicCidRoute
   ApiPublicImportStreamRoute: typeof ApiPublicImportStreamRoute
   ApiPublicTxcHealthRoute: typeof ApiPublicTxcHealthRoute
   ApiPublicTxcVerifyMessageRoute: typeof ApiPublicTxcVerifyMessageRoute
@@ -513,6 +533,7 @@ interface ApiRouteChildren {
 }
 
 const ApiRouteChildren: ApiRouteChildren = {
+  ApiPublicCidRoute: ApiPublicCidRoute,
   ApiPublicImportStreamRoute: ApiPublicImportStreamRoute,
   ApiPublicTxcHealthRoute: ApiPublicTxcHealthRoute,
   ApiPublicTxcVerifyMessageRoute: ApiPublicTxcVerifyMessageRoute,
