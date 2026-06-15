@@ -12,6 +12,13 @@ import {
 } from "@/lib/transcode.functions";
 import { VideoPlayer } from "@/components/VideoPlayer";
 
+function fmtBytes(n: number): string {
+  if (n < 1024) return `${n.toFixed(0)} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+}
+
 export const Route = createFileRoute("/s3-test")({
   head: () => ({ meta: [{ title: "S3 PUT test" }] }),
   component: S3Test,
@@ -33,6 +40,12 @@ function S3Test() {
   const [pinnedCid, setPinnedCid] = useState<string | null>(null);
   const [gateway, setGateway] = useState<string | null>(null);
   const [playUrl, setPlayUrl] = useState<string>("");
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
+  const [uploadStats, setUploadStats] = useState<{
+    loaded: number;
+    total: number;
+    bps: number;
+  } | null>(null);
 
   useEffect(() => {
     getGateway().then((g) => setGateway(g.gateway)).catch(() => {});
@@ -60,16 +73,32 @@ function S3Test() {
       push(`url host: ${new URL(url).host}`);
 
       const t0 = performance.now();
-      const res = await fetch(url, {
-        method: "PUT",
-        headers: { "content-type": ct },
-        body: file,
-      });
+      setUploadPct(0);
+      setUploadStats({ loaded: 0, total: file.size, bps: 0 });
+      const { status, body } = await new Promise<{ status: number; body: string }>(
+        (resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("PUT", url);
+          xhr.setRequestHeader("content-type", ct);
+          xhr.upload.onprogress = (e) => {
+            if (!e.lengthComputable) return;
+            const elapsed = (performance.now() - t0) / 1000;
+            const bps = elapsed > 0 ? e.loaded / elapsed : 0;
+            setUploadPct(Math.round((e.loaded / e.total) * 100));
+            setUploadStats({ loaded: e.loaded, total: e.total, bps });
+          };
+          xhr.onload = () =>
+            resolve({ status: xhr.status, body: xhr.responseText || "" });
+          xhr.onerror = () => reject(new Error("network error during PUT"));
+          xhr.onabort = () => reject(new Error("upload aborted"));
+          xhr.send(file);
+        },
+      );
       const ms = Math.round(performance.now() - t0);
-      const body = await res.text().catch(() => "");
-      push(`PUT → ${res.status} in ${ms}ms`);
+      setUploadPct(100);
+      push(`PUT → ${status} in ${ms}ms`);
       if (body) push(`response body: ${body.slice(0, 1500)}`);
-      if (res.ok) {
+      if (status >= 200 && status < 300) {
         push(`✅ Object written to ${bucket}/${key}`);
         setLastKey(key);
       } else {
@@ -202,6 +231,29 @@ function S3Test() {
         disabled={busy}
         className="block mb-4"
       />
+      {uploadPct !== null && (
+        <div className="mb-4">
+          <div className="flex justify-between text-xs text-muted-foreground mb-1">
+            <span>
+              {uploadPct < 100 ? "Uploading…" : "Upload complete"} {uploadPct}%
+            </span>
+            {uploadStats && (
+              <span>
+                {fmtBytes(uploadStats.loaded)} / {fmtBytes(uploadStats.total)}
+                {uploadStats.bps > 0 && uploadPct < 100
+                  ? ` · ${fmtBytes(uploadStats.bps)}/s`
+                  : ""}
+              </span>
+            )}
+          </div>
+          <div className="h-2 bg-muted rounded overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all duration-150"
+              style={{ width: `${uploadPct}%` }}
+            />
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         <button
           onClick={run}
