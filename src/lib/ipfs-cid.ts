@@ -6,14 +6,13 @@
 // (legacy default — rawLeaves:false, dag-pb leaves) because the same bytes
 // produce different CIDs under each scheme, and a file pinned by an older
 // client (or by `ipfs add` with default flags) will only resolve under v0.
-import { Buffer } from "buffer";
+import { Buffer as BufferPolyfill } from "buffer";
 import Hash from "ipfs-only-hash";
 
-// ipfs-only-hash uses Node's Buffer internally. In the browser bundle we
-// need to ensure a Buffer global exists before the library walks the file.
-if (typeof globalThis !== "undefined" && !(globalThis as any).Buffer) {
-  (globalThis as any).Buffer = Buffer;
-}
+// ipfs-only-hash uses Node's Buffer internally. Ensure a Buffer global
+// exists in the browser bundle before the library walks the file.
+const _g = globalThis as unknown as { Buffer?: typeof BufferPolyfill };
+if (!_g.Buffer) _g.Buffer = BufferPolyfill;
 
 export async function computeCidV1(file: File | Blob): Promise<string> {
   const buf = new Uint8Array(await file.arrayBuffer());
