@@ -9,7 +9,13 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/api/public/txc-health")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        // Admin-only: leaks internal RPC URL, balance, and topup address.
+        const expectedToken = process.env.TXC_RPC_PASS;
+        const providedToken = request.headers.get("x-admin-token");
+        if (!expectedToken || providedToken !== expectedToken) {
+          return new Response("Unauthorized", { status: 401 });
+        }
         const url = process.env.TXC_RPC_URL;
         const user = process.env.TXC_RPC_USER;
         const pass = process.env.TXC_RPC_PASS;
@@ -79,7 +85,6 @@ export const Route = createFileRoute("/api/public/txc-health")({
           }
           return Response.json({
             ok: true,
-            url: resolvedUrl,
             blockCount,
             chain: info,
             balance,
@@ -91,7 +96,6 @@ export const Route = createFileRoute("/api/public/txc-health")({
             {
               ok: false,
               stage: "fetch",
-              url: resolvedUrl,
               error: err instanceof Error ? err.message : String(err),
             },
             { status: 502 },
