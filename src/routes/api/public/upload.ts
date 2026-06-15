@@ -2,6 +2,17 @@ import { createFileRoute } from "@tanstack/react-router";
 import { pinFileToIPFS } from "@/lib/pinata.server";
 import { MAX_UPLOAD_BYTES } from "@/lib/fees";
 
+// Allow common browser video formats only. Blocks abuse of the platform's
+// Pinata account for arbitrary content pinning.
+const ALLOWED_MIME_TYPES = new Set([
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/x-matroska",
+  "video/x-msvideo",
+  "video/ogg",
+]);
+
 /**
  * Browser → Worker → Pinata upload proxy. Same-origin (no CORS),
  * capped at MAX_UPLOAD_BYTES (≈ Cloudflare Worker request-body cap).
@@ -37,6 +48,16 @@ export const Route = createFileRoute("/api/public/upload")({
           return Response.json(
             { error: "Missing 'file' field" },
             { status: 400 },
+          );
+        }
+
+        const mime = ("type" in file && typeof file.type === "string" ? file.type : "").toLowerCase();
+        if (!ALLOWED_MIME_TYPES.has(mime)) {
+          return Response.json(
+            {
+              error: `Unsupported file type: ${mime || "unknown"}. Allowed: MP4, WebM, MOV, MKV, AVI, OGG.`,
+            },
+            { status: 415 },
           );
         }
 
