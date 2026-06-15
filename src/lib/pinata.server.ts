@@ -70,7 +70,9 @@ export async function pinDirectoryToIPFS(
     const blob =
       f.body instanceof Blob
         ? f.body
-        : new Blob([f.body], { type: f.contentType ?? "application/octet-stream" });
+        : new Blob([f.body as BlobPart], {
+            type: f.contentType ?? "application/octet-stream",
+          });
     totalSize += blob.size;
     // Filename MUST start with a directory name; Pinata uses the path to build
     // the directory tree. Strip any leading slashes from the caller's path.
