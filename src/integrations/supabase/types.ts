@@ -375,6 +375,7 @@ export type Database = {
           flagged_reason: string | null
           hidden_at: string | null
           hidden_reason: string | null
+          hls_cid: string | null
           hosting_credit_txc: number
           is_nsfw: boolean
           metadata_cid: string | null
@@ -391,11 +392,17 @@ export type Database = {
           payment_received_txc: number
           payment_required_txc: number | null
           payment_tx_hash: string | null
+          renditions: Json | null
           report_count: number
           size_bytes: number
           status: string
           thumbnail_cid: string | null
           title: string
+          transcode_completed_at: string | null
+          transcode_error: string | null
+          transcode_job_id: string | null
+          transcode_started_at: string | null
+          transcode_status: string | null
           tx_hash: string | null
           unpinned_at: string | null
           video_wallet: string | null
@@ -415,6 +422,7 @@ export type Database = {
           flagged_reason?: string | null
           hidden_at?: string | null
           hidden_reason?: string | null
+          hls_cid?: string | null
           hosting_credit_txc?: number
           is_nsfw?: boolean
           metadata_cid?: string | null
@@ -431,11 +439,17 @@ export type Database = {
           payment_received_txc?: number
           payment_required_txc?: number | null
           payment_tx_hash?: string | null
+          renditions?: Json | null
           report_count?: number
           size_bytes: number
           status?: string
           thumbnail_cid?: string | null
           title: string
+          transcode_completed_at?: string | null
+          transcode_error?: string | null
+          transcode_job_id?: string | null
+          transcode_started_at?: string | null
+          transcode_status?: string | null
           tx_hash?: string | null
           unpinned_at?: string | null
           video_wallet?: string | null
@@ -455,6 +469,7 @@ export type Database = {
           flagged_reason?: string | null
           hidden_at?: string | null
           hidden_reason?: string | null
+          hls_cid?: string | null
           hosting_credit_txc?: number
           is_nsfw?: boolean
           metadata_cid?: string | null
@@ -471,11 +486,17 @@ export type Database = {
           payment_received_txc?: number
           payment_required_txc?: number | null
           payment_tx_hash?: string | null
+          renditions?: Json | null
           report_count?: number
           size_bytes?: number
           status?: string
           thumbnail_cid?: string | null
           title?: string
+          transcode_completed_at?: string | null
+          transcode_error?: string | null
+          transcode_job_id?: string | null
+          transcode_started_at?: string | null
+          transcode_status?: string | null
           tx_hash?: string | null
           unpinned_at?: string | null
           video_wallet?: string | null
