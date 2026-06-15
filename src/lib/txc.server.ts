@@ -393,7 +393,15 @@ export function explorerTxUrl(txid: string): string {
   return `${base}/tx/${txid}`;
 }
 
-const TXC_SIGNED_MESSAGE_PREFIX = "\u0019Texitcoin Signed Message:\n";
+// NOTE: just the prefix string. Do NOT bake a length byte in here —
+// we prepend a proper Bitcoin varint of the prefix length below, which
+// for "Texitcoin Signed Message:\n" (26 bytes) is 0x1a. The old
+// "\x19Texitcoin Signed Message:\n" form hardcoded 0x19 (= 25), which
+// happened to match the legacy TXC Core wallet's buggy/identical
+// encoding but does NOT match the new TXC Web Wallet, which follows
+// the standard Bitcoin convention (varint(prefixLen) + prefix +
+// varint(msgLen) + msg).
+const TXC_SIGNED_MESSAGE_PREFIX = "Texitcoin Signed Message:\n";
 
 function encodeBitcoinVarInt(value: number): Uint8Array {
   if (value < 0xfd) return Uint8Array.from([value]);
@@ -416,6 +424,22 @@ async function verifyLegacyTMessage(
   address: string,
   signature: string,
   message: string,
+): Promise<boolean> {
+  // Try the standard encoding first (new TXC Web Wallet, BIP-style
+  // varint(prefixLen) + prefix + varint(msgLen) + msg). If that fails,
+  // fall back to the legacy TXC Core encoding which hardcoded a single
+  // 0x19 byte in front of the prefix instead of a real varint.
+  if (await verifyLegacyTMessageWith(address, signature, message, "standard")) {
+    return true;
+  }
+  return await verifyLegacyTMessageWith(address, signature, message, "legacy-core");
+}
+
+async function verifyLegacyTMessageWith(
+  address: string,
+  signature: string,
+  message: string,
+  mode: "standard" | "legacy-core",
 ): Promise<boolean> {
   const [{ sha256 }, { ripemd160 }, { secp256k1 }, bs58checkModule] = await Promise.all([
     import("@noble/hashes/sha256"),
@@ -443,7 +467,12 @@ async function verifyLegacyTMessage(
 
   const prefixBytes = Buffer.from(TXC_SIGNED_MESSAGE_PREFIX, "utf8");
   const messageBytes = Buffer.from(message, "utf8");
+  const prefixHeader =
+    mode === "standard"
+      ? Buffer.from(encodeBitcoinVarInt(prefixBytes.length))
+      : Buffer.from([0x19]); // legacy TXC Core hardcoded byte
   const payload = Buffer.concat([
+    prefixHeader,
     prefixBytes,
     Buffer.from(encodeBitcoinVarInt(messageBytes.length)),
     messageBytes,
