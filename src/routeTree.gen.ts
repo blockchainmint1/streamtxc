@@ -28,6 +28,7 @@ import { Route as ApiPublicTxcVerifyMessageRouteImport } from './routes/api/publ
 import { Route as ApiPublicTxcHealthRouteImport } from './routes/api/public/txc-health'
 import { Route as ApiPublicImportStreamRouteImport } from './routes/api/public/import-stream'
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
+import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
 
 const UploadRoute = UploadRouteImport.update({
@@ -127,6 +128,12 @@ const ApiPublicHooksPaymentWatcherRoute =
     path: '/public/hooks/payment-watcher',
     getParentRoute: () => ApiRoute,
   } as any)
+const ApiPublicHooksMediaconvertRoute =
+  ApiPublicHooksMediaconvertRouteImport.update({
+    id: '/public/hooks/mediaconvert',
+    path: '/public/hooks/mediaconvert',
+    getParentRoute: () => ApiRoute,
+  } as any)
 const ApiPublicAdminRetryStampsRoute =
   ApiPublicAdminRetryStampsRouteImport.update({
     id: '/public/admin/retry-stamps',
@@ -154,6 +161,7 @@ export interface FileRoutesByFullPath {
   '/api/stream/$cid': typeof ApiStreamCidRoute
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
 }
 export interface FileRoutesByTo {
@@ -176,6 +184,7 @@ export interface FileRoutesByTo {
   '/api/stream/$cid': typeof ApiStreamCidRoute
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
 }
 export interface FileRoutesById {
@@ -199,6 +208,7 @@ export interface FileRoutesById {
   '/api/stream/$cid': typeof ApiStreamCidRoute
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
 }
 export interface FileRouteTypes {
@@ -223,6 +233,7 @@ export interface FileRouteTypes {
     | '/api/stream/$cid'
     | '/v/$cid/restore'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -245,6 +256,7 @@ export interface FileRouteTypes {
     | '/api/stream/$cid'
     | '/v/$cid/restore'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
   id:
     | '__root__'
@@ -267,6 +279,7 @@ export interface FileRouteTypes {
     | '/api/stream/$cid'
     | '/v/$cid/restore'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
   fileRoutesById: FileRoutesById
 }
@@ -420,6 +433,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksPaymentWatcherRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/public/hooks/mediaconvert': {
+      id: '/api/public/hooks/mediaconvert'
+      path: '/public/hooks/mediaconvert'
+      fullPath: '/api/public/hooks/mediaconvert'
+      preLoaderRoute: typeof ApiPublicHooksMediaconvertRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/public/admin/retry-stamps': {
       id: '/api/public/admin/retry-stamps'
       path: '/public/admin/retry-stamps'
@@ -437,6 +457,7 @@ interface ApiRouteChildren {
   ApiPublicUploadRoute: typeof ApiPublicUploadRoute
   ApiStreamCidRoute: typeof ApiStreamCidRoute
   ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
+  ApiPublicHooksMediaconvertRoute: typeof ApiPublicHooksMediaconvertRoute
   ApiPublicHooksPaymentWatcherRoute: typeof ApiPublicHooksPaymentWatcherRoute
 }
 
@@ -447,6 +468,7 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiPublicUploadRoute: ApiPublicUploadRoute,
   ApiStreamCidRoute: ApiStreamCidRoute,
   ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
+  ApiPublicHooksMediaconvertRoute: ApiPublicHooksMediaconvertRoute,
   ApiPublicHooksPaymentWatcherRoute: ApiPublicHooksPaymentWatcherRoute,
 }
 

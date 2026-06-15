@@ -121,16 +121,11 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
           .eq("cid", cid)
           .eq("transcode_job_id", jobId);
 
-        // Best-effort: re-stamp updated metadata to chain. We don't fail the
-        // webhook if this errors — the videos row is already updated.
-        try {
-          const { restampVideoMetadata } = await import("@/lib/videos.functions");
-          if (typeof restampVideoMetadata === "function") {
-            await restampVideoMetadata({ data: { cid } });
-          }
-        } catch (err) {
-          console.warn("re-stamp after transcode failed", err);
-        }
+        // Note: re-stamping the chain with the new hls_cid is intentionally
+        // a follow-up task (Phase 4b). The existing stamp pipeline anchors a
+        // single CID per video, so we'll extend the payload schema before
+        // calling it from here. For now the new hls_cid lives in the videos
+        // row and powers playback; the chain still anchors the original CID.
 
         return new Response("ok");
       },
