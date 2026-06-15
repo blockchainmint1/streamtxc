@@ -165,15 +165,22 @@ function S3Test() {
       push(`webhook → ${r.status} in ${ms}ms`);
       push(r.body.slice(0, 2000));
       try {
-        const parsed = JSON.parse(r.body) as { pinnedCid?: string };
-        if (parsed.pinnedCid) {
-          setPinnedCid(parsed.pinnedCid);
+        const parsed = JSON.parse(r.body) as {
+          hlsCid?: string;
+          originalCid?: string;
+          metadataCid?: string;
+        };
+        const hls = parsed.hlsCid;
+        if (hls) {
+          setPinnedCid(hls);
           if (gateway) {
-            const url = `https://${gateway}/ipfs/${parsed.pinnedCid}/${cid}.m3u8`;
+            const url = `https://${gateway}/ipfs/${hls}/${cid}.m3u8`;
             setPlayUrl(url);
             push(`▶ player src: ${url}`);
           }
         }
+        if (parsed.originalCid) push(`📁 original cid: ${parsed.originalCid}`);
+        if (parsed.metadataCid) push(`🪪 metadata cid: ${parsed.metadataCid}`);
       } catch { /* non-JSON response, ignore */ }
     } catch (err) {
       push(`💥 ${err instanceof Error ? err.message : String(err)}`);
