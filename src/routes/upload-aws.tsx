@@ -32,7 +32,7 @@ import {
   Cloud,
 } from "lucide-react";
 import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
-import { computeCids } from "@/lib/ipfs-cid";
+import { computeCids } from "@/lib/cid-client";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 import { recordAnonUpload } from "@/lib/anon-uploads";
 import { UrlImportTab } from "@/components/UrlImportTab";
