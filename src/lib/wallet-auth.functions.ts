@@ -26,13 +26,11 @@ function buildLoginMessage(args: {
   expiresAt: string;
 }): string {
   return [
-    "streamTXC - Sign in to prove wallet ownership",
+    "streamTXC - Wallet login",
     "",
     `Domain: streamtxc.com`,
     `Address: ${args.wallet}`,
     `Nonce: ${args.nonce}`,
-    `Issued At: ${args.issuedAt}`,
-    `Expires At: ${args.expiresAt}`,
     "",
     "Signing this message does NOT authorize any transaction or spend any TXC.",
   ].join("\n");
@@ -40,6 +38,10 @@ function buildLoginMessage(args: {
 
 function normalizeSignature(signature: string): string {
   return signature.replace(/\s+/g, "");
+}
+
+function normalizeSignedMessage(message: string): string {
+  return message.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 }
 
 /**
@@ -91,7 +93,17 @@ export const completeWalletLogin = createServerFn({ method: "POST" })
     }
     let ok = false;
     try {
-      ok = await verifyMessage(claims.wallet, normalizedSignature, claims.message);
+      const candidateMessages = Array.from(
+        new Set([
+          claims.message,
+          normalizeSignedMessage(claims.message),
+          normalizeSignedMessage(claims.message).trim(),
+        ]),
+      );
+      for (const candidate of candidateMessages) {
+        ok = await verifyMessage(claims.wallet, normalizedSignature, candidate);
+        if (ok) break;
+      }
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       console.error("[completeWalletLogin] verifyMessage threw", reason);
