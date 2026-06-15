@@ -36,6 +36,11 @@ import { computeCids } from "@/lib/ipfs-cid";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 import { recordAnonUpload } from "@/lib/anon-uploads";
 import { UrlImportTab } from "@/components/UrlImportTab";
+import {
+  getTranscodeUploadUrl,
+  startTranscode,
+  isTranscodeConfigured,
+} from "@/lib/transcode.functions";
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
@@ -125,6 +130,9 @@ function UploadPage() {
   const addCid = useServerFn(addByCid);
   const quoteFn = useServerFn(getQuote);
   const lookupCid = useServerFn(lookupPinnedCid);
+  const getS3Url = useServerFn(getTranscodeUploadUrl);
+  const startTx = useServerFn(startTranscode);
+  const checkTxConfig = useServerFn(isTranscodeConfigured);
 
   // No auto-connect: anonymous uploads are allowed. Users can paste a TXC
   // address (and optionally a signature) to claim ownership.
@@ -320,6 +328,31 @@ function UploadPage() {
       }
       if (!address) recordAnonUpload(result.cid, title);
       qc.invalidateQueries({ queryKey: ["recent-videos"] });
+
+      // Fire-and-forget: kick off the adaptive HLS transcode if AWS is wired
+      // up. We don't block navigation on this — playback falls back to the
+      // original MP4 until the webhook lands the HLS bundle.
+      try {
+        const { configured } = await checkTxConfig();
+        if (configured) {
+          const { url } = await getS3Url({
+            data: { cid: pinResult.cid, contentType: file.type || "video/mp4" },
+          });
+          const putRes = await fetch(url, {
+            method: "PUT",
+            headers: { "content-type": file.type || "video/mp4" },
+            body: file,
+          });
+          if (!putRes.ok) {
+            console.warn("S3 upload failed", putRes.status);
+          } else {
+            await startTx({ data: { cid: pinResult.cid } });
+          }
+        }
+      } catch (err) {
+        console.warn("transcode kickoff skipped:", err);
+      }
+
       navigate({ to: "/v/$cid", params: { cid: result.cid } });
     } catch (err) {
       console.error(err);
