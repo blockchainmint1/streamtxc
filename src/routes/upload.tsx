@@ -36,6 +36,11 @@ import { computeCids } from "@/lib/ipfs-cid";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 import { recordAnonUpload } from "@/lib/anon-uploads";
 import { UrlImportTab } from "@/components/UrlImportTab";
+import {
+  getTranscodeUploadUrl,
+  startTranscode,
+  isTranscodeConfigured,
+} from "@/lib/transcode.functions";
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
