@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UploadAwsRouteImport } from './routes/upload-aws'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as PrivacyRouteImport } from './routes/privacy'
@@ -32,6 +33,11 @@ import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/p
 import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
 
+const UploadAwsRoute = UploadAwsRouteImport.update({
+  id: '/upload-aws',
+  path: '/upload-aws',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
   path: '/upload',
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
+  '/upload-aws': typeof UploadAwsRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
@@ -181,6 +188,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
+  '/upload-aws': typeof UploadAwsRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
@@ -206,6 +214,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
+  '/upload-aws': typeof UploadAwsRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
@@ -232,6 +241,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/upload'
+    | '/upload-aws'
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
@@ -256,6 +266,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/upload'
+    | '/upload-aws'
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
@@ -280,6 +291,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/upload'
+    | '/upload-aws'
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
@@ -305,6 +317,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
   UploadRoute: typeof UploadRoute
+  UploadAwsRoute: typeof UploadAwsRoute
   EmbedCidRoute: typeof EmbedCidRoute
   UWalletRoute: typeof UWalletRoute
   VCidRoute: typeof VCidRouteWithChildren
@@ -312,6 +325,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/upload-aws': {
+      id: '/upload-aws'
+      path: '/upload-aws'
+      fullPath: '/upload-aws'
+      preLoaderRoute: typeof UploadAwsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/upload': {
       id: '/upload'
       path: '/upload'
@@ -525,6 +545,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
   UploadRoute: UploadRoute,
+  UploadAwsRoute: UploadAwsRoute,
   EmbedCidRoute: EmbedCidRoute,
   UWalletRoute: UWalletRoute,
   VCidRoute: VCidRouteWithChildren,
@@ -532,3 +553,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
