@@ -147,3 +147,53 @@ export const getMediaConvertJob = createServerFn({ method: "POST" })
     const { describeJob } = await import("./aws-mediaconvert.server");
     return await describeJob(data.jobId);
   });
+
+export const listTranscodeOutputs = createServerFn({ method: "POST" })
+  .inputValidator((d: { cid: string }) => {
+    if (!d.cid || d.cid.length > 200) throw new Error("Invalid cid");
+    return d;
+  })
+  .handler(async ({ data }) => {
+    const e = transcodeEnv();
+    if (!e.outputBucket) throw new Error("Transcode not configured");
+    const { listObjects } = await import("./aws-s3.server");
+    const prefix = `hls/${data.cid}/`;
+    const keys = await listObjects(e.outputBucket, prefix);
+    return { bucket: e.outputBucket, prefix, keys };
+  });
+
+export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
+  .inputValidator((d: { cid: string; jobId: string }) => {
+    if (!d.cid || d.cid.length > 200) throw new Error("Invalid cid");
+    if (!d.jobId || d.jobId.length > 200) throw new Error("Invalid jobId");
+    return d;
+  })
+  .handler(async ({ data }) => {
+    const secret = process.env.MEDIACONVERT_WEBHOOK_SECRET;
+    if (!secret) throw new Error("MEDIACONVERT_WEBHOOK_SECRET not set");
+    const { createHmac } = await import("crypto");
+
+    const event = {
+      source: "aws.mediaconvert",
+      "detail-type": "MediaConvert Job State Change",
+      detail: {
+        jobId: data.jobId,
+        status: "COMPLETE",
+        userMetadata: { videoId: data.cid },
+      },
+    };
+    const body = JSON.stringify(event);
+    const sig = createHmac("sha256", secret).update(body).digest("hex");
+
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const origin = new URL(getRequest().url).origin;
+    const url = `${origin}/api/public/hooks/mediaconvert?dryRun=1`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-webhook-signature": sig },
+      body,
+    });
+    const text = await res.text();
+    return { status: res.status, body: text, url };
+  });
