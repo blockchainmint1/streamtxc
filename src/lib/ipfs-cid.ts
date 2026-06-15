@@ -1,7 +1,9 @@
 // Browser-safe compatibility wrapper. The actual IPFS hash library is
 // Node-style CommonJS and depends on Buffer/protobuf internals, so browser
 // callers compute CIDs through our same-origin API instead of bundling it.
-export { computeCids } from "./cid-client";
+import { computeCids } from "./cid-client";
+
+export { computeCids };
 
 export async function computeCidV1(file: File): Promise<string> {
   return (await computeCids(file)).v1;
