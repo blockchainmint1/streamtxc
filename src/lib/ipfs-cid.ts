@@ -6,7 +6,7 @@
 // (legacy default — rawLeaves:false, dag-pb leaves) because the same bytes
 // produce different CIDs under each scheme, and a file pinned by an older
 // client (or by `ipfs add` with default flags) will only resolve under v0.
-import { Buffer as BufferPolyfill } from "buffer";
+import { Buffer as BufferPolyfill } from "buffer/";
 import Hash from "ipfs-only-hash";
 
 // ipfs-only-hash uses Node's Buffer internally. In the browser there is no
