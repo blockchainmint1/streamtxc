@@ -6,26 +6,17 @@
 // (legacy default — rawLeaves:false, dag-pb leaves) because the same bytes
 // produce different CIDs under each scheme, and a file pinned by an older
 // client (or by `ipfs add` with default flags) will only resolve under v0.
-import { Buffer as BufferPolyfill } from "buffer";
+// Buffer is provided globally by vite-plugin-node-polyfills (see
+// vite.config.ts). ipfs-only-hash → ipfs-unixfs-importer needs it in the
+// browser; nothing to do here at import time.
 import Hash from "ipfs-only-hash";
 
-// ipfs-only-hash uses Node's Buffer internally. In the browser there is no
-// Buffer global, so install the polyfill lazily the first time we hash.
-function ensureBuffer(): void {
-  const g = globalThis as { Buffer?: unknown };
-  if (typeof g.Buffer === "undefined") {
-    g.Buffer = BufferPolyfill;
-  }
-}
-
 export async function computeCidV1(file: File | Blob): Promise<string> {
-  ensureBuffer();
   const buf = new Uint8Array(await file.arrayBuffer());
   return Hash.of(buf, { cidVersion: 1, rawLeaves: true });
 }
 
 export async function computeCidV0(file: File | Blob): Promise<string> {
-  ensureBuffer();
   const buf = new Uint8Array(await file.arrayBuffer());
   return Hash.of(buf, { cidVersion: 0, rawLeaves: false });
 }
@@ -34,7 +25,6 @@ export async function computeCidV0(file: File | Blob): Promise<string> {
 export async function computeCids(
   file: File | Blob,
 ): Promise<{ v1: string; v0: string }> {
-  ensureBuffer();
   const buf = new Uint8Array(await file.arrayBuffer());
   const [v1, v0] = await Promise.all([
     Hash.of(buf, { cidVersion: 1, rawLeaves: true }),
