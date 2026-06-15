@@ -42,7 +42,7 @@ import {
   isTranscodeConfigured,
 } from "@/lib/transcode.functions";
 
-export const Route = createFileRoute("/upload")({
+export const Route = createFileRoute("/upload-aws")({
   head: () => ({
     meta: [
       { title: "Upload — stream.texitcoin" },
