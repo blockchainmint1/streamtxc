@@ -20,8 +20,11 @@ export default defineConfig({
       // client bundle ships a real implementation instead of Vite's empty
       // node:* external stub.
       nodePolyfills({
-        include: ["buffer", "process"],
-        globals: { Buffer: true, process: true, global: true },
+        // Only polyfill Buffer — adding `process` shadows the build-time
+        // `process.env.*` constants TanStack Start injects for serverFn
+        // base URLs, breaking RPC calls with POST /undefined…
+        include: ["buffer"],
+        globals: { Buffer: true, process: false, global: false },
         protocolImports: true,
       }),
     ],
