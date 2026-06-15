@@ -9,3 +9,13 @@ export function ipfsThumbUrl(cid: string | null | undefined): string | undefined
   if (!cid) return undefined;
   return `/api/stream/${cid}`;
 }
+
+/**
+ * Build the HLS master-playlist URL for a transcoded video's directory CID.
+ * Returns `undefined` when there's no HLS bundle yet, so callers can fall back
+ * to the legacy single-MP4 path.
+ */
+export function ipfsHlsUrl(hlsCid: string | null | undefined): string | undefined {
+  if (!hlsCid) return undefined;
+  return `/api/stream/${hlsCid}/master.m3u8`;
+}
