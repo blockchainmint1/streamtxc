@@ -28,19 +28,17 @@ export async function createPresignedPutUrl(opts: {
 }): Promise<string> {
   const client = s3Client();
   const url = new URL(`${s3Host(opts.bucket)}/${encodeURIComponent(opts.key).replace(/%2F/g, "/")}`);
+  if (opts.expiresSeconds) {
+    url.searchParams.set("X-Amz-Expires", String(opts.expiresSeconds));
+  }
   const signed = await client.sign(
     new Request(url.toString(), { method: "PUT", headers: { "content-type": opts.contentType } }),
     {
       aws: { signQuery: true },
-      // aws4fetch picks a default expiry; we pass via X-Amz-Expires below
+      // X-Amz-Expires must be present before signing; mutating it after signing invalidates the signature.
     },
   );
-  // aws4fetch defaults to 86400 if signQuery is true; force ours via URL search rewrite if needed
-  const final = new URL(signed.url);
-  if (opts.expiresSeconds) {
-    final.searchParams.set("X-Amz-Expires", String(opts.expiresSeconds));
-  }
-  return final.toString();
+  return signed.url;
 }
 
 /** List object keys under a prefix. Returns full keys (not stripped of prefix). */
