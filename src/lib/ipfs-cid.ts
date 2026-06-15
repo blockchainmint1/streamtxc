@@ -6,9 +6,7 @@
 // (legacy default — rawLeaves:false, dag-pb leaves) because the same bytes
 // produce different CIDs under each scheme, and a file pinned by an older
 // client (or by `ipfs add` with default flags) will only resolve under v0.
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - direct file import bypasses Vite's node:buffer externalization
-import { Buffer as BufferPolyfill } from "buffer/index.js";
+import { Buffer as BufferPolyfill } from "buffer";
 import Hash from "ipfs-only-hash";
 
 // ipfs-only-hash uses Node's Buffer internally. In the browser there is no
