@@ -23,6 +23,7 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
         const secret = process.env.MEDIACONVERT_WEBHOOK_SECRET;
         if (!secret) return new Response("Webhook not configured", { status: 503 });
 
+        const dryRun = new URL(request.url).searchParams.get("dryRun") === "1";
         const body = await request.text();
         const sig = request.headers.get("x-webhook-signature") ?? "";
         const expected = createHmac("sha256", secret).update(body).digest("hex");
@@ -77,25 +78,12 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
         if (!outputBucket) return new Response("S3 not configured", { status: 503 });
 
         const { listObjects, getObjectBlob } = await import("@/lib/aws-s3.server");
-        const { pinDirectoryToIPFS } = await import("@/lib/pinata.server");
 
         const prefix = `hls/${cid}/`;
         const keys = await listObjects(outputBucket, prefix);
         if (keys.length === 0) {
           return new Response("No outputs found", { status: 500 });
         }
-
-        const files: Array<{ path: string; body: Blob; contentType?: string }> = [];
-        for (const key of keys) {
-          const blob = await getObjectBlob(outputBucket, key);
-          files.push({
-            path: key.slice(prefix.length),
-            body: blob,
-            contentType: blob.type || undefined,
-          });
-        }
-
-        const pinned = await pinDirectoryToIPFS(files, `hls-${cid}`);
 
         // Derive a minimal rendition manifest from the keys we saw.
         const renditions = keys
@@ -108,6 +96,28 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
               playlist: rel,
             };
           });
+
+        if (dryRun) {
+          // Test path: don't pin to IPFS, don't touch the DB. Just report
+          // what we found so /s3-test can verify the pipeline end-to-end.
+          return new Response(
+            JSON.stringify({ dryRun: true, cid, jobId, keys, renditions }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        }
+
+        const { pinDirectoryToIPFS } = await import("@/lib/pinata.server");
+        const files: Array<{ path: string; body: Blob; contentType?: string }> = [];
+        for (const key of keys) {
+          const blob = await getObjectBlob(outputBucket, key);
+          files.push({
+            path: key.slice(prefix.length),
+            body: blob,
+            contentType: blob.type || undefined,
+          });
+        }
+
+        const pinned = await pinDirectoryToIPFS(files, `hls-${cid}`);
 
         await supabaseAdmin
           .from("videos")
