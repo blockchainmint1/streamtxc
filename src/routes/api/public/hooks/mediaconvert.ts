@@ -130,7 +130,7 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
 
         let newMetaCid: string | null = null;
         let newMetaTx: string | null = null;
-        if (row) {
+        if (row && row.video_wallet && row.owner_wallet) {
           const { recordMetadataAnchor } = await import("@/lib/chain-events.server");
           const anchored = await recordMetadataAnchor({
             videoCid: cid,
