@@ -1,0 +1,1 @@
+UPDATE public.videos SET owner_wallet = 'TgCKcnxHJiLrBgDXHNx8jM4FBuNK7k63Jd' WHERE owner_wallet = 'TpzeTNTRtdYzCVnom5LVjZMsWEcswn7qrG';
