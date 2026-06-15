@@ -329,28 +329,38 @@ function UploadPage() {
       if (!address) recordAnonUpload(result.cid, title);
       qc.invalidateQueries({ queryKey: ["recent-videos"] });
 
-      // Fire-and-forget: kick off the adaptive HLS transcode if AWS is wired
-      // up. We don't block navigation on this — playback falls back to the
-      // original MP4 until the webhook lands the HLS bundle.
+      // Kick off the adaptive HLS transcode if AWS is wired up. Surface any
+      // errors so silent S3/MediaConvert failures (CORS, expired keys, bad
+      // bucket policy) don't disappear into the console — they're the most
+      // common reason the AWS pipeline appears not to run.
       try {
         const { configured } = await checkTxConfig();
-        if (configured) {
-          const { url } = await getS3Url({
-            data: { cid: pinResult.cid, contentType: file.type || "video/mp4" },
-          });
+        if (!configured) {
+          toast("AWS transcode not configured — skipping HLS step.");
+        } else {
+          const ct = file.type || "video/mp4";
+          const { url } = await getS3Url({ data: { cid: pinResult.cid, contentType: ct } });
           const putRes = await fetch(url, {
             method: "PUT",
-            headers: { "content-type": file.type || "video/mp4" },
+            headers: { "content-type": ct },
             body: file,
           });
           if (!putRes.ok) {
-            console.warn("S3 upload failed", putRes.status);
+            const body = await putRes.text().catch(() => "");
+            console.error("S3 PUT failed", putRes.status, body);
+            toast.error(`S3 upload failed (${putRes.status})`, {
+              description: body.slice(0, 200) || "Check bucket CORS / credentials.",
+            });
           } else {
-            await startTx({ data: { cid: pinResult.cid } });
+            const { jobId } = await startTx({ data: { cid: pinResult.cid } });
+            toast.success("HLS transcode started", { description: `Job ${jobId}` });
           }
         }
       } catch (err) {
-        console.warn("transcode kickoff skipped:", err);
+        console.error("transcode kickoff failed:", err);
+        toast.error("Transcode kickoff failed", {
+          description: err instanceof Error ? err.message : String(err),
+        });
       }
 
       navigate({ to: "/v/$cid", params: { cid: result.cid } });
