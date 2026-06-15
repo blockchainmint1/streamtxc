@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   getTranscodeUploadUrl,
@@ -8,7 +8,9 @@ import {
   getMediaConvertJob,
   listTranscodeOutputs,
   simulateMediaConvertWebhook,
+  getPinataGateway,
 } from "@/lib/transcode.functions";
+import { VideoPlayer } from "@/components/VideoPlayer";
 
 export const Route = createFileRoute("/s3-test")({
   head: () => ({ meta: [{ title: "S3 PUT test" }] }),
@@ -22,11 +24,19 @@ function S3Test() {
   const describeJob = useServerFn(getMediaConvertJob);
   const listOutputs = useServerFn(listTranscodeOutputs);
   const simulateHook = useServerFn(simulateMediaConvertWebhook);
+  const getGateway = useServerFn(getPinataGateway);
   const [file, setFile] = useState<File | null>(null);
   const [log, setLog] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [lastKey, setLastKey] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
+  const [pinnedCid, setPinnedCid] = useState<string | null>(null);
+  const [gateway, setGateway] = useState<string | null>(null);
+  const [playUrl, setPlayUrl] = useState<string>("");
+
+  useEffect(() => {
+    getGateway().then((g) => setGateway(g.gateway)).catch(() => {});
+  }, [getGateway]);
 
   function push(line: string) {
     setLog((l) => [...l, `[${new Date().toISOString().slice(11, 19)}] ${line}`]);
@@ -154,6 +164,17 @@ function S3Test() {
       const ms = Math.round(performance.now() - t0);
       push(`webhook → ${r.status} in ${ms}ms`);
       push(r.body.slice(0, 2000));
+      try {
+        const parsed = JSON.parse(r.body) as { pinnedCid?: string };
+        if (parsed.pinnedCid) {
+          setPinnedCid(parsed.pinnedCid);
+          if (gateway) {
+            const url = `https://${gateway}/ipfs/${parsed.pinnedCid}/${cid}.m3u8`;
+            setPlayUrl(url);
+            push(`▶ player src: ${url}`);
+          }
+        }
+      } catch { /* non-JSON response, ignore */ }
     } catch (err) {
       push(`💥 ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -222,6 +243,44 @@ function S3Test() {
       <pre className="mt-6 bg-muted text-foreground p-4 rounded whitespace-pre-wrap break-all min-h-[200px]">
         {log.join("\n") || "(no output yet)"}
       </pre>
+
+      <section className="mt-10">
+        <h2 className="text-xl font-bold mb-2">HLS player</h2>
+        <p className="text-muted-foreground mb-3">
+          After button 6 pins to IPFS, the master playlist URL auto-fills below.
+          You can also paste any .m3u8 URL (S3, IPFS, anywhere CORS allows).
+        </p>
+        <div className="flex gap-2 mb-4">
+          <input
+            type="url"
+            value={playUrl}
+            onChange={(e) => setPlayUrl(e.target.value)}
+            placeholder="https://…/master.m3u8"
+            className="flex-1 bg-muted text-foreground px-3 py-2 rounded text-xs"
+          />
+          <button
+            onClick={() => setPlayUrl("")}
+            disabled={!playUrl}
+            className="bg-muted text-foreground px-3 py-2 rounded disabled:opacity-50"
+          >
+            Clear
+          </button>
+        </div>
+        {pinnedCid && gateway && (
+          <p className="text-xs text-muted-foreground mb-3 break-all">
+            pinned cid: <code>{pinnedCid}</code> · gateway: <code>{gateway}</code>
+          </p>
+        )}
+        <div className="aspect-video bg-black rounded overflow-hidden">
+          {playUrl ? (
+            <VideoPlayer key={playUrl} src={playUrl} autoPlay muted />
+          ) : (
+            <div className="w-full h-full grid place-items-center text-muted-foreground text-xs">
+              (no source yet — run steps 1–6 or paste an .m3u8 URL above)
+            </div>
+          )}
+        </div>
+      </section>
     </main>
   );
 }
