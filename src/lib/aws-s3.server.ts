@@ -85,3 +85,97 @@ export async function getObjectBlob(bucket: string, key: string): Promise<Blob> 
   }
   return await res.blob();
 }
+
+// ---- Multipart upload helpers ---------------------------------------------
+// Browser flow:
+//   1. createMultipart → uploadId
+//   2. for each part: signMultipartPartUrl → PUT directly to S3 → collect ETag
+//   3. completeMultipart with [{PartNumber, ETag}, …]
+// On any failure the client should call abortMultipart to free storage.
+
+function encodeKey(key: string) {
+  return encodeURIComponent(key).replace(/%2F/g, "/");
+}
+
+export async function createMultipartUpload(opts: {
+  bucket: string;
+  key: string;
+  contentType: string;
+}): Promise<{ uploadId: string }> {
+  const client = s3Client();
+  const url = `${s3Host(opts.bucket)}/${encodeKey(opts.key)}?uploads=`;
+  const res = await client.fetch(url, {
+    method: "POST",
+    headers: { "content-type": opts.contentType },
+  });
+  if (!res.ok) {
+    throw new Error(`S3 createMultipart failed [${res.status}]: ${await res.text().catch(() => "")}`);
+  }
+  const xml = await res.text();
+  const m = xml.match(/<UploadId>([^<]+)<\/UploadId>/);
+  if (!m) throw new Error("S3 createMultipart: no UploadId in response");
+  return { uploadId: m[1] };
+}
+
+export async function signMultipartPartUrl(opts: {
+  bucket: string;
+  key: string;
+  uploadId: string;
+  partNumber: number;
+  expiresSeconds?: number;
+}): Promise<string> {
+  const client = s3Client();
+  const url = new URL(`${s3Host(opts.bucket)}/${encodeKey(opts.key)}`);
+  url.searchParams.set("partNumber", String(opts.partNumber));
+  url.searchParams.set("uploadId", opts.uploadId);
+  if (opts.expiresSeconds) url.searchParams.set("X-Amz-Expires", String(opts.expiresSeconds));
+  const signed = await client.sign(
+    new Request(url.toString(), { method: "PUT" }),
+    { aws: { signQuery: true } },
+  );
+  return signed.url;
+}
+
+export async function completeMultipartUpload(opts: {
+  bucket: string;
+  key: string;
+  uploadId: string;
+  parts: { partNumber: number; etag: string }[];
+}): Promise<void> {
+  const client = s3Client();
+  const url = `${s3Host(opts.bucket)}/${encodeKey(opts.key)}?uploadId=${encodeURIComponent(opts.uploadId)}`;
+  const sorted = [...opts.parts].sort((a, b) => a.partNumber - b.partNumber);
+  const body =
+    `<?xml version="1.0" encoding="UTF-8"?>` +
+    `<CompleteMultipartUpload>` +
+    sorted
+      .map(
+        (p) =>
+          `<Part><PartNumber>${p.partNumber}</PartNumber><ETag>${p.etag.replace(/"/g, "&quot;")}</ETag></Part>`,
+      )
+      .join("") +
+    `</CompleteMultipartUpload>`;
+  const res = await client.fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/xml" },
+    body,
+  });
+  if (!res.ok) {
+    throw new Error(`S3 completeMultipart failed [${res.status}]: ${await res.text().catch(() => "")}`);
+  }
+  // S3 may return 200 with an error embedded in the body.
+  const xml = await res.text();
+  if (/<Error>/.test(xml)) {
+    throw new Error(`S3 completeMultipart returned error: ${xml.slice(0, 500)}`);
+  }
+}
+
+export async function abortMultipartUpload(opts: {
+  bucket: string;
+  key: string;
+  uploadId: string;
+}): Promise<void> {
+  const client = s3Client();
+  const url = `${s3Host(opts.bucket)}/${encodeKey(opts.key)}?uploadId=${encodeURIComponent(opts.uploadId)}`;
+  await client.fetch(url, { method: "DELETE" }).catch(() => {});
+}

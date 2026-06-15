@@ -9,6 +9,10 @@ import {
   listTranscodeOutputs,
   simulateMediaConvertWebhook,
   getPinataGateway,
+  startMultipartUpload,
+  signMultipartPart,
+  finishMultipartUpload,
+  cancelMultipartUpload,
 } from "@/lib/transcode.functions";
 import { VideoPlayer } from "@/components/VideoPlayer";
 
@@ -32,6 +36,10 @@ function S3Test() {
   const listOutputs = useServerFn(listTranscodeOutputs);
   const simulateHook = useServerFn(simulateMediaConvertWebhook);
   const getGateway = useServerFn(getPinataGateway);
+  const mpStart = useServerFn(startMultipartUpload);
+  const mpSign = useServerFn(signMultipartPart);
+  const mpFinish = useServerFn(finishMultipartUpload);
+  const mpCancel = useServerFn(cancelMultipartUpload);
   const [file, setFile] = useState<File | null>(null);
   const [log, setLog] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -68,46 +76,169 @@ function S3Test() {
 
       const cid = `s3-test-${Date.now()}`;
       const ct = file.type || "application/octet-stream";
-      const { url, bucket, key } = await getUrl({ data: { cid, contentType: ct } });
-      push(`presigned: PUT s3://${bucket}/${key}`);
-      push(`url host: ${new URL(url).host}`);
 
-      const t0 = performance.now();
-      setUploadPct(0);
-      setUploadStats({ loaded: 0, total: file.size, bps: 0 });
-      const { status, body } = await new Promise<{ status: number; body: string }>(
-        (resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("PUT", url);
-          xhr.setRequestHeader("content-type", ct);
-          xhr.upload.onprogress = (e) => {
-            if (!e.lengthComputable) return;
-            const elapsed = (performance.now() - t0) / 1000;
-            const bps = elapsed > 0 ? e.loaded / elapsed : 0;
-            setUploadPct(Math.round((e.loaded / e.total) * 100));
-            setUploadStats({ loaded: e.loaded, total: e.total, bps });
-          };
-          xhr.onload = () =>
-            resolve({ status: xhr.status, body: xhr.responseText || "" });
-          xhr.onerror = () => reject(new Error("network error during PUT"));
-          xhr.onabort = () => reject(new Error("upload aborted"));
-          xhr.send(file);
-        },
-      );
-      const ms = Math.round(performance.now() - t0);
-      setUploadPct(100);
-      push(`PUT → ${status} in ${ms}ms`);
-      if (body) push(`response body: ${body.slice(0, 1500)}`);
-      if (status >= 200 && status < 300) {
-        push(`✅ Object written to ${bucket}/${key}`);
-        setLastKey(key);
+      // Threshold: anything ≥ 50 MB goes multipart. Smaller → simple PUT.
+      const MULTIPART_THRESHOLD = 50 * 1024 * 1024;
+      if (file.size >= MULTIPART_THRESHOLD) {
+        const key = await uploadMultipart(file, cid, ct);
+        if (key) setLastKey(key);
       } else {
-        push(`❌ Upload failed`);
+        const key = await uploadSimple(file, cid, ct);
+        if (key) setLastKey(key);
       }
     } catch (err) {
       push(`💥 ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function uploadSimple(f: File, cid: string, ct: string): Promise<string | null> {
+    const { url, bucket, key } = await getUrl({ data: { cid, contentType: ct } });
+    push(`presigned: PUT s3://${bucket}/${key}`);
+    push(`url host: ${new URL(url).host}`);
+    const t0 = performance.now();
+    setUploadPct(0);
+    setUploadStats({ loaded: 0, total: f.size, bps: 0 });
+    const { status, body } = await new Promise<{ status: number; body: string }>(
+      (resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", url);
+        xhr.setRequestHeader("content-type", ct);
+        xhr.upload.onprogress = (e) => {
+          if (!e.lengthComputable) return;
+          const elapsed = (performance.now() - t0) / 1000;
+          const bps = elapsed > 0 ? e.loaded / elapsed : 0;
+          setUploadPct(Math.round((e.loaded / e.total) * 100));
+          setUploadStats({ loaded: e.loaded, total: e.total, bps });
+        };
+        xhr.onload = () => resolve({ status: xhr.status, body: xhr.responseText || "" });
+        xhr.onerror = () => reject(new Error("network error during PUT"));
+        xhr.onabort = () => reject(new Error("upload aborted"));
+        xhr.send(f);
+      },
+    );
+    const ms = Math.round(performance.now() - t0);
+    setUploadPct(100);
+    push(`PUT → ${status} in ${ms}ms`);
+    if (body) push(`response body: ${body.slice(0, 1500)}`);
+    if (status >= 200 && status < 300) {
+      push(`✅ Object written to ${bucket}/${key}`);
+      return key;
+    }
+    push(`❌ Upload failed`);
+    return null;
+  }
+
+  async function uploadMultipart(f: File, cid: string, ct: string): Promise<string | null> {
+    // Tunables: 10 MB parts × 4 in parallel ≈ 40 MB in-flight.
+    // S3 minimum part size is 5 MB (last part can be smaller).
+    const PART_SIZE = 10 * 1024 * 1024;
+    const CONCURRENCY = 4;
+    const totalParts = Math.ceil(f.size / PART_SIZE);
+    push(`multipart upload: ${totalParts} parts × ${fmtBytes(PART_SIZE)} (concurrency=${CONCURRENCY})`);
+
+    const init = await mpStart({ data: { cid, contentType: ct } });
+    push(`init multipart: s3://${init.bucket}/${init.key}`);
+    push(`uploadId: ${init.uploadId.slice(0, 40)}…`);
+
+    const t0 = performance.now();
+    setUploadPct(0);
+    setUploadStats({ loaded: 0, total: f.size, bps: 0 });
+
+    // Per-part progress tracker — sum across all parts in flight.
+    const partLoaded = new Array<number>(totalParts).fill(0);
+    const updateProgress = () => {
+      const loaded = partLoaded.reduce((a, b) => a + b, 0);
+      const elapsed = (performance.now() - t0) / 1000;
+      const bps = elapsed > 0 ? loaded / elapsed : 0;
+      setUploadPct(Math.min(99, Math.round((loaded / f.size) * 100)));
+      setUploadStats({ loaded, total: f.size, bps });
+    };
+
+    const parts: { partNumber: number; etag: string }[] = [];
+
+    async function uploadPart(idx: number): Promise<void> {
+      const partNumber = idx + 1;
+      const start = idx * PART_SIZE;
+      const end = Math.min(start + PART_SIZE, f.size);
+      const blob = f.slice(start, end);
+      // Retry up to 3× per part on transient failure.
+      let lastErr: unknown;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const { url } = await mpSign({
+            data: { key: init.key, uploadId: init.uploadId, partNumber },
+          });
+          const etag = await new Promise<string>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open("PUT", url);
+            xhr.upload.onprogress = (e) => {
+              if (!e.lengthComputable) return;
+              partLoaded[idx] = e.loaded;
+              updateProgress();
+            };
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                const tag = xhr.getResponseHeader("ETag");
+                if (!tag) {
+                  reject(
+                    new Error(
+                      "Missing ETag header on part response — bucket CORS must expose ETag",
+                    ),
+                  );
+                  return;
+                }
+                partLoaded[idx] = blob.size;
+                updateProgress();
+                resolve(tag);
+              } else {
+                reject(new Error(`part ${partNumber} → HTTP ${xhr.status}`));
+              }
+            };
+            xhr.onerror = () => reject(new Error(`part ${partNumber}: network error`));
+            xhr.onabort = () => reject(new Error(`part ${partNumber}: aborted`));
+            xhr.send(blob);
+          });
+          parts.push({ partNumber, etag });
+          return;
+        } catch (err) {
+          lastErr = err;
+          partLoaded[idx] = 0;
+          updateProgress();
+          push(`  ⚠ part ${partNumber} attempt ${attempt} failed: ${err instanceof Error ? err.message : String(err)}`);
+          if (attempt < 3) await new Promise((r) => setTimeout(r, 500 * attempt));
+        }
+      }
+      throw lastErr instanceof Error ? lastErr : new Error(`part ${partNumber} failed`);
+    }
+
+    try {
+      // Worker pool: pull next part index until exhausted.
+      let nextIdx = 0;
+      const workers = Array.from({ length: Math.min(CONCURRENCY, totalParts) }, async () => {
+        while (true) {
+          const idx = nextIdx++;
+          if (idx >= totalParts) return;
+          await uploadPart(idx);
+        }
+      });
+      await Promise.all(workers);
+
+      push(`all ${totalParts} parts uploaded — completing…`);
+      await mpFinish({
+        data: { key: init.key, uploadId: init.uploadId, parts },
+      });
+      const ms = Math.round(performance.now() - t0);
+      setUploadPct(100);
+      push(`✅ multipart complete in ${ms}ms → s3://${init.bucket}/${init.key}`);
+      return init.key;
+    } catch (err) {
+      push(`💥 multipart failed: ${err instanceof Error ? err.message : String(err)}`);
+      push(`aborting upload to free S3 storage…`);
+      await mpCancel({ data: { key: init.key, uploadId: init.uploadId } }).catch(() => {});
+      push(`aborted.`);
+      return null;
     }
   }
 
