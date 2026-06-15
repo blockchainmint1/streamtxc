@@ -111,3 +111,39 @@ export const getTranscodeStatus = createServerFn({ method: "GET" })
     if (error) throw error;
     return row ?? null;
   });
+
+// ---- Test helpers (used by /s3-test) ---------------------------------------
+// These skip the DB lookup so we can exercise the AWS pipeline end-to-end
+// without first inserting a `videos` row.
+
+export const startTranscodeTest = createServerFn({ method: "POST" })
+  .inputValidator((d: { key: string }) => {
+    if (!d.key || d.key.length > 500) throw new Error("Invalid key");
+    return d;
+  })
+  .handler(async ({ data }) => {
+    const e = transcodeEnv();
+    if (!e.inputBucket || !e.outputBucket) throw new Error("Transcode not configured");
+    const { startHlsTranscode } = await import("./aws-mediaconvert.server");
+    const id = data.key.split("/").pop() || `test-${Date.now()}`;
+    const { jobId } = await startHlsTranscode({
+      inputUri: `s3://${e.inputBucket}/${data.key}`,
+      outputPrefix: `s3://${e.outputBucket}/hls/${id}/`,
+      videoId: id,
+    });
+    return {
+      jobId,
+      inputUri: `s3://${e.inputBucket}/${data.key}`,
+      outputPrefix: `s3://${e.outputBucket}/hls/${id}/`,
+    };
+  });
+
+export const getMediaConvertJob = createServerFn({ method: "POST" })
+  .inputValidator((d: { jobId: string }) => {
+    if (!d.jobId || d.jobId.length > 200) throw new Error("Invalid jobId");
+    return d;
+  })
+  .handler(async ({ data }) => {
+    const { describeJob } = await import("./aws-mediaconvert.server");
+    return await describeJob(data.jobId);
+  });
