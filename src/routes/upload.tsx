@@ -266,12 +266,22 @@ function UploadPage() {
       //    background probe finished.
       setStage("hashing");
       setProgress(0);
-      const cids = localCids ?? (await computeCids(file));
+      let cids = localCids;
+      if (!cids) {
+        try {
+          cids = await computeCids(file);
+          setLocalCids(cids);
+        } catch (err) {
+          console.warn("CID pre-hash failed; continuing with upload", err);
+        }
+      }
+
       setStage("checking");
-      const hit =
-        matchedCid
+      const hit = cids
+        ? matchedCid
           ? { cid: matchedCid }
-          : await lookupCid({ data: { cidV1: cids.v1, cidV0: cids.v0 } });
+          : await lookupCid({ data: { cidV1: cids.v1, cidV0: cids.v0 } })
+        : null;
       if (hit) {
         toast("Found this file on IPFS — skipping upload", {
           description: "Registering existing CID instead.",
