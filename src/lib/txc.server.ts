@@ -181,7 +181,12 @@ function rpcUrl(): string {
     const port = process.env.TXC_RPC_PORT || "15739";
     u = u.replace(/\/?$/, "") + ":" + port;
   }
-  return u;
+  // Target a specific wallet on the node. The node may have multiple wallets
+  // loaded (e.g. a watch-only wallet plus our signing "hot" wallet); without
+  // the /wallet/<name> path, Core picks the default and signing calls fail
+  // with "This wallet has no available keys".
+  const walletName = process.env.TXC_RPC_WALLET || "hot";
+  return u.replace(/\/?$/, "") + "/wallet/" + encodeURIComponent(walletName);
 }
 
 async function rpc<T = unknown>(method: string, params: unknown[]): Promise<T> {
