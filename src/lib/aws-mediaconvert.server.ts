@@ -131,3 +131,17 @@ function rendition(
     ContainerSettings: { Container: "M3U8", M3u8Settings: {} },
   };
 }
+
+/** Fetch the status/details of a MediaConvert job by id. */
+export async function describeJob(jobId: string): Promise<unknown> {
+  const endpoint = process.env.AWS_MEDIACONVERT_ENDPOINT;
+  if (!endpoint) throw new Error("AWS_MEDIACONVERT_ENDPOINT required");
+  const client = aws();
+  const res = await client.fetch(
+    `${endpoint.replace(/\/$/, "")}/2017-08-29/jobs/${encodeURIComponent(jobId)}`,
+    { method: "GET" },
+  );
+  const text = await res.text();
+  if (!res.ok) throw new Error(`MediaConvert describeJob failed [${res.status}]: ${text}`);
+  return JSON.parse(text);
+}
