@@ -44,6 +44,7 @@
         "bip322-js": "^3.0.0",
         "bitcoinjs-lib": "^7.0.1",
         "bitcoinjs-message": "^2.2.0",
+        "buffer": "^6.0.3",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",
