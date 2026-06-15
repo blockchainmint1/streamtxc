@@ -9,17 +9,23 @@
 import { Buffer as BufferPolyfill } from "buffer";
 import Hash from "ipfs-only-hash";
 
-// ipfs-only-hash uses Node's Buffer internally. Ensure a Buffer global
-// exists in the browser bundle before the library walks the file.
-const _g = globalThis as unknown as { Buffer?: typeof BufferPolyfill };
-if (!_g.Buffer) _g.Buffer = BufferPolyfill;
+// ipfs-only-hash uses Node's Buffer internally. In the browser there is no
+// Buffer global, so install the polyfill lazily the first time we hash.
+function ensureBuffer(): void {
+  const g = globalThis as { Buffer?: unknown };
+  if (typeof g.Buffer === "undefined") {
+    g.Buffer = BufferPolyfill;
+  }
+}
 
 export async function computeCidV1(file: File | Blob): Promise<string> {
+  ensureBuffer();
   const buf = new Uint8Array(await file.arrayBuffer());
   return Hash.of(buf, { cidVersion: 1, rawLeaves: true });
 }
 
 export async function computeCidV0(file: File | Blob): Promise<string> {
+  ensureBuffer();
   const buf = new Uint8Array(await file.arrayBuffer());
   return Hash.of(buf, { cidVersion: 0, rawLeaves: false });
 }
@@ -28,6 +34,7 @@ export async function computeCidV0(file: File | Blob): Promise<string> {
 export async function computeCids(
   file: File | Blob,
 ): Promise<{ v1: string; v0: string }> {
+  ensureBuffer();
   const buf = new Uint8Array(await file.arrayBuffer());
   const [v1, v0] = await Promise.all([
     Hash.of(buf, { cidVersion: 1, rawLeaves: true }),
