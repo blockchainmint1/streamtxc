@@ -61,7 +61,6 @@ export async function startHlsTranscode(opts: CreateJobOpts): Promise<{ jobId: s
               MinSegmentLength: 0,
               ManifestDurationFormat: "INTEGER",
               OutputSelection: "MANIFESTS_AND_SEGMENTS",
-              DirectoryStructure: "SUBDIRECTORY_PER_STREAM",
             },
           },
           Outputs: [
