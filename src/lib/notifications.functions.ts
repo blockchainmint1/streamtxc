@@ -136,7 +136,8 @@ export const requestTelegramPairing = createServerFn({ method: "POST" })
       { onConflict: "wallet" },
     );
     if (error) throw new Error(error.message);
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME ?? "";
+    const botUsername =
+      process.env.TELEGRAM_BOT_USERNAME ?? "TXC_notify_bot";
     const deepLink = botUsername
       ? `https://t.me/${botUsername}?start=${code}`
       : null;
