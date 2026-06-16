@@ -261,6 +261,8 @@ function ManagePageInner() {
           )}
         </div>
 
+        {address && <NotificationPrefs wallet={address} />}
+
         {unclaimedAnon.length > 0 && (
           <div className="mb-10 border-2 border-amber-500/40 bg-amber-500/5 rounded-sm p-5">
             <div className="font-mono text-xs text-amber-500 mb-2">
