@@ -371,6 +371,7 @@ export type Database = {
           duration_s: number | null
           escrowed_creator_txc: number
           expires_at: string
+          expiring_at: string | null
           flagged_at: string | null
           flagged_reason: string | null
           hidden_at: string | null
@@ -381,6 +382,9 @@ export type Database = {
           metadata_cid: string | null
           mime_type: string | null
           months_prepaid: number
+          notified_expiring_at: string | null
+          notified_pre_expiry_at: string | null
+          notified_unpinned_at: string | null
           op_return_payload: string | null
           owner_nonce: string | null
           owner_proof_status: string
@@ -404,6 +408,7 @@ export type Database = {
           transcode_started_at: string | null
           transcode_status: string | null
           tx_hash: string | null
+          unpin_after: string | null
           unpinned_at: string | null
           video_wallet: string | null
           view_count: number
@@ -418,6 +423,7 @@ export type Database = {
           duration_s?: number | null
           escrowed_creator_txc?: number
           expires_at?: string
+          expiring_at?: string | null
           flagged_at?: string | null
           flagged_reason?: string | null
           hidden_at?: string | null
@@ -428,6 +434,9 @@ export type Database = {
           metadata_cid?: string | null
           mime_type?: string | null
           months_prepaid?: number
+          notified_expiring_at?: string | null
+          notified_pre_expiry_at?: string | null
+          notified_unpinned_at?: string | null
           op_return_payload?: string | null
           owner_nonce?: string | null
           owner_proof_status?: string
@@ -451,6 +460,7 @@ export type Database = {
           transcode_started_at?: string | null
           transcode_status?: string | null
           tx_hash?: string | null
+          unpin_after?: string | null
           unpinned_at?: string | null
           video_wallet?: string | null
           view_count?: number
@@ -465,6 +475,7 @@ export type Database = {
           duration_s?: number | null
           escrowed_creator_txc?: number
           expires_at?: string
+          expiring_at?: string | null
           flagged_at?: string | null
           flagged_reason?: string | null
           hidden_at?: string | null
@@ -475,6 +486,9 @@ export type Database = {
           metadata_cid?: string | null
           mime_type?: string | null
           months_prepaid?: number
+          notified_expiring_at?: string | null
+          notified_pre_expiry_at?: string | null
+          notified_unpinned_at?: string | null
           op_return_payload?: string | null
           owner_nonce?: string | null
           owner_proof_status?: string
@@ -498,6 +512,7 @@ export type Database = {
           transcode_started_at?: string | null
           transcode_status?: string | null
           tx_hash?: string | null
+          unpin_after?: string | null
           unpinned_at?: string | null
           video_wallet?: string | null
           view_count?: number
@@ -532,6 +547,51 @@ export type Database = {
             referencedColumns: ["cid"]
           },
         ]
+      }
+      wallet_notification_prefs: {
+        Row: {
+          created_at: string
+          email: string | null
+          email_verified_at: string | null
+          email_verify_expires_at: string | null
+          email_verify_token: string | null
+          notify_expiry: boolean
+          telegram_chat_id: number | null
+          telegram_pairing_code: string | null
+          telegram_pairing_expires_at: string | null
+          telegram_username: string | null
+          updated_at: string
+          wallet: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          email_verified_at?: string | null
+          email_verify_expires_at?: string | null
+          email_verify_token?: string | null
+          notify_expiry?: boolean
+          telegram_chat_id?: number | null
+          telegram_pairing_code?: string | null
+          telegram_pairing_expires_at?: string | null
+          telegram_username?: string | null
+          updated_at?: string
+          wallet: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          email_verified_at?: string | null
+          email_verify_expires_at?: string | null
+          email_verify_token?: string | null
+          notify_expiry?: boolean
+          telegram_chat_id?: number | null
+          telegram_pairing_code?: string | null
+          telegram_pairing_expires_at?: string | null
+          telegram_username?: string | null
+          updated_at?: string
+          wallet?: string
+        }
+        Relationships: []
       }
     }
     Views: {

@@ -1,59 +1,98 @@
-## Goal
+# Notifications + expiring lifecycle
 
-Stand up a parallel "v2" surface to test the MediaConvert → S3 → Pinata HLS pipeline without disturbing the live `/v/:cid` and `/upload` flows. Everything new lives at `/v2/:cid` and `/upload2` so we can iterate freely.
+Two related pieces:
+1. Let a wallet register Telegram and/or email so we can warn them before their videos die.
+2. Add a real "expiring → unpinned → archived" lifecycle so a wipe isn't instant and metadata is never lost.
 
-## 1. New player route: `/v2/:cid`
+---
 
-New file: `src/routes/v2.$cid.tsx`. Forks the current `/v/:cid` page but swaps the player for an enhanced `VideoPlayerV2`.
+## 1. Wallet notification prefs
 
-New file: `src/components/VideoPlayerV2.tsx`:
-- HLS-first: prefers `hls_cid` (served via existing `/api/stream/$cid/$` route, e.g. `master.m3u8`), falls back to the legacy single-file CID.
-- Quality selector built on `hls.levels` (Auto / 1080p / 720p / 480p / 360p), persists choice to `localStorage`.
-- Playback speed menu (0.5x – 2x).
-- Buffered / loading indicator overlay.
-- Small "Source" badge showing `HLS` vs `MP4 fallback` and which gateway is serving.
-- Keyboard shortcuts: space, ←/→ (5s), J/L (10s), M, F.
+New table `wallet_notification_prefs` keyed by `wallet` (no users table — wallet signature is identity):
 
-The `/v2/:cid` page also shows a small dev panel (only visible to the video owner or in dev) with: `transcode_status`, `transcode_job_id`, `transcode_started_at/completed_at`, `hls_cid`, `renditions`, and any `transcode_error`.
+| column | notes |
+|---|---|
+| `wallet` (pk) | the owner_wallet string |
+| `email` | nullable, plain text |
+| `email_verified_at` | set after click-through verification |
+| `telegram_chat_id` | nullable, set after they DM the bot with their pairing code |
+| `telegram_username` | display only |
+| `pairing_code` | short random token they paste into our Telegram bot to link the chat to their wallet |
+| `pairing_expires_at` | 15-min TTL |
+| `notify_expiry` | bool, default true |
+| `created_at` / `updated_at` | |
 
-## 2. New upload route: `/upload2`
+RLS: locked. All reads/writes via server functions gated by `requireWalletSignature` (same pattern used elsewhere for wallet-owned rows).
 
-New file: `src/routes/upload2.tsx`. Fork of `/upload` with the new pipeline language and a visible stage tracker:
+UI lives in `src/routes/manage.tsx` as a new "Notifications" card above the videos list:
+- Email field with "Send verification" button → emails a magic verify link (`/api/public/notify/verify-email?token=…`).
+- Telegram block: shows "Connect Telegram", reveals pairing code + a `https://t.me/<bot>?start=<code>` deep link. Once the bot sees `/start <code>` it stores chat_id and the UI auto-refreshes.
+- Toggle per alert type (only "expiry" for now).
+
+## 2. Expiring lifecycle for videos
+
+Today: grace expired → immediate `unpinByCid` + `status=unpinned`. We replace that with a softer 3-state machine on existing `videos` rows (no row deletion ever):
 
 ```text
-1. Sign upload   →   2. Upload to S3   →   3. Register video
-                                                   ↓
-4. Pin original to IPFS   ←   5. Transcoding (MediaConvert)   →   6. Pinning HLS to IPFS   →   7. Done
+active ──expires_at passed──▶ expiring (1-week pin grace)
+                                  │
+                                  ├─owner pays──▶ active
+                                  │
+                                  └─grace passed──▶ unpinned (Pinata removed,
+                                                              row + metadata kept forever)
 ```
 
-Behavior:
-- Step 1–3 use the existing AWS S3 signed-upload + `registerUpload` flow (already on `/upload-aws`).
-- `registerUpload` is extended to set `transcode_status='pending'` and kick off MediaConvert when `AWS_MEDIACONVERT_ENDPOINT` is set; otherwise it stays `pending` and the UI shows "Transcoding queued (AWS not yet provisioned)".
-- After register, the page polls `getTranscodeStatus({ videoId })` (new tiny server fn over the existing columns) every 4s and advances the stage tracker.
-- On `transcode_status='complete'` the page auto-links to `/v2/:cid` and offers "Copy v2 link".
-- Copy doesn't change `/upload` at all.
+New columns on `videos`:
+- `expiring_at timestamptz` — when we entered expiring (= original expires_at).
+- `unpin_after timestamptz` — `expiring_at + 7 days`; cron only unpins past this.
+- `notified_pre_expiry_at` / `notified_expiring_at` / `notified_unpinned_at` — dedupe alert sends.
 
-New language throughout: "Uploading to S3", "Transcoding (HLS, multi-bitrate)", "Pinning HLS directory to IPFS", "Re-anchoring metadata", "Ready to stream".
+Status enum gains `expiring`. `unpinned` rows keep all metadata (title, thumbnail_cid, chain events, comments) so a renewal payment re-pins and restores.
 
-## 3. What else (small, high-leverage additions)
+### Payment watcher changes (`src/routes/api/public/hooks/payment-watcher.ts`)
+- When `expires_at` passes for a paid video: set `status='expiring'`, `expiring_at=now`, `unpin_after=now+7d`. Don't unpin.
+- Only call `unpinByCid` once `now > unpin_after`.
+- Restore flow already clears `unpinned_at` and bumps `expires_at`; extend it to also clear `expiring_at` / `unpin_after`.
 
-- **`/manage` badges**: add a `TranscodeBadge` next to each video row — Pending / Processing / Ready / Failed, with a "Retry transcode" action on Failed (server fn already exists or stub). Links the Ready badge to `/v2/:cid` so you can A/B against `/v/:cid`.
-- **`getTranscodeStatus` server fn**: thin read-only fn used by both `/upload2` polling and `/manage` badges. No new tables.
-- **`ipfsHlsUrl` helper verification**: short pass on `src/lib/ipfs-gateway.ts` to confirm `master.m3u8` resolution + add a unit-test-style runtime check exposed at `/v2/:cid` dev panel ("HLS playlist reachable: yes/no, X variants").
-- **MediaConvert kickoff gating**: wrap the job-create call in `if (process.env.AWS_MEDIACONVERT_ENDPOINT)` so `/upload2` works end-to-end today (minus actual transcode) while the VPC limit increase is pending. The moment AWS comes back, no code change needed.
+### Pre-expiry alerts
+Same cron pass enqueues notifications:
+- 7 days before `expires_at` → "your video expires in 7 days" (sets `notified_pre_expiry_at`).
+- On entry to `expiring` → "video is in 7-day grace, pay to keep it" (sets `notified_expiring_at`).
+- On actual unpin → "video unpinned; metadata kept, repay anytime to restore" (sets `notified_unpinned_at`).
 
-## Out of scope (explicit)
+Each alert lookups `wallet_notification_prefs` for the row's `owner_wallet` and fans out to whichever channels are configured & verified.
 
-- No changes to `/v/:cid`, `/upload`, `/upload-aws`, or the webhook handler.
-- No DB migrations — all columns already exist.
-- No new auth/roles.
+## 3. Delivery
 
-## Technical notes
+### Telegram
+Use the Telegram connector (gateway). New public route `src/routes/api/public/hooks/telegram.ts` receives bot webhooks, handles `/start <code>` to bind chat_id ↔ wallet. Outbound sends use `sendMessage` via the gateway. Bot token / connector linking is handled via `standard_connectors--connect telegram` — I'll prompt for that when wiring up.
 
-- Files created: `src/routes/v2.$cid.tsx`, `src/routes/upload2.tsx`, `src/components/VideoPlayerV2.tsx`. Possibly `src/lib/transcode-status.functions.ts` if we don't extend `transcode.functions.ts`.
-- Files touched: `src/routes/manage.tsx` (add badge column), `src/lib/transcode.functions.ts` (gate MediaConvert call on env var, add `getTranscodeStatus`).
-- `/v2/:cid` reuses the existing public `getVideoByCid` loader pattern from `/v/:cid` for SSR + OG tags — share links remain crawlable.
+### Email
+Use Lovable Emails (built-in). Requires `email_domain--setup_email_infra` + `scaffold_transactional_email`. Templates:
+- `wallet-verify-email` (verification link)
+- `video-expiry-warning` (7-day heads-up)
+- `video-expiring` (entered grace)
+- `video-unpinned` (post-unpin notice with restore link)
 
-## Open question
+If you don't already have an email domain configured I'll trigger the setup dialog first.
 
-For `/upload2`, should the page **auto-redirect** to `/v2/:cid` when transcode completes, or just show a "Watch on v2" button and stay put so you can keep testing? Default in the plan above is "stay put, show button" — say the word if you want auto-redirect.
+## 4. Migrations (one file)
+
+1. `CREATE TABLE public.wallet_notification_prefs` + GRANTs + RLS (deny-all; server-side only).
+2. `ALTER TABLE public.videos ADD COLUMN expiring_at, unpin_after, notified_*`.
+3. Backfill: for rows currently `status='unpinned'`, leave alone. For active rows, no change.
+
+## 5. Out of scope (will do later when you ask)
+- SMS / push.
+- Per-video opt-out.
+- Notifications dashboard / history.
+- Other alert types (comment paid, view milestones, etc.) — table is already shaped for them.
+
+---
+
+## Open questions before I build
+
+1. **Telegram bot**: do you already have a bot (BotFather token) you want to use, or should I have you connect one via the Telegram connector?
+2. **Email domain**: is one configured on this project, or should I kick off email-domain setup first?
+3. **Grace length**: you said 1 week — confirm 7 days exactly (vs. 7 calendar days from local midnight, etc.)?
+4. **"Hold metadata forever"** — I'll keep unpinned rows indefinitely. OK to also keep `thumbnail_cid` pinned so the manage page still shows a poster after unpin?
