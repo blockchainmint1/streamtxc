@@ -112,9 +112,7 @@ export const ipfsLambdaHealth = createServerFn({ method: "GET" }).handler(
     try {
       const res = await fetch(`${url.replace(/\/$/, "")}/health`);
       const text = await res.text();
-      let parsed: unknown = text;
-      try { parsed = JSON.parse(text); } catch { /* keep raw */ }
-      return { ok: res.ok, status: res.status, body: parsed };
+      return { ok: res.ok, status: res.status, body: text.slice(0, 500) };
     } catch (err) {
       return { ok: false, reason: err instanceof Error ? err.message : String(err) };
     }
