@@ -665,8 +665,8 @@ function EditVideoDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="font-mono">
-          <Pencil className="mr-1 h-3 w-3" /> edit
+        <Button size="icon" variant="outline" className="font-mono h-7 w-7" title="Edit">
+          <Pencil className="h-3 w-3" />
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
