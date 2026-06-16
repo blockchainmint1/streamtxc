@@ -21,7 +21,6 @@ import { ReportButton } from "@/components/ReportButton";
 import { Comments } from "@/components/Comments";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import {
-  ArrowLeft,
   CheckCircle2,
   Loader2,
   AlertTriangle,
