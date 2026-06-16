@@ -356,6 +356,21 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
     };
     const metaPin = await pinJsonToIPFS(meta, `${data.cid}.meta.json`);
 
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error: updErr, count } = await supabaseAdmin
+      .from("videos")
+      .update({
+        hls_cid: pinned.cid,
+        renditions,
+        transcode_status: "ready",
+        transcode_completed_at: new Date().toISOString(),
+        transcode_error: null,
+        metadata_cid: metaPin.cid,
+      }, { count: "exact" })
+      .eq("cid", data.cid)
+      .eq("transcode_job_id", data.jobId);
+    if (updErr) throw updErr;
+
     return {
       status: 200,
       body: JSON.stringify({
@@ -364,6 +379,7 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
         metadataCid: metaPin.cid,
         metadata: meta,
         keys: keys.length,
+        rowsUpdated: count ?? 0,
         timings: { originalMs: tOrig, listMs: tList, fetchMs: tFetch, pinMs: tPin },
       }),
       url: `inline://${data.cid}`,
