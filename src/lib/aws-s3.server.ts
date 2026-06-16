@@ -86,6 +86,31 @@ export async function getObjectBlob(bucket: string, key: string): Promise<Blob> 
   return await res.blob();
 }
 
+/**
+ * Server-side S3 copy. Used to land the original input file inside the
+ * HLS output prefix so the IPFS Lambda can pin original + ladder under
+ * one wrap-directory CID. Single-bucket operation per call; cross-bucket
+ * copy is supported by passing `srcBucket`.
+ */
+export async function copyObject(opts: {
+  srcBucket: string;
+  srcKey: string;
+  dstBucket: string;
+  dstKey: string;
+}): Promise<void> {
+  const client = s3Client();
+  const url = `${s3Host(opts.dstBucket)}/${encodeKey(opts.dstKey)}`;
+  // x-amz-copy-source must be URL-encoded "/{bucket}/{key}"
+  const copySource = `/${opts.srcBucket}/${encodeKey(opts.srcKey)}`;
+  const res = await client.fetch(url, {
+    method: "PUT",
+    headers: { "x-amz-copy-source": copySource },
+  });
+  if (!res.ok) {
+    throw new Error(`S3 copy failed [${res.status}]: ${await res.text().catch(() => "")}`);
+  }
+}
+
 // ---- Multipart upload helpers ---------------------------------------------
 // Browser flow:
 //   1. createMultipart → uploadId
