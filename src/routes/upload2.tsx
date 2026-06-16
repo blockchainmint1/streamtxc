@@ -52,6 +52,33 @@ import {
 import { toast } from "sonner";
 import { parseDuplicateCidError, type DuplicateCidInfo } from "@/lib/duplicate-cid";
 
+const INFLIGHT_KEY = "txc:upload2-inflight";
+interface InflightJob {
+  cid: string;
+  jobId?: string;
+  startedAt: number;
+}
+function saveInflight(j: InflightJob) {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(INFLIGHT_KEY, JSON.stringify(j)); } catch { /* ignore */ }
+}
+function readInflight(): InflightJob | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(INFLIGHT_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as InflightJob;
+    if (!p || typeof p.cid !== "string") return null;
+    // expire after 6h
+    if (Date.now() - (p.startedAt ?? 0) > 6 * 60 * 60 * 1000) return null;
+    return p;
+  } catch { return null; }
+}
+function clearInflight() {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.removeItem(INFLIGHT_KEY); } catch { /* ignore */ }
+}
+
 export const Route = createFileRoute("/upload2")({
   head: () => ({
     meta: [
