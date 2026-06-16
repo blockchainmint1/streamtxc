@@ -233,7 +233,7 @@ export function S3VideoUpload({
         setStage("pin-ipfs", "done");
         setStage("register", "done");
         setStage("transcode", "active", inflight.jobId ? `job ${inflight.jobId}` : "polling…");
-        setStage("pin-hls", "active", "waiting for MediaConvert webhook…");
+        setStage("pin-hls", "pending", "queued — will start after transcode finishes");
         setResultCid(inflight.cid);
       } catch (err) {
         pushLog("warn", `resume check failed: ${err instanceof Error ? err.message : String(err)}`);
