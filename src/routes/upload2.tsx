@@ -406,9 +406,16 @@ function Upload2Page() {
 
       // 1. Prepare — hash file, compute CIDs for dedupe.
       setStage("prepare", "active");
-      pushLog("info", "computing local CIDv1 + CIDv0 (this hashes the whole file)…");
+      pushLog("info", "computing local CIDv1 + CIDv0 in a Web Worker (streamed, no full-file buffer)…");
       const tCid = Date.now();
-      const cids = await computeCids(file);
+      let lastHashPct = -10;
+      const cids = await computeCids(file, (pct) => {
+        setStage("prepare", "active", `hashing ${pct.toFixed(0)}%`);
+        if (pct - lastHashPct >= 10) {
+          lastHashPct = pct;
+          pushLog("info", `cid hash progress: ${pct.toFixed(0)}%`);
+        }
+      });
       pushLog("ok", `cid v1: ${cids.v1}`);
       pushLog("info", `cid v0: ${cids.v0} (legacy hash)`);
       pushLog("info", `local CID hashing took ${Date.now() - tCid}ms`);
