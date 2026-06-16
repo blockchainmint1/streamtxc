@@ -26,6 +26,7 @@ import {
   submitOwnershipProof,
   retryOwnStamp,
   retryOwnTranscode,
+  finalizeOwnTranscode,
   buildBulkExtendQuote,
   verifyBulkExtensionTx,
   setVideoVisibility,
@@ -184,6 +185,44 @@ function RetryTranscodeButton({ cid, wallet }: { cid: string; wallet: string }) 
     >
       {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
       <span className="ml-1">retry transcode</span>
+    </Button>
+  );
+}
+
+function FinalizeTranscodeButton({ cid, wallet }: { cid: string; wallet: string }) {
+  const qc = useQueryClient();
+  const finalize = useServerFn(finalizeOwnTranscode);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="font-mono"
+      disabled={busy}
+      title="MediaConvert finished but the pin step never ran — finalize HLS now"
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const res = await finalize({ data: { wallet, cid } });
+          if (res.ok) {
+            if ("alreadyFinalized" in res && res.alreadyFinalized) {
+              toast.success("Already finalized");
+            } else {
+              toast.success(`Finalized — pinned ${res.keys} files`);
+            }
+            qc.invalidateQueries({ queryKey: ["my-videos"] });
+          } else {
+            toast.error("Finalize failed");
+          }
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Finalize failed");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+      <span className="ml-1">finalize hls</span>
     </Button>
   );
 }
@@ -482,7 +521,10 @@ function ManagePageInner() {
                           {!v.hls_cid &&
                             (v.transcode_status === "processing" ||
                               v.transcode_status === "failed") && (
-                              <RetryTranscodeButton cid={v.cid} wallet={address!} />
+                              <>
+                                <FinalizeTranscodeButton cid={v.cid} wallet={address!} />
+                                <RetryTranscodeButton cid={v.cid} wallet={address!} />
+                              </>
                             )}
                           <ToggleVisibilityButton
                             cid={v.cid}

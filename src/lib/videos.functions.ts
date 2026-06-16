@@ -1617,6 +1617,129 @@ export const retryOwnTranscode = createServerFn({ method: "POST" })
     return { ok: true, jobId };
   });
 
+/**
+ * Owner-triggered finalize for a video where MediaConvert completed but
+ * the webhook never landed (signature mismatch, EventBridge delay, etc.).
+ * Lists HLS outputs in S3, pins the directory to IPFS, anchors metadata
+ * on-chain, and writes hls_cid + renditions to the row — same work the
+ * /api/public/hooks/mediaconvert webhook would have done.
+ */
+export const finalizeOwnTranscode = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
+  .inputValidator((input) =>
+    z
+      .object({
+        wallet: walletSchema,
+        cid: z.string().min(1).max(200),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const wallet = context.wallet;
+    const { data: v, error } = await supabaseAdmin
+      .from("videos")
+      .select(
+        "cid, owner_wallet, video_wallet, title, description, thumbnail_cid, transcode_job_id, hls_cid",
+      )
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!v) throw new Error("Video not found");
+    if (!ownerMatches(v.owner_wallet, wallet)) {
+      throw new Error("Not your video");
+    }
+    if (v.hls_cid) {
+      return { ok: true, alreadyFinalized: true, hlsCid: v.hls_cid };
+    }
+    const jobId = v.transcode_job_id;
+    if (!jobId) throw new Error("No transcode job recorded for this video");
+
+    const outputBucket = process.env.AWS_S3_OUTPUT_BUCKET;
+    if (!outputBucket) throw new Error("Transcode not configured");
+
+    const { listObjects, getObjectBlob } = await import("./aws-s3.server");
+    const prefix = `hls/${data.cid}/`;
+    const keys = await listObjects(outputBucket, prefix);
+    if (keys.length === 0) {
+      throw new Error(`No HLS outputs at s3://${outputBucket}/${prefix} yet`);
+    }
+
+    let pinned: { cid: string; size: number };
+    const lambdaToken = process.env.IPFS_LAMBDA_TOKEN;
+    const lambdaUrl = process.env.IPFS_LAMBDA_URL;
+    const lambdaName = process.env.IPFS_LAMBDA_NAME;
+    if (lambdaToken && (lambdaName || lambdaUrl)) {
+      const { callPinLambda } = await import("./ipfs-lambda.functions");
+      const json = await callPinLambda(
+        { bucket: outputBucket, keys },
+        lambdaToken,
+      );
+      if (!json.cid) throw new Error("Lambda /pin returned no cid");
+      pinned = { cid: json.cid, size: json.totalBytes ?? 0 };
+    } else {
+      const { pinDirectoryToIPFS } = await import("./pinata.server");
+      const files: Array<{ path: string; body: Blob; contentType?: string }> = [];
+      for (const key of keys) {
+        const blob = await getObjectBlob(outputBucket, key);
+        files.push({
+          path: key.slice(prefix.length),
+          body: blob,
+          contentType: blob.type || undefined,
+        });
+      }
+      pinned = await pinDirectoryToIPFS(files, `hls-${data.cid}`);
+    }
+
+    const renditions = keys
+      .filter((k) => k.endsWith(".m3u8") && !k.endsWith("/master.m3u8"))
+      .map((k) => {
+        const rel = k.slice(prefix.length);
+        const m = rel.match(/(\d+)p/);
+        return { height: m ? Number(m[1]) : null, playlist: rel };
+      });
+
+    let newMetaCid: string | null = null;
+    let newMetaTx: string | null = null;
+    if (v.video_wallet && v.owner_wallet) {
+      const anchored = await recordMetadataAnchor({
+        videoCid: data.cid,
+        videoWallet: v.video_wallet,
+        uploaderWallet: v.owner_wallet,
+        title: v.title ?? "",
+        description: v.description ?? "",
+        thumbnailCid: v.thumbnail_cid ?? null,
+        hlsCid: pinned.cid,
+        renditions,
+      });
+      if (anchored) {
+        newMetaCid = anchored.metaCid;
+        newMetaTx = anchored.stamp.real ? anchored.stamp.txid : null;
+      }
+    }
+
+    const { error: updErr } = await supabaseAdmin
+      .from("videos")
+      .update({
+        hls_cid: pinned.cid,
+        renditions,
+        transcode_status: "ready",
+        transcode_completed_at: new Date().toISOString(),
+        transcode_error: null,
+        ...(newMetaCid ? { metadata_cid: newMetaCid } : {}),
+        ...(newMetaTx ? { tx_hash: newMetaTx } : {}),
+      })
+      .eq("cid", data.cid);
+    if (updErr) throw new Error(updErr.message);
+
+    return {
+      ok: true,
+      hlsCid: pinned.cid,
+      keys: keys.length,
+      metadataCid: newMetaCid,
+      metadataTx: newMetaTx,
+    };
+  });
+
 // --- View tracking (called by stream proxy) -------------------------------
 
 export async function recordView(cid: string, ipHash: string) {
