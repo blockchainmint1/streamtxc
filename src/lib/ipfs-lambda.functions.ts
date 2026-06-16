@@ -207,3 +207,88 @@ export const ipfsLambdaHealth = createServerFn({ method: "GET" }).handler(
     }
   },
 );
+
+/**
+ * Kick off an asynchronous HLS-bundle pin on the IPFS Lambda. Returns
+ * immediately (well under 1s) — the Lambda runs to completion in the
+ * background and POSTs results to /api/public/hooks/ipfs-pin-complete
+ * when done. This is the only viable path for large bundles, because
+ * synchronous Lambda invokes from the Cloudflare Worker time out at
+ * ~100s while a 2 GB HLS pin can take 5-15 minutes.
+ *
+ * Requires:
+ *   IPFS_LAMBDA_NAME              (Lambda function name, for direct AWS invoke)
+ *   AWS_ACCESS_KEY_ID / SECRET / REGION
+ *   IPFS_LAMBDA_TOKEN             (bearer the lambda checks)
+ *   MEDIACONVERT_WEBHOOK_SECRET   (HMAC secret, reused for the callback)
+ *   AWS_S3_OUTPUT_BUCKET, AWS_S3_INPUT_BUCKET
+ */
+export const kickHlsPinAsync = createServerFn({ method: "POST" })
+  .inputValidator((d: { cid: string; jobId: string }) => {
+    if (!d.cid || d.cid.length > 200) throw new Error("Invalid cid");
+    if (!d.jobId || d.jobId.length > 200) throw new Error("Invalid jobId");
+    return d;
+  })
+  .handler(async ({ data }) => {
+    const token = process.env.IPFS_LAMBDA_TOKEN;
+    const fnName = process.env.IPFS_LAMBDA_NAME;
+    const callbackSecret = process.env.MEDIACONVERT_WEBHOOK_SECRET;
+    const outputBucket = process.env.AWS_S3_OUTPUT_BUCKET;
+    const inputBucket = process.env.AWS_S3_INPUT_BUCKET;
+    if (!token) throw new Error("IPFS_LAMBDA_TOKEN missing");
+    if (!fnName) throw new Error("IPFS_LAMBDA_NAME missing — async pin requires direct Lambda invoke");
+    if (!callbackSecret) throw new Error("MEDIACONVERT_WEBHOOK_SECRET missing — needed to sign the pin callback");
+    if (!outputBucket) throw new Error("AWS_S3_OUTPUT_BUCKET missing");
+
+    const prefix = `hls/${data.cid}/`;
+    const { listObjects, copyObject } = await import("./aws-s3.server");
+    let keys = await listObjects(outputBucket, prefix);
+    if (keys.length === 0) throw new Error(`No HLS outputs at s3://${outputBucket}/${prefix}`);
+
+    // Bundle the original input file inside the HLS wrap directory (mirrors
+    // what the EventBridge webhook does), so the resulting CID contains
+    // both `original` and the HLS ladder.
+    if (inputBucket) {
+      const dstKey = `${prefix}original`;
+      try {
+        await copyObject({
+          srcBucket: inputBucket,
+          srcKey: `inputs/${data.cid}`,
+          dstBucket: outputBucket,
+          dstKey,
+        });
+        keys = [dstKey, ...keys.filter((k) => k !== dstKey)];
+      } catch (err) {
+        console.warn(`[kickHlsPinAsync ${data.cid}] copy original failed:`, err);
+      }
+    }
+
+    // Derive the callback URL from the request origin so this works in
+    // preview + production without hardcoding hostnames.
+    const origin = new URL(getRequest().url).origin;
+    const callbackUrl = `${origin}/api/public/hooks/ipfs-pin-complete`;
+
+    // Flip the DB row to a distinct "pinning" state so the UI can show
+    // an accurate stage while we wait for the Lambda callback.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("videos")
+      .update({ transcode_status: "pinning", transcode_error: null })
+      .eq("cid", data.cid)
+      .eq("transcode_job_id", data.jobId);
+
+    const { invokeLambdaAsync } = await import("./aws-lambda.server");
+    await invokeLambdaAsync(fnName, {
+      routeKey: "POST /pin",
+      headers: { authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        bucket: outputBucket,
+        keys,
+        callbackUrl,
+        callbackSecret,
+        callbackMeta: { cid: data.cid, jobId: data.jobId, prefix },
+      }),
+    });
+
+    return { ok: true, files: keys.length, callbackUrl };
+  });
