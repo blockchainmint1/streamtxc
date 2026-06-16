@@ -795,11 +795,16 @@ function UploadPage() {
             <Button
               type="submit"
               size="lg"
-              disabled={!file || !title || tooBig || stage !== "idle"}
+              disabled={!file || !title || tooBig || stage !== "idle" || thumbPinning}
               className="w-full font-mono"
             >
               {stage === "idle" && (
-                cidProbe === "on-ipfs" ? (
+                thumbPinning ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Pinning thumbnail…
+                  </>
+                ) : cidProbe === "on-ipfs" ? (
                   <>
                     <Sparkles className="mr-2 h-4 w-4" />
                     Publish your video
