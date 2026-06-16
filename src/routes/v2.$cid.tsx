@@ -68,6 +68,7 @@ function V2WatchPage() {
     enabled: !hlsOverride, // skip polling when manually overriding
     refetchInterval: (q) =>
       q.state.data?.transcode_status === "complete" ||
+      q.state.data?.transcode_status === "ready" ||
       q.state.data?.transcode_status === "failed" ||
       !q.state.data?.transcode_status
         ? false
@@ -129,7 +130,7 @@ function V2WatchPage() {
     );
   }
 
-  const hlsUrl = ipfsHlsUrl(video.hls_cid);
+  const hlsUrl = ipfsHlsUrl(video.hls_cid, video.cid);
   const streamUrl = hlsUrl ?? `/api/stream/${video.cid}`;
   const status = tx?.transcode_status ?? video.transcode_status ?? null;
   const renditions = (tx?.renditions ?? video.renditions ?? null) as
@@ -216,7 +217,7 @@ function TranscodeDevPanel({
   cid: string;
 }) {
   const icon =
-    status === "complete" ? (
+    status === "complete" || status === "ready" ? (
       <CheckCircle2 className="h-4 w-4 text-primary" />
     ) : status === "failed" ? (
       <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -227,7 +228,7 @@ function TranscodeDevPanel({
     );
 
   const label =
-    status === "complete"
+    status === "complete" || status === "ready"
       ? "HLS ready · multi-bitrate streaming active"
       : status === "processing"
       ? "Transcoding on MediaConvert…"
