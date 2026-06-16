@@ -77,6 +77,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Comments } from "@/components/Comments";
 import { ipfsThumbUrl, ipfsHlsUrl } from "@/lib/ipfs-gateway";
+import { CidField as Field } from "@/components/CidField";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 
 export const Route = createFileRoute("/v/$cid")({
   loader: async ({ params }) => {
