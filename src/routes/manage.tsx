@@ -197,7 +197,7 @@ function FinalizeTranscodeButton({ cid, wallet }: { cid: string; wallet: string 
     <Button
       size="icon"
       variant="outline"
-      className="font-mono h-7 w-7"
+      className="font-mono h-7 w-7 text-[10px]"
       title="Finalize HLS"
       disabled={busy}
       onClick={async () => {
@@ -221,7 +221,7 @@ function FinalizeTranscodeButton({ cid, wallet }: { cid: string; wallet: string 
         }
       }}
     >
-      {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+      {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <span className="font-bold">H</span>}
     </Button>
   );
 }
