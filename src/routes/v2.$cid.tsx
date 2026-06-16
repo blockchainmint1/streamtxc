@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { VideoPlayerV2 } from "@/components/VideoPlayerV2";
@@ -18,7 +20,16 @@ import {
 } from "lucide-react";
 import { formatBytes, formatDate } from "@/lib/fees";
 
+const v2Search = z.object({
+  // Override the HLS directory CID (skip DB lookup of hls_cid).
+  hls: fallback(z.string().min(10).optional(), undefined),
+  // Override the playlist filename within that directory.
+  // Defaults to "master.m3u8" when omitted.
+  playlist: fallback(z.string().min(1).optional(), undefined),
+});
+
 export const Route = createFileRoute("/v2/$cid")({
+  validateSearch: zodValidator(v2Search),
   loader: async ({ params }) => {
     try {
       const video = await getVideo({ data: { cid: params.cid } });
@@ -42,6 +53,7 @@ export const Route = createFileRoute("/v2/$cid")({
 
 function V2WatchPage() {
   const { cid } = Route.useParams();
+  const { hls: hlsOverride, playlist: playlistOverride } = Route.useSearch();
   const fetchVideo = useServerFn(getVideo);
   const fetchStatus = useServerFn(getTranscodeStatus);
 
@@ -53,6 +65,7 @@ function V2WatchPage() {
   const { data: tx } = useQuery({
     queryKey: ["transcode-status", cid],
     queryFn: () => fetchStatus({ data: { cid } }),
+    enabled: !hlsOverride, // skip polling when manually overriding
     refetchInterval: (q) =>
       q.state.data?.transcode_status === "complete" ||
       q.state.data?.transcode_status === "failed" ||
@@ -60,6 +73,38 @@ function V2WatchPage() {
         ? false
         : 5_000,
   });
+
+  // Manual override path: any CID in the URL is acceptable as a routing
+  // placeholder; the override drives playback. Lets us smoke-test HLS
+  // directories that aren't in the DB yet.
+  if (hlsOverride) {
+    const streamUrl = `/api/stream/${hlsOverride}/${playlistOverride ?? "master.m3u8"}`;
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="mx-auto w-full max-w-6xl px-6 py-8 flex-1 space-y-6">
+          <div className="space-y-1">
+            <div className="font-mono text-xs text-amber-500">
+              [ V2 PLAYER · MANUAL OVERRIDE · NOT FROM DB ]
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              HLS preview
+            </h1>
+          </div>
+          <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden">
+            <VideoPlayerV2 src={streamUrl} />
+          </div>
+          <div className="border border-border rounded-sm p-4 font-mono text-xs text-muted-foreground space-y-1">
+            <div className="text-primary mb-2">[ OVERRIDE SOURCE ]</div>
+            <div>hls cid &nbsp;&nbsp;{hlsOverride}</div>
+            <div>playlist &nbsp;{playlistOverride ?? "master.m3u8 (default)"}</div>
+            <div>stream &nbsp;&nbsp;&nbsp;{streamUrl}</div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
