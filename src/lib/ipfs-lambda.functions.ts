@@ -9,6 +9,7 @@
 //   IPFS_LAMBDA_TOKEN  bearer token printed by the deploy script
 
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 
 export interface PinManifestEntry {
   path: string;
