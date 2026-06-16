@@ -1,3 +1,4 @@
+/// <reference lib="webworker" />
 // Streaming CID hasher running in a Web Worker so multi-GB files don't
 // freeze the upload UI. Runs v1 + v0 sequentially (two reads of the
 // file stream) to keep peak memory bounded.
@@ -11,7 +12,7 @@ type OutMsg =
   | { type: "done"; v1: string; v0: string }
   | { type: "error"; message: string };
 
-const ctx: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
+const ctx = self as unknown as DedicatedWorkerGlobalScope;
 const post = (m: OutMsg) => ctx.postMessage(m);
 
 async function* streamChunks(
@@ -47,11 +48,17 @@ ctx.onmessage = async (e: MessageEvent<InMsg>) => {
         post({ type: "progress", loaded, total });
       }
     };
-    const v1 = await Hash.of(streamChunks(file, bump), {
+    // ipfs-only-hash's runtime accepts AsyncIterable<Uint8Array> (it forwards
+    // to ipfs-unixfs-importer) even though its .d.ts only lists string|Uint8Array.
+    const hashOf = Hash.of as unknown as (
+      input: AsyncIterable<Uint8Array>,
+      opts: { cidVersion: 0 | 1; rawLeaves: boolean },
+    ) => Promise<string>;
+    const v1 = await hashOf(streamChunks(file, bump), {
       cidVersion: 1,
       rawLeaves: true,
     });
-    const v0 = await Hash.of(streamChunks(file, bump), {
+    const v0 = await hashOf(streamChunks(file, bump), {
       cidVersion: 0,
       rawLeaves: false,
     });
