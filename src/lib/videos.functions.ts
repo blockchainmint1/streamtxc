@@ -1558,6 +1558,65 @@ export const retryOwnStamp = createServerFn({ method: "POST" })
     return { ok: result.cStamp.ok, ...result };
   });
 
+/**
+ * Owner-triggered restart of MediaConvert transcoding. Used when a job
+ * got lost (worker timeout, webhook miss, etc.) and the video is stuck
+ * in `transcode_status='processing'` or `'failed'`. The S3 input object
+ * at `inputs/<cid>` is reused, so no re-upload is needed.
+ */
+export const retryOwnTranscode = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
+  .inputValidator((input) =>
+    z
+      .object({
+        wallet: walletSchema,
+        cid: z.string().min(1).max(200),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const wallet = context.wallet;
+    const { data: v, error } = await supabaseAdmin
+      .from("videos")
+      .select("cid, owner_wallet, transcode_status, hls_cid")
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!v) throw new Error("Video not found");
+    if (!ownerMatches(v.owner_wallet, wallet)) {
+      throw new Error("Not your video");
+    }
+    if (v.hls_cid) {
+      return { ok: true, alreadyTranscoded: true, hlsCid: v.hls_cid };
+    }
+
+    const inputBucket = process.env.AWS_S3_INPUT_BUCKET;
+    const outputBucket = process.env.AWS_S3_OUTPUT_BUCKET;
+    if (!inputBucket || !outputBucket) {
+      throw new Error("Transcode not configured");
+    }
+
+    const { startHlsTranscode } = await import("./aws-mediaconvert.server");
+    const { jobId } = await startHlsTranscode({
+      inputUri: `s3://${inputBucket}/inputs/${data.cid}`,
+      outputPrefix: `s3://${outputBucket}/hls/${data.cid}/`,
+      videoId: data.cid,
+    });
+
+    await supabaseAdmin
+      .from("videos")
+      .update({
+        transcode_status: "processing",
+        transcode_job_id: jobId,
+        transcode_started_at: new Date().toISOString(),
+        transcode_completed_at: null,
+        transcode_error: null,
+      })
+      .eq("cid", data.cid);
+
+    return { ok: true, jobId };
+  });
+
 // --- View tracking (called by stream proxy) -------------------------------
 
 export async function recordView(cid: string, ipHash: string) {
