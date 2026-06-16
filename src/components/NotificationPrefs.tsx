@@ -77,7 +77,7 @@ export function NotificationPrefs({ wallet }: { wallet: string }) {
   async function onStartPairing() {
     setPairBusy(true);
     try {
-      const res = await startPairing({ data: undefined });
+      const res = await startPairing();
       setPairing(res);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
@@ -89,7 +89,7 @@ export function NotificationPrefs({ wallet }: { wallet: string }) {
   async function onStopTelegram() {
     setPairBusy(true);
     try {
-      await stopTelegram({ data: undefined });
+      await stopTelegram();
       setPairing(null);
       toast.success("Telegram disconnected");
       invalidate();
@@ -102,7 +102,7 @@ export function NotificationPrefs({ wallet }: { wallet: string }) {
 
   async function onSendTest() {
     try {
-      await sendTest({ data: undefined });
+      await sendTest();
       toast.success("Test message sent to Telegram");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
