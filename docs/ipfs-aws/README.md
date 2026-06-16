@@ -5,9 +5,27 @@ Goal: stand up a private IPFS node on EC2 inside a VPC, plus a Lambda
 Cloudflare Worker (Lovable) calls that Lambda from the MediaConvert
 webhook, then pins the CID to Pinata as backup, then writes to chain.
 
-You can copy/paste this top-to-bottom. Total time: ~45 min the first
-time. Region used throughout: **us-east-1** (change if your S3 bucket
-is elsewhere — IPFS must be in the same region as S3 to avoid egress).
+If you are using AWS CloudShell, use the one-shot script instead of
+pasting individual README snippets. It creates the templates, deploys
+the stacks, installs the IPFS gateway, and prints the values Lovable
+needs at the end.
+
+```bash
+export S3_BUCKET=your-mediaconvert-output-bucket
+curl -fsSL https://raw.githubusercontent.com/REPLACE_ME/txc-ipfs-deploy.sh -o txc-ipfs-deploy.sh || true
+bash txc-ipfs-deploy.sh
+```
+
+If you already copied the file into CloudShell, just run:
+
+```bash
+export S3_BUCKET=your-mediaconvert-output-bucket
+bash txc-ipfs-deploy.sh
+```
+
+Total time: ~45 min the first time. Region used throughout:
+**us-east-1** by default. Change with `export AWS_REGION=...` if your
+S3 bucket is elsewhere.
 
 ---
 
