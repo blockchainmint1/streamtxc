@@ -435,6 +435,7 @@ export function S3VideoUpload({
         pushLog("err", `duplicate CID — already on stream as "${dup.title}"`);
         setDuplicate(dup);
         toast.error(`Already on stream: "${dup.title}" — redirecting…`);
+        setRunning(false);
         setTimeout(() => {
           void navigate({ to: destination === "v" ? "/v/$cid" : "/v2/$cid", params: { cid: dup.cid } });
         }, 1500);
@@ -443,10 +444,8 @@ export function S3VideoUpload({
         pushLog("err", msg);
         setError(msg);
         toast.error(msg);
+        setRunning(false);
       }
-    } finally {
-      setRunning(false);
-      pushLog("step", "◼ pipeline run complete");
     }
   }
 
