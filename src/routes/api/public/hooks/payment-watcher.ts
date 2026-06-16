@@ -32,6 +32,23 @@ import {
 import { PAYMENT_GRACE_HOURS } from "@/lib/fees";
 import { sweepCommentPayout } from "@/lib/videos.functions";
 import { recordSplitPayout } from "@/lib/chain-events.server";
+import { deliverAlert } from "@/lib/notifications.server";
+
+// How long after expires_at we keep the file pinned before actually
+// removing from Pinata. Metadata + DB row stay forever.
+const POST_EXPIRY_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
+// How far in advance we warn the owner that a video is about to expire.
+const PRE_EXPIRY_WARNING_MS = 7 * 24 * 60 * 60 * 1000;
+
+function explorerVideoUrl(cid: string) {
+  const base = process.env.APP_PUBLIC_URL ?? "https://streamtxc.com";
+  return `${base}/v/${cid}`;
+}
+
+function manageUrl() {
+  const base = process.env.APP_PUBLIC_URL ?? "https://streamtxc.com";
+  return `${base}/manage`;
+}
 
 // Boost is just additional comment revenue — apply the same 90/5/5 split
 // against the boost amount (not the cumulative comment total) and log it.
@@ -221,7 +238,7 @@ async function processVideos() {
   const { data: pending, error } = await supabaseAdmin
     .from("videos")
     .select(
-      "cid, owner_wallet, video_wallet, payment_required_txc, months_prepaid, created_at, paid_at, expires_at, payment_received_txc, unpinned_at",
+      "cid, title, owner_wallet, video_wallet, payment_required_txc, months_prepaid, created_at, paid_at, expires_at, payment_received_txc, unpinned_at, status, expiring_at, unpin_after, notified_pre_expiry_at, notified_expiring_at, notified_unpinned_at",
     )
     .not("video_wallet", "is", null)
     .limit(100);
