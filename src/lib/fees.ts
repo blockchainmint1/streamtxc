@@ -10,6 +10,10 @@ export const VIEW_DEBOUNCE_SECONDS = 30;
 // allowlist off the critical path. Larger files? Pin to IPFS first
 // (e.g. pinata.cloud) and use the "Add by CID" flow.
 export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+// Cap for the S3-presigned-PUT path (upload2 / v3). The browser uploads
+// directly to S3, bypassing the Cloudflare Worker body limit. S3's single
+// PUT max is 5 GiB; we cap there.
+export const MAX_S3_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024;
 export const PAYMENT_GRACE_HOURS = 24 * 7; // unpaid videos are unpinned after this (1 week free)
 
 /**
