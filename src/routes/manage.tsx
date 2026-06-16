@@ -49,6 +49,7 @@ import {
 } from "lucide-react";
 import { CheckCircle2, Film, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { NotificationPrefs } from "@/components/NotificationPrefs";
 
 export const Route = createFileRoute("/manage")({
   head: () => ({
@@ -259,6 +260,8 @@ function ManagePageInner() {
             <BulkExtendDialog wallet={address} />
           )}
         </div>
+
+        {address && <NotificationPrefs wallet={address} />}
 
         {unclaimedAnon.length > 0 && (
           <div className="mb-10 border-2 border-amber-500/40 bg-amber-500/5 rounded-sm p-5">

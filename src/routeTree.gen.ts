@@ -30,6 +30,8 @@ import { Route as ApiPublicTxcVerifyMessageRouteImport } from './routes/api/publ
 import { Route as ApiPublicTxcHealthRouteImport } from './routes/api/public/txc-health'
 import { Route as ApiPublicImportStreamRouteImport } from './routes/api/public/import-stream'
 import { Route as ApiStreamCidSplatRouteImport } from './routes/api/stream.$cid.$'
+import { Route as ApiPublicNotifyVerifyEmailRouteImport } from './routes/api/public/notify/verify-email'
+import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/hooks/telegram'
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
 import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
@@ -140,6 +142,17 @@ const ApiStreamCidSplatRoute = ApiStreamCidSplatRouteImport.update({
   path: '/$',
   getParentRoute: () => ApiStreamCidRoute,
 } as any)
+const ApiPublicNotifyVerifyEmailRoute =
+  ApiPublicNotifyVerifyEmailRouteImport.update({
+    id: '/public/notify/verify-email',
+    path: '/public/notify/verify-email',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicHooksTelegramRoute = ApiPublicHooksTelegramRouteImport.update({
+  id: '/public/hooks/telegram',
+  path: '/public/hooks/telegram',
+  getParentRoute: () => ApiRoute,
+} as any)
 const ApiPublicHooksPaymentWatcherRoute =
   ApiPublicHooksPaymentWatcherRouteImport.update({
     id: '/public/hooks/payment-watcher',
@@ -183,6 +196,8 @@ export interface FileRoutesByFullPath {
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
+  '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
+  '/api/public/notify/verify-email': typeof ApiPublicNotifyVerifyEmailRoute
   '/api/stream/$cid/$': typeof ApiStreamCidSplatRoute
 }
 export interface FileRoutesByTo {
@@ -209,6 +224,8 @@ export interface FileRoutesByTo {
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
+  '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
+  '/api/public/notify/verify-email': typeof ApiPublicNotifyVerifyEmailRoute
   '/api/stream/$cid/$': typeof ApiStreamCidSplatRoute
 }
 export interface FileRoutesById {
@@ -236,6 +253,8 @@ export interface FileRoutesById {
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
+  '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
+  '/api/public/notify/verify-email': typeof ApiPublicNotifyVerifyEmailRoute
   '/api/stream/$cid/$': typeof ApiStreamCidSplatRoute
 }
 export interface FileRouteTypes {
@@ -264,6 +283,8 @@ export interface FileRouteTypes {
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
+    | '/api/public/hooks/telegram'
+    | '/api/public/notify/verify-email'
     | '/api/stream/$cid/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -290,6 +311,8 @@ export interface FileRouteTypes {
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
+    | '/api/public/hooks/telegram'
+    | '/api/public/notify/verify-email'
     | '/api/stream/$cid/$'
   id:
     | '__root__'
@@ -316,6 +339,8 @@ export interface FileRouteTypes {
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
+    | '/api/public/hooks/telegram'
+    | '/api/public/notify/verify-email'
     | '/api/stream/$cid/$'
   fileRoutesById: FileRoutesById
 }
@@ -485,6 +510,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStreamCidSplatRouteImport
       parentRoute: typeof ApiStreamCidRoute
     }
+    '/api/public/notify/verify-email': {
+      id: '/api/public/notify/verify-email'
+      path: '/public/notify/verify-email'
+      fullPath: '/api/public/notify/verify-email'
+      preLoaderRoute: typeof ApiPublicNotifyVerifyEmailRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/hooks/telegram': {
+      id: '/api/public/hooks/telegram'
+      path: '/public/hooks/telegram'
+      fullPath: '/api/public/hooks/telegram'
+      preLoaderRoute: typeof ApiPublicHooksTelegramRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/public/hooks/payment-watcher': {
       id: '/api/public/hooks/payment-watcher'
       path: '/public/hooks/payment-watcher'
@@ -530,6 +569,8 @@ interface ApiRouteChildren {
   ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
   ApiPublicHooksMediaconvertRoute: typeof ApiPublicHooksMediaconvertRoute
   ApiPublicHooksPaymentWatcherRoute: typeof ApiPublicHooksPaymentWatcherRoute
+  ApiPublicHooksTelegramRoute: typeof ApiPublicHooksTelegramRoute
+  ApiPublicNotifyVerifyEmailRoute: typeof ApiPublicNotifyVerifyEmailRoute
 }
 
 const ApiRouteChildren: ApiRouteChildren = {
@@ -541,6 +582,8 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
   ApiPublicHooksMediaconvertRoute: ApiPublicHooksMediaconvertRoute,
   ApiPublicHooksPaymentWatcherRoute: ApiPublicHooksPaymentWatcherRoute,
+  ApiPublicHooksTelegramRoute: ApiPublicHooksTelegramRoute,
+  ApiPublicNotifyVerifyEmailRoute: ApiPublicNotifyVerifyEmailRoute,
 }
 
 const ApiRouteWithChildren = ApiRoute._addFileChildren(ApiRouteChildren)
