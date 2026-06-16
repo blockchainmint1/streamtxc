@@ -459,7 +459,7 @@ function ManagePageInner() {
                             <div className="h-10 w-16 rounded-sm border border-dashed border-border bg-secondary shrink-0" />
                           )}
                           <div className="min-w-0">
-                            <div className="font-bold truncate max-w-[8rem] flex items-center gap-2">
+                            <div className="font-bold truncate max-w-[14rem] flex items-center gap-2">
                               <Link to="/v/$cid" params={{ cid: v.cid }} className="truncate hover:underline">
                                 {v.title}
                               </Link>
@@ -469,7 +469,7 @@ function ManagePageInner() {
                                 </span>
                               )}
                             </div>
-                            <div className="font-mono text-[10px] text-muted-foreground truncate max-w-[8rem]">
+                            <div className="font-mono text-[10px] text-muted-foreground truncate max-w-[14rem]">
                               {v.cid}
                             </div>
                           </div>
