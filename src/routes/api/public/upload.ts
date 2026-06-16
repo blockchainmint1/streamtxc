@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { pinFileToIPFS } from "@/lib/pinata.server";
 import { MAX_UPLOAD_BYTES } from "@/lib/fees";
 
 // Allow common browser video formats only. Blocks abuse of the platform's
@@ -14,12 +13,16 @@ const ALLOWED_MIME_TYPES = new Set([
 ]);
 
 /**
- * Browser → Worker → Pinata upload proxy. Same-origin (no CORS),
- * capped at MAX_UPLOAD_BYTES (≈ Cloudflare Worker request-body cap).
+ * Browser → Worker → S3 → self-hosted IPFS node (ipfs.honest.money).
+ * Same-origin (no CORS), capped at MAX_UPLOAD_BYTES.
  *
- * Why not direct browser → Pinata? Pinata's TUS endpoint enforces a
- * per-API-key CORS allowlist, which has to be updated for every custom
- * domain we serve from. Routing through our own origin sidesteps that.
+ * Pipeline:
+ *   1. Stream the file into S3 under `uploads/<uuid>/<filename>`.
+ *   2. Ask the IPFS pinning Lambda to stream that S3 key into our kubo
+ *      node and return the CID.
+ *
+ * Pinata is no longer touched on the hot upload path — every new video
+ * lands on our own IPFS infra.
  */
 export const Route = createFileRoute("/api/public/upload")({
   server: {
@@ -80,17 +83,48 @@ export const Route = createFileRoute("/api/public/upload")({
         }
 
         try {
-          const pinned = await pinFileToIPFS(file, filename);
+          const [{ s3PutObject }, { callPinLambda }] = await Promise.all([
+            import("@/lib/aws-s3.server"),
+            import("@/lib/ipfs-lambda.functions"),
+          ]);
+
+          const token = process.env.IPFS_LAMBDA_TOKEN;
+          if (!token) throw new Error("IPFS_LAMBDA_TOKEN is not configured");
+          const bucket = process.env.AWS_S3_INPUT_BUCKET;
+          if (!bucket) throw new Error("AWS_S3_INPUT_BUCKET is not configured");
+
+          // Sanitise the filename to a safe S3 key fragment.
+          const safeName = filename.replace(/[^\w.\-]+/g, "_");
+          const key = `uploads/${crypto.randomUUID()}/${safeName}`;
+
+          await s3PutObject({
+            bucket,
+            key,
+            body: file,
+            contentType: mime || "application/octet-stream",
+          });
+
+          const pinned = await callPinLambda(
+            { bucket, keys: [key] },
+            token,
+          );
+          const manifest = Array.isArray(pinned.manifest) ? pinned.manifest : [];
+          const fileCid = manifest[0]?.cid;
+          const cid = fileCid || pinned.cid;
+          if (!cid) {
+            throw new Error("IPFS pinning returned no CID");
+          }
           return Response.json({
-            cid: pinned.cid,
-            size: pinned.size,
+            cid,
+            size: pinned.totalBytes ?? file.size,
+            wrapCid: pinned.cid ?? null,
           });
         } catch (err) {
-          console.error("upload proxy: Pinata pin failed", err);
+          console.error("upload proxy: self-hosted IPFS pin failed", err);
           return Response.json(
             {
               error:
-                err instanceof Error ? err.message : "Pinata upload failed",
+                err instanceof Error ? err.message : "IPFS upload failed",
             },
             { status: 502 },
           );
