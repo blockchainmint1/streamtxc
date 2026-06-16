@@ -58,8 +58,10 @@ export const Route = createFileRoute("/v/$cid")({
     const v = loaderData?.video;
     return {
       meta: [
-        { title: v ? `${v.title} · streamTXC v2` : "v2 player · streamTXC" },
-        { name: "robots", content: "noindex" },
+        { title: v ? `${v.title} · streamTXC` : "streamTXC" },
+        ...(v?.description
+          ? [{ name: "description", content: v.description.slice(0, 160) }]
+          : []),
       ],
       links: [{ rel: "canonical", href: `https://streamtxc.com/v/${params.cid}` }],
     };
@@ -112,7 +114,7 @@ function WatchPage() {
         <main className="mx-auto w-full max-w-6xl px-6 py-8 flex-1 space-y-6">
           <div className="space-y-1">
             <div className="font-mono text-xs text-amber-500">
-              [ V2 PLAYER · MANUAL OVERRIDE · NOT FROM DB ]
+              [ MANUAL OVERRIDE · NOT FROM DB ]
             </div>
             <h1 className="text-2xl font-bold tracking-tight">
               HLS preview
@@ -188,16 +190,6 @@ function WatchPage() {
                 src={streamUrl}
                 poster={ipfsThumbUrl(video.thumbnail_cid)}
               />
-            </div>
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="font-mono text-xs text-primary">
-                [ V2 PLAYER · EXPERIMENTAL ]
-              </div>
-              <Link to="/v/$cid" params={{ cid: video.cid }}>
-                <Button variant="outline" size="sm" className="font-mono">
-                  <ArrowLeft className="mr-2 h-3 w-3" /> v1 player
-                </Button>
-              </Link>
             </div>
             <h1 className="text-2xl font-bold tracking-tight">{video.title}</h1>
             {video.description && (
