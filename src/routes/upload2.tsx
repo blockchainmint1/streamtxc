@@ -625,7 +625,7 @@ function Upload2Page() {
                     {isDragging ? "drop to upload" : "drag & drop or click to choose a video"}
                   </div>
                   <div className="font-mono text-xs text-muted-foreground mt-1">
-                    mp4 / webm / mov · max {formatBytes(MAX_UPLOAD_BYTES)}
+                    mp4 / webm / mov · max {formatBytes(MAX_S3_UPLOAD_BYTES)}
                   </div>
                 </div>
               )}
