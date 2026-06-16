@@ -17,7 +17,7 @@ import { recordChainEvent, recordMetadataAnchor } from "./chain-events.server";
 import { recordOwnershipAnchor, recordSplitPayout } from "./chain-events.server";
 import { verifyMessage, sendToAddress, getPlatformAddress } from "./txc.server";
 import { retryStuckStampForVideo } from "./stamp-retry.server";
-import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES, PAYMENT_GRACE_HOURS } from "./fees";
+import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES, MAX_S3_UPLOAD_BYTES, PAYMENT_GRACE_HOURS } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
 
 // Accepts either an EVM-style 0x… (legacy mock-wallet rows) or a real TXC
@@ -130,7 +130,7 @@ export const registerUpload = createServerFn({ method: "POST" })
           ),
         title: z.string().min(1).max(200),
         description: z.string().max(2000).optional().default(""),
-        sizeBytes: z.number().int().positive().max(MAX_UPLOAD_BYTES),
+        sizeBytes: z.number().int().positive().max(MAX_S3_UPLOAD_BYTES),
         mimeType: z.string().min(1).max(100),
         months: z.number().int().min(1).max(12).default(1),
         thumbnailCid: cidStringSchema.optional(),
