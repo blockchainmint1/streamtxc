@@ -363,6 +363,12 @@ async function processVideos() {
           .update({
             payment_received_txc: received,
             expires_at: extendedExpires,
+            // A top-up rescues a video from the expiring lifecycle.
+            expiring_at: null,
+            unpin_after: null,
+            status: "active",
+            notified_pre_expiry_at: null,
+            notified_expiring_at: null,
           })
           .eq("cid", v.cid);
         results.push({
@@ -371,9 +377,134 @@ async function processVideos() {
           received,
           expires_at: extendedExpires,
         });
-      } else {
-        results.push({ cid: v.cid, action: "paid_noop", received });
+        continue;
       }
+
+      // --- Lifecycle for already-paid videos ---------------------------
+      const expMs = new Date(v.expires_at).getTime();
+      const title = v.title ?? v.cid.slice(0, 12);
+
+      // 3a. Past unpin_after → actually remove from Pinata.
+      if (
+        v.unpin_after &&
+        now > new Date(v.unpin_after as string).getTime()
+      ) {
+        try {
+          const stamp = await recordChainEvent({
+            cid: v.cid,
+            videoWallet: v.video_wallet,
+            eventType: "X",
+            uploaderWallet: v.owner_wallet ?? "anon",
+            extra: "expired",
+          });
+          await unpinByCid(v.cid);
+          await supabaseAdmin
+            .from("videos")
+            .update({
+              unpinned_at: new Date().toISOString(),
+              status: "unpinned",
+            })
+            .eq("cid", v.cid);
+          if (!v.notified_unpinned_at && v.owner_wallet) {
+            await deliverAlert({
+              wallet: v.owner_wallet,
+              telegramText: `🗑️ <b>Video unpinned</b>\n<b>${title}</b> has been removed from IPFS storage because no renewal payment arrived during the 7-day grace.\n\nThe video's page and chain proofs are preserved. Pay any time to re-pin and restore it:\n${explorerVideoUrl(v.cid)}`,
+              email: {
+                templateName: "video-unpinned",
+                templateData: {
+                  title,
+                  cid: v.cid,
+                  videoUrl: explorerVideoUrl(v.cid),
+                  manageUrl: manageUrl(),
+                },
+                idempotencyKey: `unpinned-${v.cid}`,
+              },
+            });
+            await supabaseAdmin
+              .from("videos")
+              .update({ notified_unpinned_at: new Date().toISOString() })
+              .eq("cid", v.cid);
+          }
+          results.push({ cid: v.cid, action: "lifecycle_unpinned", txid: stamp.txid });
+        } catch (err) {
+          results.push({
+            cid: v.cid,
+            action: "lifecycle_unpin_failed",
+            error: String(err),
+          });
+        }
+        continue;
+      }
+
+      // 3b. Just crossed expires_at → enter expiring grace.
+      if (now > expMs && v.status !== "expiring" && v.status !== "unpinned") {
+        const unpinAfter = new Date(now + POST_EXPIRY_GRACE_MS).toISOString();
+        await supabaseAdmin
+          .from("videos")
+          .update({
+            status: "expiring",
+            expiring_at: new Date(now).toISOString(),
+            unpin_after: unpinAfter,
+          })
+          .eq("cid", v.cid);
+        if (!v.notified_expiring_at && v.owner_wallet) {
+          await deliverAlert({
+            wallet: v.owner_wallet,
+            telegramText: `⚠️ <b>Video expiring in 7 days</b>\n<b>${title}</b> has reached its paid-through date. We'll keep it pinned for 7 more days, then remove the file from IPFS storage.\n\nRenew now to keep it online:\n${manageUrl()}`,
+            email: {
+              templateName: "video-expiring",
+              templateData: {
+                title,
+                cid: v.cid,
+                videoUrl: explorerVideoUrl(v.cid),
+                manageUrl: manageUrl(),
+                unpinAfter,
+              },
+              idempotencyKey: `expiring-${v.cid}`,
+            },
+          });
+          await supabaseAdmin
+            .from("videos")
+            .update({ notified_expiring_at: new Date().toISOString() })
+            .eq("cid", v.cid);
+        }
+        results.push({ cid: v.cid, action: "entered_expiring", unpin_after: unpinAfter });
+        continue;
+      }
+
+      // 3c. Approaching expiry → 7-day heads-up.
+      if (
+        now < expMs &&
+        expMs - now < PRE_EXPIRY_WARNING_MS &&
+        !v.notified_pre_expiry_at &&
+        v.owner_wallet
+      ) {
+        const daysLeft = Math.max(1, Math.ceil((expMs - now) / (24 * 3600 * 1000)));
+        await deliverAlert({
+          wallet: v.owner_wallet,
+          telegramText: `⏰ <b>Heads-up:</b> <b>${title}</b> expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"}. Renew anytime in Manage:\n${manageUrl()}`,
+          email: {
+            templateName: "video-expiry-warning",
+            templateData: {
+              title,
+              cid: v.cid,
+              daysLeft,
+              expiresAt: v.expires_at,
+              videoUrl: explorerVideoUrl(v.cid),
+              manageUrl: manageUrl(),
+            },
+            idempotencyKey: `pre-expiry-${v.cid}`,
+          },
+        });
+        await supabaseAdmin
+          .from("videos")
+          .update({ notified_pre_expiry_at: new Date().toISOString() })
+          .eq("cid", v.cid);
+        results.push({ cid: v.cid, action: "pre_expiry_warned", daysLeft });
+        continue;
+      }
+
+      results.push({ cid: v.cid, action: "paid_noop", received });
       continue;
     }
 
