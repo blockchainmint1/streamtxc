@@ -226,6 +226,45 @@ function Upload2Page() {
     if (box) box.scrollTop = box.scrollHeight;
   }, [log]);
 
+  // Resume polling for an in-flight transcode job from a previous tab/session.
+  useEffect(() => {
+    const inflight = readInflight();
+    if (!inflight) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const row = await checkStatus({ data: { cid: inflight.cid } });
+        if (cancelled) return;
+        const st = row?.transcode_status;
+        if (st === "complete" || st === "ready") {
+          clearInflight();
+          toast.success(`Previous upload finished — opening /v2/${inflight.cid.slice(0, 10)}…`);
+          void navigate({ to: "/v2/$cid", params: { cid: inflight.cid } });
+          return;
+        }
+        if (st === "failed") {
+          clearInflight();
+          toast.error("Previous transcode job failed");
+          return;
+        }
+        // Still processing (or unknown) — reattach the poller.
+        if (startTimeRef.current === 0) startTimeRef.current = inflight.startedAt || Date.now();
+        pushLog("step", `↻ resuming in-flight job for cid ${inflight.cid}${inflight.jobId ? ` (job ${inflight.jobId})` : ""}`);
+        setStage("prepare", "done");
+        setStage("s3-upload", "done");
+        setStage("pin-ipfs", "done");
+        setStage("register", "done");
+        setStage("transcode", "active", inflight.jobId ? `job ${inflight.jobId}` : "polling…");
+        setStage("pin-hls", "active", "waiting for MediaConvert webhook…");
+        setResultCid(inflight.cid);
+      } catch (err) {
+        pushLog("warn", `resume check failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function setStage(key: StageKey, state: StageState, detail?: string) {
     setStages((s) => ({ ...s, [key]: state }));
     if (detail !== undefined) {
