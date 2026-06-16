@@ -141,7 +141,7 @@ interface LogLine { t: number; level: LogLevel; msg: string; }
 export interface S3VideoUploadProps {
   /** Default-collapse the verbose pipeline log. Default false. */
   showLogByDefault?: boolean;
-  /** Route to send users to once their video is ready. Default /v2/$cid. */
+  /** Route to send users to once their video is ready. Default /v/$cid. */
   destination?: "v" | "v2";
 }
 
@@ -222,7 +222,7 @@ export function S3VideoUpload({
         if (st === "complete" || st === "ready") {
           clearInflight();
           toast.success(`Previous upload finished — opening player…`);
-          void navigate({ to: destination === "v" ? "/v/$cid" : "/v2/$cid", params: { cid: inflight.cid } });
+          void navigate({ to: destination === "v" ? "/v/$cid" : "/v/$cid", params: { cid: inflight.cid } });
           return;
         }
         if (st === "failed") { clearInflight(); toast.error("Previous transcode job failed"); return; }
@@ -292,7 +292,7 @@ export function S3VideoUpload({
                 if (pollRef.current) window.clearInterval(pollRef.current);
                 if (autoNavigate && resultCid) {
                   window.setTimeout(() => {
-                    void navigate({ to: destination === "v" ? "/v/$cid" : "/v2/$cid", params: { cid: resultCid } });
+                    void navigate({ to: destination === "v" ? "/v/$cid" : "/v/$cid", params: { cid: resultCid } });
                   }, 1500);
                 }
               } else if (awsStatus === "ERROR" || awsStatus === "CANCELED") {
@@ -315,7 +315,7 @@ export function S3VideoUpload({
           if (pollRef.current) window.clearInterval(pollRef.current);
           if (autoNavigate && resultCid) {
             window.setTimeout(() => {
-              void navigate({ to: destination === "v" ? "/v/$cid" : "/v2/$cid", params: { cid: resultCid } });
+              void navigate({ to: destination === "v" ? "/v/$cid" : "/v/$cid", params: { cid: resultCid } });
             }, 1500);
           }
           return;
@@ -440,7 +440,7 @@ export function S3VideoUpload({
         toast.error(`Already on stream: "${dup.title}" — redirecting…`);
         setRunning(false);
         setTimeout(() => {
-          void navigate({ to: destination === "v" ? "/v/$cid" : "/v2/$cid", params: { cid: dup.cid } });
+          void navigate({ to: destination === "v" ? "/v/$cid" : "/v/$cid", params: { cid: dup.cid } });
         }, 1500);
       } else {
         const msg = err instanceof Error ? err.message : String(err);
@@ -461,7 +461,7 @@ export function S3VideoUpload({
             <div className="flex-1 min-w-0">
               <div className="font-mono text-xs text-destructive mb-1">[ ALREADY ON STREAM ]</div>
               <div className="font-bold mb-2">"{duplicate.title}"</div>
-              <Link to="/v2/$cid" params={{ cid: duplicate.cid }}
+              <Link to="/v/$cid" params={{ cid: duplicate.cid }}
                 className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline">
                 → view the original
               </Link>
@@ -583,7 +583,7 @@ export function S3VideoUpload({
             auto-navigate when HLS is ready
           </label>
           <div className="flex gap-2 flex-wrap">
-            <Link to="/v2/$cid" params={{ cid: resultCid }}>
+            <Link to="/v/$cid" params={{ cid: resultCid }}>
               <Button size="sm" className="font-mono">Watch on v2 <ArrowRight className="ml-2 h-3 w-3" /></Button>
             </Link>
             <Link to="/v/$cid" params={{ cid: resultCid }}>

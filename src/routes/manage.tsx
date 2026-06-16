@@ -74,7 +74,7 @@ function TranscodeBadge({
   if (status === "complete" || hlsCid) {
     return (
       <Link
-        to="/v2/$cid"
+        to="/v/$cid"
         params={{ cid }}
         className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-primary hover:underline"
         title="Open enhanced HLS player"
