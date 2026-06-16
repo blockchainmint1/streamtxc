@@ -111,16 +111,8 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
         }
 
         // Derive a minimal rendition manifest from the keys we saw.
-        const renditions = keys
-          .filter((k) => k.endsWith(".m3u8") && !k.endsWith("/master.m3u8"))
-          .map((k) => {
-            const rel = k.slice(prefix.length);
-            const m = rel.match(/(\d+)p/);
-            return {
-              height: m ? Number(m[1]) : null,
-              playlist: rel,
-            };
-          });
+        const { renditionsFromKeys, finalizeHlsPin } = await import("@/lib/finalize-hls-pin.server");
+        const renditions = renditionsFromKeys(keys, prefix);
 
         if (dryRun) {
           // Test path: don't pin to IPFS, don't touch the DB. Just report
@@ -186,69 +178,17 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
         const pinned = { cid: pinnedCid, size: pinnedSize };
         console.log(`[mediaconvert ${cid}] IPFS pin complete in ${Date.now() - pinT0}ms → ${pinned.cid} (${pinned.size} bytes)`);
 
-        // Look up the videos row so we can re-anchor full metadata (v3
-        // adds hlsCid + renditions) to IPFS and the chain. Best-effort —
-        // if the row doesn't exist (e.g. /s3-test), skip re-anchor.
-        const { data: row } = await supabaseAdmin
-          .from("videos")
-          .select("video_wallet, owner_wallet, title, description, thumbnail_cid")
-          .eq("cid", cid)
-          .maybeSingle();
-
-        let newMetaCid: string | null = null;
-        let newMetaTx: string | null = null;
-        if (row && row.video_wallet && row.owner_wallet) {
-          const { recordMetadataAnchor } = await import("@/lib/chain-events.server");
-          const anchored = await recordMetadataAnchor({
-            videoCid: cid,
-            videoWallet: row.video_wallet,
-            uploaderWallet: row.owner_wallet,
-            title: row.title ?? "",
-            description: row.description ?? "",
-            thumbnailCid: row.thumbnail_cid ?? null,
-            hlsCid: pinned.cid,
-            renditions,
-          });
-          if (anchored) {
-            newMetaCid = anchored.metaCid;
-            newMetaTx = anchored.stamp.real ? anchored.stamp.txid : null;
-          }
-        }
-
-        const { error: updErr, count } = await supabaseAdmin
-          .from("videos")
-          .update({
-            hls_cid: pinned.cid,
-            renditions,
-            transcode_status: "ready",
-            transcode_completed_at: new Date().toISOString(),
-            transcode_error: null,
-            ...(newMetaCid ? { metadata_cid: newMetaCid } : {}),
-            ...(newMetaTx ? { tx_hash: newMetaTx } : {}),
-          }, { count: "exact" })
-          .eq("cid", cid)
-          .eq("transcode_job_id", jobId);
-        if (updErr) {
-          return new Response(
-            JSON.stringify({ pinnedCid: pinned.cid, dbError: updErr.message }),
-            { status: 500, headers: { "content-type": "application/json" } },
-          );
-        }
-
-        // Note: re-stamping the chain with the new hls_cid is intentionally
-        // a follow-up task (Phase 4b). The existing stamp pipeline anchors a
-        // single CID per video, so we'll extend the payload schema before
-        // calling it from here. For now the new hls_cid lives in the videos
-        // row and powers playback; the chain still anchors the original CID.
-
+        const finalized = await finalizeHlsPin({
+          cid, jobId, hlsCid: pinned.cid, renditions,
+        });
         return new Response(
           JSON.stringify({
             pinnedCid: pinned.cid,
             renditions,
             keys: keys.length,
-            rowsUpdated: count ?? 0,
-            metadataCid: newMetaCid,
-            metadataTx: newMetaTx,
+            rowsUpdated: finalized.rowsUpdated,
+            metadataCid: finalized.metadataCid,
+            metadataTx: finalized.metadataTx,
           }),
           { status: 200, headers: { "content-type": "application/json" } },
         );
