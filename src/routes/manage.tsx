@@ -660,6 +660,20 @@ function EditVideoDialog({
           </div>
           <div className="space-y-2">
             <Label className="font-mono text-xs">THUMBNAIL</Label>
+            <ThumbnailPicker
+              videoSrc={`/api/stream/${cid}`}
+              onChange={(c) => {
+                if (c) {
+                  setThumbCid(c);
+                  if (previewUrl) URL.revokeObjectURL(previewUrl);
+                  setPreviewUrl(null);
+                }
+              }}
+            />
+            <div className="pt-2 border-t border-border/50">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                or upload your own
+              </p>
             <div className="flex items-center gap-3">
               <div className="h-20 w-32 rounded-sm border border-border bg-secondary overflow-hidden flex items-center justify-center shrink-0">
                 {displayThumb ? (
@@ -722,6 +736,7 @@ function EditVideoDialog({
                   jpg / png / webp · max 1.5 MB
                 </p>
               </div>
+            </div>
             </div>
           </div>
         </div>
