@@ -300,15 +300,11 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
     if (!e.inputBucket || !e.outputBucket) throw new Error("AWS buckets not set");
 
     const { listObjects, getObjectBlob } = await import("./aws-s3.server");
-    const { pinDirectoryToIPFS, pinFileToIPFS, pinJsonToIPFS } = await import("./pinata.server");
 
-    // 1. Pin the ORIGINAL file (still living in the input bucket) to IPFS.
-    const tOrig0 = Date.now();
-    const origBlob = await getObjectBlob(e.inputBucket, `inputs/${data.cid}`);
-    const origPin = await pinFileToIPFS(origBlob, `${data.cid}.original`);
-    const tOrig = Date.now() - tOrig0;
-
-    // 2. Pin the HLS bundle as a single directory.
+    // 1. Pin the HLS bundle as a single directory. Do not fetch the original
+    // input object here: the already-registered video CID is the canonical
+    // original, and the app AWS user may intentionally only have write access
+    // to the input bucket.
     const prefix = `hls/${data.cid}/`;
     const t0 = Date.now();
     const keys = await listObjects(e.outputBucket, prefix);
@@ -316,19 +312,28 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
     const tList = Date.now() - t0;
 
     const t1 = Date.now();
-    const files = await mapWithConcurrency(keys, 8, async (key) => {
-      const blob = await getObjectBlob(e.outputBucket!, key);
-      return {
-        path: key.slice(prefix.length),
-        body: blob,
-        contentType: blob.type || undefined,
-      };
-    });
+    let pinned: { cid: string; size: number };
+    const lambdaToken = process.env.IPFS_LAMBDA_TOKEN;
+    const lambdaUrl = process.env.IPFS_LAMBDA_URL;
+    const lambdaName = process.env.IPFS_LAMBDA_NAME;
+    if (lambdaToken && (lambdaName || lambdaUrl)) {
+      const { callPinLambda } = await import("./ipfs-lambda.functions");
+      const json = await callPinLambda({ bucket: e.outputBucket, keys }, lambdaToken);
+      if (!json.cid) throw new Error("Lambda /pin returned no cid");
+      pinned = { cid: json.cid, size: json.totalBytes ?? 0 };
+    } else {
+      const { pinDirectoryToIPFS } = await import("./pinata.server");
+      const files = await mapWithConcurrency(keys, 8, async (key) => {
+        const blob = await getObjectBlob(e.outputBucket!, key);
+        return {
+          path: key.slice(prefix.length),
+          body: blob,
+          contentType: blob.type || undefined,
+        };
+      });
+      pinned = await pinDirectoryToIPFS(files, `hls-${data.cid}`);
+    }
     const tFetch = Date.now() - t1;
-
-    const t2 = Date.now();
-    const pinned = await pinDirectoryToIPFS(files, `hls-${data.cid}`);
-    const tPin = Date.now() - t2;
 
     // 3. Derive a rendition manifest (mirrors what the real webhook builds).
     const renditions = keys
