@@ -300,6 +300,11 @@ async function processVideos() {
               payment_received_txc: received,
               payment_tx_hash: stamp.txid,
               expires_at: extendedExpires,
+              expiring_at: null,
+              unpin_after: null,
+              notified_pre_expiry_at: null,
+              notified_expiring_at: null,
+              notified_unpinned_at: null,
             })
             .eq("cid", v.cid);
           results.push({
