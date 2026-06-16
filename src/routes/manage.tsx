@@ -369,17 +369,21 @@ function ManagePageInner() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           {v.thumbnail_cid ? (
-                            <img
-                              src={ipfsThumbUrl(v.thumbnail_cid)}
-                              alt=""
-                              className="h-10 w-16 object-cover rounded-sm border border-border bg-secondary shrink-0"
-                            />
+                            <Link to="/v/$cid" params={{ cid: v.cid }}>
+                              <img
+                                src={ipfsThumbUrl(v.thumbnail_cid)}
+                                alt=""
+                                className="h-10 w-16 object-cover rounded-sm border border-border bg-secondary shrink-0"
+                              />
+                            </Link>
                           ) : (
                             <div className="h-10 w-16 rounded-sm border border-dashed border-border bg-secondary shrink-0" />
                           )}
                           <div className="min-w-0">
                             <div className="font-bold truncate max-w-xs flex items-center gap-2">
-                              <span className="truncate">{v.title}</span>
+                              <Link to="/v/$cid" params={{ cid: v.cid }} className="truncate hover:underline">
+                                {v.title}
+                              </Link>
                               {v.is_nsfw && (
                                 <span className="shrink-0 rounded-sm border border-destructive px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider text-destructive">
                                   NSFW
