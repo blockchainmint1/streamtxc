@@ -121,9 +121,10 @@ function RetryStampButton({ cid, wallet }: { cid: string; wallet: string }) {
   const [busy, setBusy] = useState(false);
   return (
     <Button
-      size="sm"
+      size="icon"
       variant="outline"
-      className="font-mono"
+      className="font-mono h-7 w-7"
+      title="Retry stamp"
       disabled={busy}
       onClick={async () => {
         setBusy(true);
@@ -147,7 +148,6 @@ function RetryStampButton({ cid, wallet }: { cid: string; wallet: string }) {
       }}
     >
       {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-      <span className="ml-1">retry stamp</span>
     </Button>
   );
 }
@@ -240,9 +240,9 @@ function ToggleVisibilityButton({
   const [busy, setBusy] = useState(false);
   return (
     <Button
-      size="sm"
+      size="icon"
       variant="outline"
-      className="font-mono"
+      className="font-mono h-7 w-7"
       disabled={busy}
       title={hidden ? "Show this video publicly" : "Hide from public listings"}
       onClick={async () => {
@@ -265,7 +265,6 @@ function ToggleVisibilityButton({
       ) : (
         <Eye className="h-3 w-3" />
       )}
-      <span className="ml-1">{hidden ? "show" : "hide"}</span>
     </Button>
   );
 }
@@ -460,7 +459,7 @@ function ManagePageInner() {
                             <div className="h-10 w-16 rounded-sm border border-dashed border-border bg-secondary shrink-0" />
                           )}
                           <div className="min-w-0">
-                            <div className="font-bold truncate max-w-[8rem] flex items-center gap-2">
+                            <div className="font-bold truncate max-w-[14rem] flex items-center gap-2">
                               <Link to="/v/$cid" params={{ cid: v.cid }} className="truncate hover:underline">
                                 {v.title}
                               </Link>
@@ -470,7 +469,7 @@ function ManagePageInner() {
                                 </span>
                               )}
                             </div>
-                            <div className="font-mono text-[10px] text-muted-foreground truncate max-w-[8rem]">
+                            <div className="font-mono text-[10px] text-muted-foreground truncate max-w-[14rem]">
                               {v.cid}
                             </div>
                           </div>
@@ -539,11 +538,12 @@ function ManagePageInner() {
                           />
                           <Link to="/v/$cid" params={{ cid: v.cid }}>
                             <Button
-                              size="sm"
+                              size="icon"
                               variant="outline"
-                              className="font-mono"
+                              className="font-mono h-7 w-7"
+                              title="View"
                             >
-                              view <ArrowUpRight className="ml-1 h-3 w-3" />
+                              <ArrowUpRight className="h-3 w-3" />
                             </Button>
                           </Link>
                         </div>
@@ -666,8 +666,8 @@ function EditVideoDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="font-mono">
-          <Pencil className="mr-1 h-3 w-3" /> edit
+        <Button size="icon" variant="outline" className="font-mono h-7 w-7" title="Edit">
+          <Pencil className="h-3 w-3" />
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
