@@ -158,9 +158,10 @@ function RetryTranscodeButton({ cid, wallet }: { cid: string; wallet: string }) 
   const [busy, setBusy] = useState(false);
   return (
     <Button
-      size="sm"
+      size="icon"
       variant="outline"
-      className="font-mono"
+      className="font-mono h-7 w-7"
+      title="Retry transcode"
       disabled={busy}
       onClick={async () => {
         setBusy(true);
@@ -184,7 +185,6 @@ function RetryTranscodeButton({ cid, wallet }: { cid: string; wallet: string }) 
       }}
     >
       {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-      <span className="ml-1">retry transcode</span>
     </Button>
   );
 }
