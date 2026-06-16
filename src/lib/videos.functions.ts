@@ -877,6 +877,11 @@ export const reseedVideo = createServerFn({ method: "POST" })
       .update({
         unpinned_at: null,
         status: "active",
+        expiring_at: null,
+        unpin_after: null,
+        notified_pre_expiry_at: null,
+        notified_expiring_at: null,
+        notified_unpinned_at: null,
       })
       .eq("cid", data.cid);
 
