@@ -448,6 +448,7 @@ YAML
 # ───────────────────────────────────────────────────────────────
 cat > lambda/index.js <<'LAMBDAEOF'
 const { Readable } = require("stream");
+const { createHmac } = require("crypto");
 const { S3Client, GetObjectCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");
 
 const s3 = new S3Client({});
@@ -464,8 +465,8 @@ exports.handler = async (event) => {
     const auth = event.headers?.authorization || event.headers?.Authorization || "";
     if (auth !== `Bearer ${BEARER}`) return resp(401, { error: "unauthorized" });
     const body = JSON.parse(event.body || "{}");
-    if (route === "POST /pin-by-hash") return pinByHash(body);
-    return pinFromS3(body);
+    if (route === "POST /pin-by-hash") return await pinByHash(body);
+    return await pinFromS3(body);
   } catch (err) {
     console.error(err);
     return resp(500, { error: String(err?.message || err) });
@@ -509,27 +510,61 @@ async function pinFromS3(body) {
     duplex: "half",
     headers: { "Content-Type": `multipart/form-data; boundary=${boundary}` },
   });
+  let result;
   if (!ipfsRes.ok) {
     const t = await ipfsRes.text();
-    return resp(502, { error: "ipfs add failed", status: ipfsRes.status, body: t.slice(0, 1000) });
+    result = { ok: false, error: "ipfs add failed", status: ipfsRes.status, body: t.slice(0, 1000) };
+  } else {
+    const text = await ipfsRes.text();
+    const entries = text.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
+    const root = entries.find((e) => e.Name === "wrap") || entries[entries.length - 1];
+    result = {
+      ok: true,
+      cid: root?.Hash,
+      files: sentFiles.length,
+      totalBytes,
+      manifest: entries
+        .filter((e) => e.Name && e.Name !== "wrap" && e.Hash !== root?.Hash)
+        .map((e) => ({ path: e.Name.replace(/^wrap\//, ""), cid: e.Hash, size: Number(e.Size || 0) })),
+    };
   }
 
-  const text = await ipfsRes.text();
-  const entries = text.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
-  const root = entries.find((e) => e.Name === "wrap") || entries[entries.length - 1];
+  // Optional async callback: when the caller passes callbackUrl + callbackSecret
+  // (typical for the long-running HLS bundle pin invoked with X-Amz-Invocation-Type: Event),
+  // POST the result back to our webhook with an HMAC signature so the app can
+  // finalize the videos row without holding an open connection for the whole pin.
+  if (body.callbackUrl && body.callbackSecret) {
+    const payload = {
+      cid: result.ok ? result.cid : null,
+      files: result.files || 0,
+      totalBytes: result.totalBytes || 0,
+      manifest: result.manifest || [],
+      error: result.ok ? null : (result.error || "pin failed"),
+      meta: body.callbackMeta || {},
+    };
+    const bodyStr = JSON.stringify(payload);
+    const sig = createHmac("sha256", body.callbackSecret).update(bodyStr).digest("hex");
+    try {
+      const cbRes = await fetch(body.callbackUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-webhook-signature": sig },
+        body: bodyStr,
+      });
+      console.log(`callback → ${body.callbackUrl} : ${cbRes.status}`);
+    } catch (e) {
+      console.error("callback POST failed:", e);
+    }
+  }
+
+  if (!result.ok) return resp(502, result);
   return resp(200, {
-    cid: root?.Hash,
-    files: sentFiles.length,
-    totalBytes,
-    manifest: entries
-      .filter((e) => e.Name && e.Name !== "wrap" && e.Hash !== root?.Hash)
-      .map((e) => ({ path: e.Name.replace(/^wrap\//, ""), cid: e.Hash, size: Number(e.Size || 0) })),
+    cid: result.cid, files: result.files, totalBytes: result.totalBytes, manifest: result.manifest,
   });
 }
 
 async function pinByHash(body) {
   if (!PINATA_JWT) return resp(400, { error: "PINATA_JWT not configured" });
-  if (!body.cid)   return resp(400, { error: "cid required" });
+  if (!body.cid) return resp(400, { error: "cid required" });
   const r = await fetch("https://api.pinata.cloud/pinning/pinByHash", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${PINATA_JWT}` },
@@ -544,7 +579,9 @@ async function listAll(bucket, prefix) {
   let token;
   do {
     const r = await s3.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, ContinuationToken: token }));
-    for (const item of r.Contents || []) if (item.Key && !item.Key.endsWith("/")) out.push(item.Key);
+    for (const item of r.Contents || []) {
+      if (item.Key && !item.Key.endsWith("/")) out.push(item.Key);
+    }
     token = r.IsTruncated ? r.NextContinuationToken : undefined;
   } while (token);
   return out;
@@ -553,7 +590,14 @@ async function listAll(bucket, prefix) {
 function resp(statusCode, obj) {
   return { statusCode, headers: { "Content-Type": "application/json" }, body: JSON.stringify(obj) };
 }
-function safeJson(t) { try { return JSON.parse(t); } catch { return t; } }
+
+function safeJson(t) {
+  try {
+    return JSON.parse(t);
+  } catch (e) {
+    return t;
+  }
+}
 LAMBDAEOF
 
 # ───────────────────────────────────────────────────────────────
