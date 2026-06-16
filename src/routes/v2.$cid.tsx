@@ -9,10 +9,14 @@ import { Footer } from "@/components/Footer";
 import { VideoPlayerV2 } from "@/components/VideoPlayerV2";
 import { Button } from "@/components/ui/button";
 import { getVideo } from "@/lib/videos.functions";
+import { pollTxStatus } from "@/lib/videos.functions";
 import { getTranscodeStatus } from "@/lib/transcode.functions";
 import { ipfsThumbUrl, ipfsHlsUrl } from "@/lib/ipfs-gateway";
 import { CidField } from "@/components/CidField";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { OnChainProofPanel } from "@/components/OnChainProofPanel";
+import { PaymentPanel } from "@/components/PaymentPanel";
+import { EmbedPanel } from "@/components/EmbedPanel";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import {
   ArrowLeft,
@@ -23,8 +27,10 @@ import {
   Layers,
   Eye,
   Calendar,
+  Wallet,
+  Code2,
 } from "lucide-react";
-import { formatBytes, formatDate } from "@/lib/fees";
+import { formatBytes, formatDate, formatDateTime } from "@/lib/fees";
 import { shortWalletId } from "@/lib/wallet";
 
 const v2Search = z.object({
@@ -63,6 +69,7 @@ function V2WatchPage() {
   const { hls: hlsOverride, playlist: playlistOverride } = Route.useSearch();
   const fetchVideo = useServerFn(getVideo);
   const fetchStatus = useServerFn(getTranscodeStatus);
+  const pollTx = useServerFn(pollTxStatus);
   const copy = (s: string) => void copyToClipboard(s);
 
   const { data: video, isLoading } = useQuery({
@@ -81,6 +88,14 @@ function V2WatchPage() {
       !q.state.data?.transcode_status
         ? false
         : 5_000,
+  });
+
+  const { data: chain } = useQuery({
+    queryKey: ["tx-status", cid],
+    queryFn: () => pollTx({ data: { cid } }),
+    enabled: !hlsOverride && !!video,
+    refetchInterval: (q) =>
+      q.state.data?.status === "active" ? false : 15_000,
   });
 
   // Manual override path: any CID in the URL is acceptable as a routing
@@ -148,6 +163,13 @@ function V2WatchPage() {
   const jobId = tx?.transcode_job_id ?? video.transcode_job_id ?? null;
   const error = tx?.transcode_error ?? video.transcode_error ?? null;
 
+  const chainStatus = chain?.status ?? video.status;
+  const blockNumber = chain?.blockNumber ?? video.block_number ?? null;
+  const blockHash = chain?.blockHash ?? video.block_hash ?? null;
+  const txHash = chain?.txHash ?? video.tx_hash ?? null;
+  const confirmed = chainStatus === "active" && !!blockNumber;
+  const stampFailed = chainStatus === "stamp_failed";
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -205,10 +227,50 @@ function V2WatchPage() {
 
           {/* Sidebar */}
           <div className="space-y-4">
+            <OnChainProofPanel
+              cid={video.cid}
+              videoWallet={video.video_wallet}
+              txHash={txHash}
+              blockNumber={blockNumber}
+              blockHash={blockHash}
+              opReturnPayload={video.op_return_payload}
+              metadataCid={video.metadata_cid}
+              confirmed={confirmed}
+              stampFailed={stampFailed}
+              onCopy={copy}
+            />
+
+            {video.video_wallet && video.payment_required_txc != null && (
+              <CollapsibleSection
+                title="[ HOSTING PAYMENT ]"
+                icon={<Wallet className="h-3.5 w-3.5" />}
+                defaultOpen={!video.paid_at}
+              >
+                <PaymentPanel
+                  required={Number(video.payment_required_txc)}
+                  received={Number(video.payment_received_txc ?? 0)}
+                  wallet={video.video_wallet}
+                  paidAt={video.paid_at ?? null}
+                  createdAt={video.created_at}
+                  expiresAt={video.expires_at}
+                  monthsPrepaid={video.months_prepaid ?? 1}
+                  onCopy={copy}
+                />
+              </CollapsibleSection>
+            )}
+
+            <CollapsibleSection
+              title="[ EMBED ]"
+              icon={<Code2 className="h-3.5 w-3.5" />}
+              defaultOpen={false}
+            >
+              <EmbedPanel cid={video.cid} onCopy={copy} />
+            </CollapsibleSection>
+
             <CollapsibleSection
               title="[ TRANSCODE PIPELINE ]"
               icon={<Layers className="h-3.5 w-3.5" />}
-              defaultOpen={true}
+              defaultOpen={false}
             >
               <TranscodeBody
                 status={status}
@@ -306,9 +368,9 @@ function TranscodeBody({
       {jobId && <CidField label="MediaConvert job" value={jobId} onCopy={onCopy} mono />}
       <div className="grid grid-cols-2 gap-3 font-mono text-xs pt-1 border-t border-border">
         <Meta k="Size" v={formatBytes(sizeBytes)} />
-        <Meta k="Uploaded" v={formatDate(createdAt)} />
-        <Meta k="Started" v={startedAt ? formatDate(startedAt) : "—"} />
-        <Meta k="Completed" v={completedAt ? formatDate(completedAt) : "—"} />
+        <Meta k="Uploaded" v={formatDateTime(createdAt)} />
+        <Meta k="Started" v={startedAt ? formatDateTime(startedAt) : "—"} />
+        <Meta k="Completed" v={completedAt ? formatDateTime(completedAt) : "—"} />
       </div>
       {renditions && renditions.length > 0 && (
         <div className="pt-2 border-t border-border font-mono text-xs">
