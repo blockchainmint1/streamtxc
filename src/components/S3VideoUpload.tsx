@@ -32,6 +32,7 @@ import {
   pinS3ToIpfs,
   ipfsLambdaHealth,
   isIpfsLambdaConfigured,
+  kickHlsPinAsync,
 } from "@/lib/ipfs-lambda.functions";
 import { computeCids } from "@/lib/ipfs-cid";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
@@ -160,6 +161,7 @@ export function S3VideoUpload({
   const checkStatus = useServerFn(getTranscodeStatus);
   const describeJob = useServerFn(getMediaConvertJob);
   const runWebhook = useServerFn(simulateMediaConvertWebhook);
+  const kickPin = useServerFn(kickHlsPinAsync);
   const pinFromS3 = useServerFn(pinS3ToIpfs);
   const checkIpfs = useServerFn(isIpfsLambdaConfigured);
   const probeIpfs = useServerFn(ipfsLambdaHealth);
