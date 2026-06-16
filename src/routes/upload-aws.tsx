@@ -154,6 +154,19 @@ function UploadPage() {
   const [cidTitle, setCidTitle] = useState("");
   const [cidDescription, setCidDescription] = useState("");
   const [cidThumbnailCid, setCidThumbnailCid] = useState<string | null>(null);
+  // Track whether either thumbnail picker is mid-flight so we can both
+  // disable Submit AND wait for it before calling register(). Without
+  // this, clicking Upload before the picker finishes pins the thumbnail
+  // to IPFS but never attaches the CID to the videos row.
+  const [thumbPinning, setThumbPinning] = useState(false);
+  const [cidThumbPinning, setCidThumbPinning] = useState(false);
+  // Mirror state into a ref so handleSubmit always reads the latest CID
+  // even if the user picked a frame between clicking Upload and the
+  // register() call (the closure would otherwise hold the click-time value).
+  const thumbnailCidRef = useRef<string | null>(null);
+  useEffect(() => { thumbnailCidRef.current = thumbnailCid; }, [thumbnailCid]);
+  const cidThumbnailCidRef = useRef<string | null>(null);
+  useEffect(() => { cidThumbnailCidRef.current = cidThumbnailCid; }, [cidThumbnailCid]);
   const [nsfw, setNsfw] = useState(false);
   const [cidNsfw, setCidNsfw] = useState(false);
   const [cidStage, setCidStage] = useState<
