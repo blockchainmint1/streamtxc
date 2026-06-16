@@ -77,6 +77,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Comments } from "@/components/Comments";
 import { ipfsThumbUrl, ipfsHlsUrl } from "@/lib/ipfs-gateway";
+import { CidField as Field } from "@/components/CidField";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 
 export const Route = createFileRoute("/v/$cid")({
   loader: async ({ params }) => {
@@ -575,56 +577,6 @@ function WatchPage() {
   );
 }
 
-function Field({
-  label,
-  value,
-  href,
-  onCopy,
-  mono,
-}: {
-  label: string;
-  value: string;
-  href?: string;
-  onCopy?: (s: string) => void;
-  mono?: boolean;
-}) {
-  return (
-    <div>
-      <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
-        {label}
-      </div>
-      <div className="flex items-center gap-2 mt-0.5">
-        <span
-          className={`flex-1 truncate text-xs ${mono ? "font-mono" : ""}`}
-          title={value}
-        >
-          {value}
-        </span>
-        {onCopy && (
-          <button
-            onClick={() => onCopy(value)}
-            className="text-muted-foreground hover:text-primary"
-            aria-label={`Copy ${label}`}
-          >
-            <Copy className="h-3 w-3" />
-          </button>
-        )}
-        {href && (
-          <a
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-primary"
-            aria-label={`Open ${label}`}
-          >
-            <ExternalLink className="h-3 w-3" />
-          </a>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function ShareBar({
   title,
   url,
@@ -877,38 +829,6 @@ function PaymentPanel({
         </>
       )}
     </>
-  );
-}
-
-function CollapsibleSection({
-  title,
-  icon,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  icon?: React.ReactNode;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <div className="border border-border bg-card rounded-sm">
-        <CollapsibleTrigger className="w-full flex items-center justify-between p-4 group">
-          <h2 className="font-mono text-xs text-primary flex items-center gap-1.5">
-            {icon}
-            {title}
-          </h2>
-          <ChevronDown
-            className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
-          />
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="px-4 pb-4 space-y-3">{children}</div>
-        </CollapsibleContent>
-      </div>
-    </Collapsible>
   );
 }
 

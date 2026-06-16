@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -10,6 +11,9 @@ import { Button } from "@/components/ui/button";
 import { getVideo } from "@/lib/videos.functions";
 import { getTranscodeStatus } from "@/lib/transcode.functions";
 import { ipfsThumbUrl, ipfsHlsUrl } from "@/lib/ipfs-gateway";
+import { CidField } from "@/components/CidField";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -17,8 +21,11 @@ import {
   AlertTriangle,
   Clock,
   Layers,
+  Eye,
+  Calendar,
 } from "lucide-react";
 import { formatBytes, formatDate } from "@/lib/fees";
+import { shortWalletId } from "@/lib/wallet";
 
 const v2Search = z.object({
   // Override the HLS directory CID (skip DB lookup of hls_cid).
@@ -56,6 +63,7 @@ function V2WatchPage() {
   const { hls: hlsOverride, playlist: playlistOverride } = Route.useSearch();
   const fetchVideo = useServerFn(getVideo);
   const fetchStatus = useServerFn(getTranscodeStatus);
+  const copy = (s: string) => void copyToClipboard(s);
 
   const { data: video, isLoading } = useQuery({
     queryKey: ["video", cid],
@@ -136,56 +144,96 @@ function V2WatchPage() {
   const renditions = (tx?.renditions ?? video.renditions ?? null) as
     | { height: number | null; playlist: string }[]
     | null;
+  const hlsCid = tx?.hls_cid ?? video.hls_cid ?? null;
+  const jobId = tx?.transcode_job_id ?? video.transcode_job_id ?? null;
+  const error = tx?.transcode_error ?? video.transcode_error ?? null;
 
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="mx-auto w-full max-w-6xl px-6 py-8 flex-1 space-y-6">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="space-y-1">
-            <div className="font-mono text-xs text-primary">
-              [ V2 PLAYER · EXPERIMENTAL ]
+      <main className="mx-auto w-full max-w-6xl px-6 py-8 flex-1">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Player + meta */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden">
+              <VideoPlayerV2
+                src={streamUrl}
+                poster={ipfsThumbUrl(video.thumbnail_cid)}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="font-mono text-xs text-primary">
+                [ V2 PLAYER · EXPERIMENTAL ]
+              </div>
+              <Link to="/v/$cid" params={{ cid: video.cid }}>
+                <Button variant="outline" size="sm" className="font-mono">
+                  <ArrowLeft className="mr-2 h-3 w-3" /> v1 player
+                </Button>
+              </Link>
             </div>
             <h1 className="text-2xl font-bold tracking-tight">{video.title}</h1>
+            {video.description && (
+              <p className="text-muted-foreground whitespace-pre-wrap">
+                {video.description}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-4 font-mono text-xs text-muted-foreground border-t border-border pt-4">
+              <span className="flex items-center gap-1.5">
+                <Eye className="h-3.5 w-3.5" /> {video.view_count} views
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5" />
+                {formatDate(video.created_at)}
+              </span>
+              <span>{formatBytes(video.size_bytes)}</span>
+              <span className="flex items-center gap-1">
+                uploader:{" "}
+                {video.owner_wallet ? (
+                  <Link
+                    to="/u/$wallet"
+                    params={{ wallet: video.owner_wallet }}
+                    className="font-mono hover:text-primary transition-colors"
+                  >
+                    {shortWalletId(video.owner_wallet)}
+                  </Link>
+                ) : (
+                  "anonymous"
+                )}
+              </span>
+            </div>
           </div>
-          <Link to="/v/$cid" params={{ cid: video.cid }}>
-            <Button variant="outline" size="sm" className="font-mono">
-              <ArrowLeft className="mr-2 h-3 w-3" /> back to /v/{video.cid.slice(0, 8)}…
-            </Button>
-          </Link>
-        </div>
 
-        <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden">
-          <VideoPlayerV2
-            src={streamUrl}
-            poster={ipfsThumbUrl(video.thumbnail_cid)}
-          />
-        </div>
+          {/* Sidebar */}
+          <div className="space-y-4">
+            <CollapsibleSection
+              title="[ TRANSCODE PIPELINE ]"
+              icon={<Layers className="h-3.5 w-3.5" />}
+              defaultOpen={true}
+            >
+              <TranscodeBody
+                status={status}
+                hlsCid={hlsCid}
+                jobId={jobId}
+                error={error}
+                startedAt={video.transcode_started_at ?? null}
+                completedAt={video.transcode_completed_at ?? null}
+                renditions={renditions}
+                sizeBytes={video.size_bytes}
+                createdAt={video.created_at}
+                cid={video.cid}
+                onCopy={copy}
+              />
+            </CollapsibleSection>
 
-        {video.description && (
-          <p className="text-muted-foreground whitespace-pre-wrap">
-            {video.description}
-          </p>
-        )}
-
-        <TranscodeDevPanel
-          status={status}
-          hlsCid={tx?.hls_cid ?? video.hls_cid ?? null}
-          jobId={tx?.transcode_job_id ?? video.transcode_job_id ?? null}
-          error={tx?.transcode_error ?? video.transcode_error ?? null}
-          startedAt={video.transcode_started_at ?? null}
-          completedAt={video.transcode_completed_at ?? null}
-          renditions={renditions}
-          sizeBytes={video.size_bytes}
-          createdAt={video.created_at}
-          cid={video.cid}
-        />
-
-        <div className="border border-border rounded-sm p-4 font-mono text-xs text-muted-foreground space-y-1">
-          <div className="text-primary mb-2">[ KEYBOARD SHORTCUTS ]</div>
-          <div>space / k — play/pause</div>
-          <div>← / → — seek 5s · j / l — seek 10s · 0-9 — seek to %</div>
-          <div>m — mute · f — fullscreen</div>
+            <CollapsibleSection title="[ KEYBOARD SHORTCUTS ]" defaultOpen={false}>
+              <div className="font-mono text-xs text-muted-foreground space-y-1">
+                <div>space / k — play/pause</div>
+                <div>← / → — seek 5s · j / l — seek 10s</div>
+                <div>0-9 — seek to %</div>
+                <div>m — mute · f — fullscreen</div>
+              </div>
+            </CollapsibleSection>
+          </div>
         </div>
       </main>
       <Footer />
@@ -193,7 +241,7 @@ function V2WatchPage() {
   );
 }
 
-function TranscodeDevPanel({
+function TranscodeBody({
   status,
   hlsCid,
   jobId,
@@ -204,6 +252,7 @@ function TranscodeDevPanel({
   sizeBytes,
   createdAt,
   cid,
+  onCopy,
 }: {
   status: string | null;
   hlsCid: string | null;
@@ -215,6 +264,7 @@ function TranscodeDevPanel({
   sizeBytes: number;
   createdAt: string;
   cid: string;
+  onCopy: (s: string) => void;
 }) {
   const icon =
     status === "complete" || status === "ready" ? (
@@ -239,53 +289,50 @@ function TranscodeDevPanel({
       : "Legacy single-MP4 (no transcode record)";
 
   return (
-    <div className="border border-border rounded-sm">
-      <div className="px-4 py-3 border-b border-border bg-card font-mono text-xs text-primary flex items-center gap-2">
-        <Layers className="h-3 w-3" /> [ TRANSCODE PIPELINE ]
+    <>
+      <div className="flex items-start gap-2 text-sm">
+        <span className="shrink-0 mt-0.5">{icon}</span>
+        <span className={`font-mono text-xs ${status === "failed" ? "text-destructive" : ""}`}>
+          {label}
+        </span>
       </div>
-      <div className="p-4 space-y-3 font-mono text-xs">
-        <div className="flex items-center gap-2 text-sm">
-          {icon}
-          <span className={status === "failed" ? "text-destructive" : ""}>
-            {label}
-          </span>
+      {error && (
+        <div className="text-destructive border border-destructive/40 bg-destructive/5 rounded-sm p-2 whitespace-pre-wrap font-mono text-[11px]">
+          {error}
         </div>
-        {error && (
-          <div className="text-destructive border border-destructive/40 bg-destructive/5 rounded-sm p-2 whitespace-pre-wrap">
-            {error}
-          </div>
-        )}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-muted-foreground">
-          <Row k="CID (original)" v={cid} />
-          <Row k="HLS CID (directory)" v={hlsCid ?? "—"} />
-          <Row k="MediaConvert job" v={jobId ?? "—"} />
-          <Row k="Size" v={formatBytes(sizeBytes)} />
-          <Row k="Uploaded" v={formatDate(createdAt)} />
-          <Row k="Transcode started" v={startedAt ? formatDate(startedAt) : "—"} />
-          <Row k="Transcode completed" v={completedAt ? formatDate(completedAt) : "—"} />
-        </div>
-        {renditions && renditions.length > 0 && (
-          <div className="pt-2 border-t border-border">
-            <div className="text-muted-foreground mb-1">RENDITIONS</div>
-            <ul className="space-y-0.5">
-              {renditions.map((r) => (
-                <li key={r.playlist} className="text-foreground">
-                  {r.height ? `${r.height}p` : "?"} · {r.playlist}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+      )}
+      <CidField label="CID (original)" value={cid} onCopy={onCopy} mono />
+      <CidField label="HLS CID (directory)" value={hlsCid ?? "—"} onCopy={hlsCid ? onCopy : undefined} mono />
+      {jobId && <CidField label="MediaConvert job" value={jobId} onCopy={onCopy} mono />}
+      <div className="grid grid-cols-2 gap-3 font-mono text-xs pt-1 border-t border-border">
+        <Meta k="Size" v={formatBytes(sizeBytes)} />
+        <Meta k="Uploaded" v={formatDate(createdAt)} />
+        <Meta k="Started" v={startedAt ? formatDate(startedAt) : "—"} />
+        <Meta k="Completed" v={completedAt ? formatDate(completedAt) : "—"} />
       </div>
-    </div>
+      {renditions && renditions.length > 0 && (
+        <div className="pt-2 border-t border-border font-mono text-xs">
+          <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
+            Renditions
+          </div>
+          <ul className="space-y-0.5">
+            {renditions.map((r) => (
+              <li key={r.playlist} className="text-foreground break-all">
+                {r.height ? `${r.height}p` : "?"} · {r.playlist}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
   );
 }
 
-function Row({ k, v }: { k: string; v: string }) {
+function Meta({ k, v }: { k: string; v: string }) {
   return (
-    <div className="flex justify-between gap-3">
-      <span className="shrink-0">{k}</span>
-      <span className="text-foreground truncate text-right">{v}</span>
+    <div>
+      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{k}</div>
+      <div className="text-foreground break-words">{v}</div>
     </div>
   );
 }
