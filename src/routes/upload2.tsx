@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useWallet } from "@/lib/wallet";
-import { formatBytes, MAX_UPLOAD_BYTES } from "@/lib/fees";
+import { formatBytes, MAX_S3_UPLOAD_BYTES } from "@/lib/fees";
 import {
   registerUpload,
   lookupPinnedCid,
@@ -206,7 +206,7 @@ function Upload2Page() {
   const startTimeRef = useRef<number>(0);
   const logBoxRef = useRef<HTMLDivElement | null>(null);
 
-  const tooBig = !!file && file.size > MAX_UPLOAD_BYTES;
+  const tooBig = !!file && file.size > MAX_S3_UPLOAD_BYTES;
 
   const pushLog = useCallback((level: LogLevel, msg: string) => {
     const t = startTimeRef.current
