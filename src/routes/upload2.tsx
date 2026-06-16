@@ -145,6 +145,8 @@ function Upload2Page() {
   const startTx = useServerFn(startTranscode);
   const checkConfig = useServerFn(isTranscodeConfigured);
   const checkStatus = useServerFn(getTranscodeStatus);
+  const describeJob = useServerFn(getMediaConvertJob);
+  const runWebhook = useServerFn(simulateMediaConvertWebhook);
   const pinFromS3 = useServerFn(pinS3ToIpfs);
   const checkIpfs = useServerFn(isIpfsLambdaConfigured);
   const probeIpfs = useServerFn(ipfsLambdaHealth);
