@@ -467,6 +467,7 @@ function Upload2Page() {
         setStage("transcode", "active", `job ${jobId}`);
         setStage("pin-hls", "active", "waiting for MediaConvert webhook…");
         pushLog("step", "waiting for MediaConvert webhook (polling every 5s)…");
+        saveInflight({ cid: result.cid, jobId, startedAt: Date.now() });
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Could not start transcode";
         pushLog("err", `startTranscode failed: ${msg}`);
