@@ -272,6 +272,7 @@ function Upload2Page() {
                 setStage("pin-hls", "done", hlsCid ? `hls cid: ${hlsCid}` : "pinned via fallback");
                 setStage("done", "done");
                 pushLog("step", `pipeline complete — /v2/${resultCid}`);
+                clearInflight();
                 if (pollRef.current) window.clearInterval(pollRef.current);
                 if (autoNavigate && resultCid) {
                   pushLog("info", "auto-navigating to /v2 in 1500ms…");
