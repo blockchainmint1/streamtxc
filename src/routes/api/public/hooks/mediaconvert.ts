@@ -106,18 +106,59 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
           );
         }
 
-        const { pinDirectoryToIPFS } = await import("@/lib/pinata.server");
-        const files: Array<{ path: string; body: Blob; contentType?: string }> = [];
-        for (const key of keys) {
-          const blob = await getObjectBlob(outputBucket, key);
-          files.push({
-            path: key.slice(prefix.length),
-            body: blob,
-            contentType: blob.type || undefined,
+        // Prefer the self-hosted IPFS Lambda (streams S3 → kubo node, no
+        // Worker memory pressure). Fall back to direct Pinata directory
+        // pin when the Lambda isn't configured or fails.
+        let pinnedCid: string;
+        let pinnedSize = 0;
+        const lambdaUrl = process.env.IPFS_LAMBDA_URL;
+        const lambdaToken = process.env.IPFS_LAMBDA_TOKEN;
+        if (lambdaUrl && lambdaToken) {
+          const res = await fetch(`${lambdaUrl.replace(/\/$/, "")}/pin`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${lambdaToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ bucket: outputBucket, prefix }),
           });
+          const text = await res.text();
+          if (!res.ok) {
+            console.warn(`hls-pin: lambda /pin failed [${res.status}]: ${text.slice(0, 400)} — falling back to Pinata`);
+            const { pinDirectoryToIPFS } = await import("@/lib/pinata.server");
+            const files: Array<{ path: string; body: Blob; contentType?: string }> = [];
+            for (const key of keys) {
+              const blob = await getObjectBlob(outputBucket, key);
+              files.push({
+                path: key.slice(prefix.length),
+                body: blob,
+                contentType: blob.type || undefined,
+              });
+            }
+            const fb = await pinDirectoryToIPFS(files, `hls-${cid}`);
+            pinnedCid = fb.cid;
+            pinnedSize = fb.size;
+          } else {
+            const json = JSON.parse(text) as { cid: string; totalBytes?: number };
+            pinnedCid = json.cid;
+            pinnedSize = json.totalBytes ?? 0;
+          }
+        } else {
+          const { pinDirectoryToIPFS } = await import("@/lib/pinata.server");
+          const files: Array<{ path: string; body: Blob; contentType?: string }> = [];
+          for (const key of keys) {
+            const blob = await getObjectBlob(outputBucket, key);
+            files.push({
+              path: key.slice(prefix.length),
+              body: blob,
+              contentType: blob.type || undefined,
+            });
+          }
+          const fb = await pinDirectoryToIPFS(files, `hls-${cid}`);
+          pinnedCid = fb.cid;
+          pinnedSize = fb.size;
         }
-
-        const pinned = await pinDirectoryToIPFS(files, `hls-${cid}`);
+        const pinned = { cid: pinnedCid, size: pinnedSize };
 
         // Look up the videos row so we can re-anchor full metadata (v3
         // adds hlsCid + renditions) to IPFS and the chain. Best-effort —
