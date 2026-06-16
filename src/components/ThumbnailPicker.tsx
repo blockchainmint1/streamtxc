@@ -13,6 +13,9 @@ interface Props {
   /** OR provide a URL (CID/import tabs) — pulled via crossOrigin="anonymous". */
   videoSrc?: string;
   onChange: (cid: string | null) => void;
+  /** Optional: notified while a frame is being captured/pinned, so the
+   *  parent can disable its Submit button until the thumbnail CID is ready. */
+  onPinningChange?: (pinning: boolean) => void;
 }
 
 /**
@@ -22,7 +25,7 @@ interface Props {
  * onChange). Auto-captures the frame at ~1s when the file changes so the
  * user always has a reasonable default without clicking anything.
  */
-export function ThumbnailPicker({ file, videoSrc, onChange }: Props) {
+export function ThumbnailPicker({ file, videoSrc, onChange, onPinningChange }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -33,6 +36,11 @@ export function ThumbnailPicker({ file, videoSrc, onChange }: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [thumbCid, setThumbCid] = useState<string | null>(null);
   const [stage, setStage] = useState<"idle" | "capturing" | "pinning">("idle");
+
+  // Mirror stage → parent so the upload form can wait for a mid-flight pin.
+  useEffect(() => {
+    onPinningChange?.(stage !== "idle");
+  }, [stage, onPinningChange]);
 
   // Build & tear down the video source when file/url changes.
   useEffect(() => {

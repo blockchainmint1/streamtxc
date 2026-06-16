@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
@@ -154,6 +154,19 @@ function UploadPage() {
   const [cidTitle, setCidTitle] = useState("");
   const [cidDescription, setCidDescription] = useState("");
   const [cidThumbnailCid, setCidThumbnailCid] = useState<string | null>(null);
+  // Track whether either thumbnail picker is mid-flight so we can both
+  // disable Submit AND wait for it before calling register(). Without
+  // this, clicking Upload before the picker finishes pins the thumbnail
+  // to IPFS but never attaches the CID to the videos row.
+  const [thumbPinning, setThumbPinning] = useState(false);
+  const [cidThumbPinning, setCidThumbPinning] = useState(false);
+  // Mirror state into a ref so handleSubmit always reads the latest CID
+  // even if the user picked a frame between clicking Upload and the
+  // register() call (the closure would otherwise hold the click-time value).
+  const thumbnailCidRef = useRef<string | null>(null);
+  useEffect(() => { thumbnailCidRef.current = thumbnailCid; }, [thumbnailCid]);
+  const cidThumbnailCidRef = useRef<string | null>(null);
+  useEffect(() => { cidThumbnailCidRef.current = cidThumbnailCid; }, [cidThumbnailCid]);
   const [nsfw, setNsfw] = useState(false);
   const [cidNsfw, setCidNsfw] = useState(false);
   const [cidStage, setCidStage] = useState<
@@ -259,6 +272,18 @@ function UploadPage() {
     }
     setDuplicate(null);
 
+    // If the thumbnail picker is still capturing/pinning, wait briefly
+    // so the chosen CID actually gets attached to the videos row.
+    // Without this, clicking Upload mid-pin pins the thumbnail to IPFS
+    // but register() runs with thumbnailCid=null and the picture is lost.
+    if (thumbPinning) {
+      toast("Waiting for thumbnail to finish pinning…");
+      const start = Date.now();
+      while (thumbPinning && Date.now() - start < 30_000) {
+        await new Promise((r) => setTimeout(r, 150));
+      }
+    }
+
     try {
       // 1. Reuse the CID + IPFS check computed when the file was selected.
       //    Falls back to recomputing if the user submitted before the
@@ -283,7 +308,7 @@ function UploadPage() {
             title,
             description,
             months,
-            thumbnailCid: thumbnailCid ?? undefined,
+            thumbnailCid: thumbnailCidRef.current ?? thumbnailCid ?? undefined,
             nsfw,
           },
         });
@@ -316,7 +341,7 @@ function UploadPage() {
           sizeBytes: pinResult.size || file.size,
           mimeType: file.type || "video/mp4",
           months,
-          thumbnailCid: thumbnailCid ?? undefined,
+          thumbnailCid: thumbnailCidRef.current ?? thumbnailCid ?? undefined,
           nsfw,
         },
       });
@@ -383,6 +408,13 @@ function UploadPage() {
     if (!cidInput || !cidTitle) return;
     setDuplicate(null);
     setCidNotFound(null);
+    if (cidThumbPinning) {
+      toast("Waiting for thumbnail to finish pinning…");
+      const start = Date.now();
+      while (cidThumbPinning && Date.now() - start < 30_000) {
+        await new Promise((r) => setTimeout(r, 150));
+      }
+    }
     try {
       setCidStage("fetching");
       const result = await addCid({
@@ -392,7 +424,7 @@ function UploadPage() {
           title: cidTitle,
           description: cidDescription,
           months,
-          thumbnailCid: cidThumbnailCid ?? undefined,
+          thumbnailCid: cidThumbnailCidRef.current ?? cidThumbnailCid ?? undefined,
           nsfw: cidNsfw,
         },
       });
@@ -670,7 +702,11 @@ function UploadPage() {
             </div>
 
             {file && !tooBig && (
-              <ThumbnailPicker file={file} onChange={setThumbnailCid} />
+              <ThumbnailPicker
+                file={file}
+                onChange={setThumbnailCid}
+                onPinningChange={setThumbPinning}
+              />
             )}
 
             <label className="flex items-start gap-3 border border-border bg-card rounded-sm p-4 cursor-pointer hover:border-primary/60 transition-colors">
@@ -759,11 +795,16 @@ function UploadPage() {
             <Button
               type="submit"
               size="lg"
-              disabled={!file || !title || tooBig || stage !== "idle"}
+              disabled={!file || !title || tooBig || stage !== "idle" || thumbPinning}
               className="w-full font-mono"
             >
               {stage === "idle" && (
-                cidProbe === "on-ipfs" ? (
+                thumbPinning ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Pinning thumbnail…
+                  </>
+                ) : cidProbe === "on-ipfs" ? (
                   <>
                     <Sparkles className="mr-2 h-4 w-4" />
                     Publish your video
@@ -868,6 +909,7 @@ function UploadPage() {
                     key={cidInput.trim()}
                     videoSrc={`/api/stream/${cidInput.trim()}`}
                     onChange={setCidThumbnailCid}
+                    onPinningChange={setCidThumbPinning}
                   />
                 )}
 

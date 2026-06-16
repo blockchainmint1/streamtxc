@@ -307,9 +307,11 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
     // to the input bucket.
     const prefix = `hls/${data.cid}/`;
     const t0 = Date.now();
+    console.log(`[transcode ${data.cid}] job ${data.jobId} complete — listing HLS outputs from s3://${e.outputBucket}/${prefix}`);
     const keys = await listObjects(e.outputBucket, prefix);
     if (keys.length === 0) throw new Error(`No outputs at s3://${e.outputBucket}/${prefix}`);
     const tList = Date.now() - t0;
+    console.log(`[transcode ${data.cid}] transcode finished — ${keys.length} output objects (list took ${tList}ms), starting IPFS pin`);
 
     const t1 = Date.now();
     let pinned: { cid: string; size: number };
@@ -317,11 +319,13 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
     const lambdaUrl = process.env.IPFS_LAMBDA_URL;
     const lambdaName = process.env.IPFS_LAMBDA_NAME;
     if (lambdaToken && (lambdaName || lambdaUrl)) {
+      console.log(`[transcode ${data.cid}] pinning to self-hosted IPFS (ipfs.honest.money) via Lambda`);
       const { callPinLambda } = await import("./ipfs-lambda.functions");
       const json = await callPinLambda({ bucket: e.outputBucket, keys }, lambdaToken);
       if (!json.cid) throw new Error("Lambda /pin returned no cid");
       pinned = { cid: json.cid, size: json.totalBytes ?? 0 };
     } else {
+      console.log(`[transcode ${data.cid}] pinning to Pinata (self-hosted Lambda not configured)`);
       const { pinDirectoryToIPFS } = await import("./pinata.server");
       const files = await mapWithConcurrency(keys, 8, async (key) => {
         const blob = await getObjectBlob(e.outputBucket!, key);
@@ -334,6 +338,7 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
       pinned = await pinDirectoryToIPFS(files, `hls-${data.cid}`);
     }
     const tFetch = Date.now() - t1;
+    console.log(`[transcode ${data.cid}] IPFS pin complete in ${tFetch}ms → ${pinned.cid} (${pinned.size} bytes)`);
 
     // 3. Derive a rendition manifest (mirrors what the real webhook builds).
     const renditions = keys

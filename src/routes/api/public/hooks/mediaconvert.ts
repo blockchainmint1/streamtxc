@@ -80,7 +80,9 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
         const { listObjects, getObjectBlob, copyObject } = await import("@/lib/aws-s3.server");
 
         const prefix = `hls/${cid}/`;
+        console.log(`[mediaconvert ${cid}] job ${jobId} COMPLETE — listing HLS outputs from s3://${outputBucket}/${prefix}`);
         let keys = await listObjects(outputBucket, prefix);
+        console.log(`[mediaconvert ${cid}] transcode finished — ${keys.length} output objects, starting IPFS pin`);
         if (keys.length === 0) {
           return new Response("No outputs found", { status: 500 });
         }
@@ -137,8 +139,10 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
         const lambdaToken = process.env.IPFS_LAMBDA_TOKEN;
         const lambdaUrl = process.env.IPFS_LAMBDA_URL;
         const lambdaName = process.env.IPFS_LAMBDA_NAME;
+        const pinT0 = Date.now();
         if (lambdaToken && (lambdaName || lambdaUrl)) {
           try {
+            console.log(`[mediaconvert ${cid}] pinning ${keys.length} files to self-hosted IPFS (ipfs.honest.money) via Lambda`);
             const { callPinLambda } = await import("@/lib/ipfs-lambda.functions");
             const json = await callPinLambda(
               { bucket: outputBucket, keys },
@@ -164,6 +168,7 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
             pinnedSize = fb.size;
           }
         } else {
+          console.log(`[mediaconvert ${cid}] pinning ${keys.length} files to Pinata (self-hosted Lambda not configured)`);
           const { pinDirectoryToIPFS } = await import("@/lib/pinata.server");
           const files: Array<{ path: string; body: Blob; contentType?: string }> = [];
           for (const key of keys) {
@@ -179,6 +184,7 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
           pinnedSize = fb.size;
         }
         const pinned = { cid: pinnedCid, size: pinnedSize };
+        console.log(`[mediaconvert ${cid}] IPFS pin complete in ${Date.now() - pinT0}ms → ${pinned.cid} (${pinned.size} bytes)`);
 
         // Look up the videos row so we can re-anchor full metadata (v3
         // adds hlsCid + renditions) to IPFS and the chain. Best-effort —

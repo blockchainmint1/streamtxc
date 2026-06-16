@@ -1,0 +1,1 @@
+UPDATE public.videos SET thumbnail_cid = 'bafkreiehmkqib6vv4wubhy6zqzdk57fnp6gzbauinxqs2saspagoyu7cya' WHERE cid = 'bafybeid76o4ytltkq67q5wcvj3ypkpcjajlupcpx75czjzdxo2l2zisohq' AND thumbnail_cid IS NULL;
