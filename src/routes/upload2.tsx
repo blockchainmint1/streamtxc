@@ -231,15 +231,31 @@ function Upload2Page() {
           if (jobId && !pinTriggered) {
             try {
               const job = await describeJob({ data: { jobId } });
-              const awsStatus = (job as { status?: string } | null)?.status;
+              const awsJob = (job as { job?: { status?: string; jobPercentComplete?: number; errorMessage?: string } } | null)?.job;
+              const awsStatus = awsJob?.status;
               if (awsStatus === "COMPLETE") {
                 pinTriggered = true;
                 pushLog("step", `AWS reports COMPLETE — webhook missed, pinning HLS bundle inline…`);
                 setStage("pin-hls", "active", "pinning HLS bundle (fallback path)");
                 const res = await runWebhook({ data: { cid: resultCid!, jobId } });
                 pushLog("ok", `inline pin done (${res.status})`);
-              } else if (awsStatus === "ERROR") {
-                pushLog("err", `AWS job ${jobId} ERROR`);
+                const parsed = JSON.parse(res.body || "{}") as { hlsCid?: string; pinnedCid?: string };
+                const hlsCid = parsed.hlsCid ?? parsed.pinnedCid;
+                setStage("transcode", "done");
+                setStage("pin-hls", "done", hlsCid ? `hls cid: ${hlsCid}` : "pinned via fallback");
+                setStage("done", "done");
+                pushLog("step", `pipeline complete — /v2/${resultCid}`);
+                if (pollRef.current) window.clearInterval(pollRef.current);
+                if (autoNavigate && resultCid) {
+                  pushLog("info", "auto-navigating to /v2 in 1500ms…");
+                  window.setTimeout(() => {
+                    void navigate({ to: "/v2/$cid", params: { cid: resultCid } });
+                  }, 1500);
+                }
+              } else if (awsStatus === "ERROR" || awsStatus === "CANCELED") {
+                pushLog("err", `AWS job ${jobId} ${awsStatus}${awsJob?.errorMessage ? `: ${awsJob.errorMessage}` : ""}`);
+              } else if (awsStatus) {
+                pushLog("info", `AWS job ${jobId} → ${awsStatus}${awsJob?.jobPercentComplete ? ` (${awsJob.jobPercentComplete}%)` : ""}`);
               }
             } catch (err) {
               pinTriggered = false;
@@ -276,7 +292,7 @@ function Upload2Page() {
       cancelled = true;
       if (pollRef.current) window.clearInterval(pollRef.current);
     };
-  }, [resultCid, checkStatus, pushLog, navigate, autoNavigate]);
+  }, [resultCid, checkStatus, describeJob, runWebhook, pushLog, navigate, autoNavigate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
