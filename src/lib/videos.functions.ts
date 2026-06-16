@@ -130,7 +130,7 @@ export const registerUpload = createServerFn({ method: "POST" })
           ),
         title: z.string().min(1).max(200),
         description: z.string().max(2000).optional().default(""),
-        sizeBytes: z.number().int().positive().max(MAX_UPLOAD_BYTES),
+        sizeBytes: z.number().int().positive().max(MAX_S3_UPLOAD_BYTES),
         mimeType: z.string().min(1).max(100),
         months: z.number().int().min(1).max(12).default(1),
         thumbnailCid: cidStringSchema.optional(),
