@@ -70,6 +70,37 @@ export async function invokeLambda<T = unknown>(
 }
 
 /**
+ * Fire-and-forget Lambda invocation (Invocation-Type: Event). Returns as
+ * soon as AWS accepts the request — does not wait for the function to
+ * finish. Use for work that may exceed the CF Worker subrequest budget
+ * (e.g. multi-minute IPFS pins of large HLS bundles). The function must
+ * deliver its result some other way (typically by calling a webhook back
+ * into this app).
+ */
+export async function invokeLambdaAsync(
+  functionName: string,
+  event: unknown,
+): Promise<void> {
+  const region = process.env.AWS_REGION;
+  const url = `https://lambda.${region}.amazonaws.com/2015-03-31/functions/${encodeURIComponent(
+    functionName,
+  )}/invocations`;
+  const aws = client();
+  const res = await aws.fetch(url, {
+    method: "POST",
+    headers: {
+      "X-Amz-Invocation-Type": "Event",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(event),
+  });
+  if (res.status !== 202) {
+    const text = await res.text();
+    throw new Error(`Lambda async invoke HTTP ${res.status}: ${text.slice(0, 500)}`);
+  }
+}
+
+/**
  * Invoke a Lambda that follows the API Gateway response shape
  * `{ statusCode, headers, body }`, parse the body, and throw on non-2xx
  * status. This is what the txc-ipfs-pinner Lambda returns.
