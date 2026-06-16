@@ -26,7 +26,6 @@ import {
   isTranscodeConfigured,
   getTranscodeStatus,
   getMediaConvertJob,
-  simulateMediaConvertWebhook,
 } from "@/lib/transcode.functions";
 import {
   pinS3ToIpfs,
@@ -160,7 +159,6 @@ export function S3VideoUpload({
   const checkConfig = useServerFn(isTranscodeConfigured);
   const checkStatus = useServerFn(getTranscodeStatus);
   const describeJob = useServerFn(getMediaConvertJob);
-  const runWebhook = useServerFn(simulateMediaConvertWebhook);
   const kickPin = useServerFn(kickHlsPinAsync);
   const pinFromS3 = useServerFn(pinS3ToIpfs);
   const checkIpfs = useServerFn(isIpfsLambdaConfigured);
@@ -333,7 +331,7 @@ export function S3VideoUpload({
       cancelled = true;
       if (pollRef.current) window.clearInterval(pollRef.current);
     };
-  }, [resultCid, checkStatus, describeJob, runWebhook, pushLog, navigate, autoNavigate, destination]);
+  }, [resultCid, checkStatus, describeJob, kickPin, pushLog, navigate, autoNavigate, destination]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
