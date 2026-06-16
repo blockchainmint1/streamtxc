@@ -35,7 +35,6 @@ import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
 import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
 import { Route as ApiPublicHooksIpfsPinCompleteRouteImport } from './routes/api/public/hooks/ipfs-pin-complete'
-import { Route as ApiPublicAdminRetryTranscodeRouteImport } from './routes/api/public/admin/retry-transcode'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
 
 const UploadAwsRoute = UploadAwsRouteImport.update({
@@ -173,12 +172,6 @@ const ApiPublicHooksIpfsPinCompleteRoute =
     path: '/public/hooks/ipfs-pin-complete',
     getParentRoute: () => ApiRoute,
   } as any)
-const ApiPublicAdminRetryTranscodeRoute =
-  ApiPublicAdminRetryTranscodeRouteImport.update({
-    id: '/public/admin/retry-transcode',
-    path: '/public/admin/retry-transcode',
-    getParentRoute: () => ApiRoute,
-  } as any)
 const ApiPublicAdminRetryStampsRoute =
   ApiPublicAdminRetryStampsRouteImport.update({
     id: '/public/admin/retry-stamps',
@@ -208,7 +201,6 @@ export interface FileRoutesByFullPath {
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
-  '/api/public/admin/retry-transcode': typeof ApiPublicAdminRetryTranscodeRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
@@ -238,7 +230,6 @@ export interface FileRoutesByTo {
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
-  '/api/public/admin/retry-transcode': typeof ApiPublicAdminRetryTranscodeRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
@@ -269,7 +260,6 @@ export interface FileRoutesById {
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
-  '/api/public/admin/retry-transcode': typeof ApiPublicAdminRetryTranscodeRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
@@ -301,7 +291,6 @@ export interface FileRouteTypes {
     | '/api/stream/$cid'
     | '/v/$cid/restore'
     | '/api/public/admin/retry-stamps'
-    | '/api/public/admin/retry-transcode'
     | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
@@ -331,7 +320,6 @@ export interface FileRouteTypes {
     | '/api/stream/$cid'
     | '/v/$cid/restore'
     | '/api/public/admin/retry-stamps'
-    | '/api/public/admin/retry-transcode'
     | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
@@ -361,7 +349,6 @@ export interface FileRouteTypes {
     | '/api/stream/$cid'
     | '/v/$cid/restore'
     | '/api/public/admin/retry-stamps'
-    | '/api/public/admin/retry-transcode'
     | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
@@ -571,13 +558,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksIpfsPinCompleteRouteImport
       parentRoute: typeof ApiRoute
     }
-    '/api/public/admin/retry-transcode': {
-      id: '/api/public/admin/retry-transcode'
-      path: '/public/admin/retry-transcode'
-      fullPath: '/api/public/admin/retry-transcode'
-      preLoaderRoute: typeof ApiPublicAdminRetryTranscodeRouteImport
-      parentRoute: typeof ApiRoute
-    }
     '/api/public/admin/retry-stamps': {
       id: '/api/public/admin/retry-stamps'
       path: '/public/admin/retry-stamps'
@@ -607,7 +587,6 @@ interface ApiRouteChildren {
   ApiPublicUploadRoute: typeof ApiPublicUploadRoute
   ApiStreamCidRoute: typeof ApiStreamCidRouteWithChildren
   ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
-  ApiPublicAdminRetryTranscodeRoute: typeof ApiPublicAdminRetryTranscodeRoute
   ApiPublicHooksIpfsPinCompleteRoute: typeof ApiPublicHooksIpfsPinCompleteRoute
   ApiPublicHooksMediaconvertRoute: typeof ApiPublicHooksMediaconvertRoute
   ApiPublicHooksPaymentWatcherRoute: typeof ApiPublicHooksPaymentWatcherRoute
@@ -622,7 +601,6 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiPublicUploadRoute: ApiPublicUploadRoute,
   ApiStreamCidRoute: ApiStreamCidRouteWithChildren,
   ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
-  ApiPublicAdminRetryTranscodeRoute: ApiPublicAdminRetryTranscodeRoute,
   ApiPublicHooksIpfsPinCompleteRoute: ApiPublicHooksIpfsPinCompleteRoute,
   ApiPublicHooksMediaconvertRoute: ApiPublicHooksMediaconvertRoute,
   ApiPublicHooksPaymentWatcherRoute: ApiPublicHooksPaymentWatcherRoute,

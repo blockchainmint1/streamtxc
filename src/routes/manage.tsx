@@ -25,6 +25,7 @@ import {
   getOwnershipChallenge,
   submitOwnershipProof,
   retryOwnStamp,
+  retryOwnTranscode,
   buildBulkExtendQuote,
   verifyBulkExtensionTx,
   setVideoVisibility,
