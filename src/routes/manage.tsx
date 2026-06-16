@@ -158,9 +158,10 @@ function RetryTranscodeButton({ cid, wallet }: { cid: string; wallet: string }) 
   const [busy, setBusy] = useState(false);
   return (
     <Button
-      size="sm"
+      size="icon"
       variant="outline"
-      className="font-mono"
+      className="font-mono h-7 w-7"
+      title="Retry transcode"
       disabled={busy}
       onClick={async () => {
         setBusy(true);
@@ -184,7 +185,6 @@ function RetryTranscodeButton({ cid, wallet }: { cid: string; wallet: string }) 
       }}
     >
       {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-      <span className="ml-1">retry transcode</span>
     </Button>
   );
 }
@@ -195,11 +195,11 @@ function FinalizeTranscodeButton({ cid, wallet }: { cid: string; wallet: string 
   const [busy, setBusy] = useState(false);
   return (
     <Button
-      size="sm"
+      size="icon"
       variant="outline"
-      className="font-mono"
+      className="font-mono h-7 w-7"
+      title="Finalize HLS"
       disabled={busy}
-      title="MediaConvert finished but the pin step never ran — finalize HLS now"
       onClick={async () => {
         setBusy(true);
         try {
@@ -222,7 +222,6 @@ function FinalizeTranscodeButton({ cid, wallet }: { cid: string; wallet: string 
       }}
     >
       {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-      <span className="ml-1">finalize hls</span>
     </Button>
   );
 }
@@ -461,7 +460,7 @@ function ManagePageInner() {
                             <div className="h-10 w-16 rounded-sm border border-dashed border-border bg-secondary shrink-0" />
                           )}
                           <div className="min-w-0">
-                            <div className="font-bold truncate max-w-xs flex items-center gap-2">
+                            <div className="font-bold truncate max-w-[8rem] flex items-center gap-2">
                               <Link to="/v/$cid" params={{ cid: v.cid }} className="truncate hover:underline">
                                 {v.title}
                               </Link>
@@ -471,7 +470,7 @@ function ManagePageInner() {
                                 </span>
                               )}
                             </div>
-                            <div className="font-mono text-[10px] text-muted-foreground truncate max-w-xs">
+                            <div className="font-mono text-[10px] text-muted-foreground truncate max-w-[8rem]">
                               {v.cid}
                             </div>
                           </div>
