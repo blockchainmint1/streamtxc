@@ -36,6 +36,7 @@ import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/p
 import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
 import { Route as ApiPublicHooksIpfsPinCompleteRouteImport } from './routes/api/public/hooks/ipfs-pin-complete'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
+import { Route as ApiPublicAdminFinalizeHlsRouteImport } from './routes/api/public/admin/finalize-hls'
 
 const UploadAwsRoute = UploadAwsRouteImport.update({
   id: '/upload-aws',
@@ -178,6 +179,12 @@ const ApiPublicAdminRetryStampsRoute =
     path: '/public/admin/retry-stamps',
     getParentRoute: () => ApiRoute,
   } as any)
+const ApiPublicAdminFinalizeHlsRoute =
+  ApiPublicAdminFinalizeHlsRouteImport.update({
+    id: '/public/admin/finalize-hls',
+    path: '/public/admin/finalize-hls',
+    getParentRoute: () => ApiRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -200,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
   '/v/$cid/restore': typeof VCidRestoreRoute
+  '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
@@ -229,6 +237,7 @@ export interface FileRoutesByTo {
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
   '/v/$cid/restore': typeof VCidRestoreRoute
+  '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
@@ -259,6 +268,7 @@ export interface FileRoutesById {
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
   '/v/$cid/restore': typeof VCidRestoreRoute
+  '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
@@ -290,6 +300,7 @@ export interface FileRouteTypes {
     | '/api/public/upload'
     | '/api/stream/$cid'
     | '/v/$cid/restore'
+    | '/api/public/admin/finalize-hls'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/mediaconvert'
@@ -319,6 +330,7 @@ export interface FileRouteTypes {
     | '/api/public/upload'
     | '/api/stream/$cid'
     | '/v/$cid/restore'
+    | '/api/public/admin/finalize-hls'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/mediaconvert'
@@ -348,6 +360,7 @@ export interface FileRouteTypes {
     | '/api/public/upload'
     | '/api/stream/$cid'
     | '/v/$cid/restore'
+    | '/api/public/admin/finalize-hls'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/mediaconvert'
@@ -565,6 +578,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAdminRetryStampsRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/public/admin/finalize-hls': {
+      id: '/api/public/admin/finalize-hls'
+      path: '/public/admin/finalize-hls'
+      fullPath: '/api/public/admin/finalize-hls'
+      preLoaderRoute: typeof ApiPublicAdminFinalizeHlsRouteImport
+      parentRoute: typeof ApiRoute
+    }
   }
 }
 
@@ -586,6 +606,7 @@ interface ApiRouteChildren {
   ApiPublicTxcVerifyMessageRoute: typeof ApiPublicTxcVerifyMessageRoute
   ApiPublicUploadRoute: typeof ApiPublicUploadRoute
   ApiStreamCidRoute: typeof ApiStreamCidRouteWithChildren
+  ApiPublicAdminFinalizeHlsRoute: typeof ApiPublicAdminFinalizeHlsRoute
   ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
   ApiPublicHooksIpfsPinCompleteRoute: typeof ApiPublicHooksIpfsPinCompleteRoute
   ApiPublicHooksMediaconvertRoute: typeof ApiPublicHooksMediaconvertRoute
@@ -600,6 +621,7 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiPublicTxcVerifyMessageRoute: ApiPublicTxcVerifyMessageRoute,
   ApiPublicUploadRoute: ApiPublicUploadRoute,
   ApiStreamCidRoute: ApiStreamCidRouteWithChildren,
+  ApiPublicAdminFinalizeHlsRoute: ApiPublicAdminFinalizeHlsRoute,
   ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
   ApiPublicHooksIpfsPinCompleteRoute: ApiPublicHooksIpfsPinCompleteRoute,
   ApiPublicHooksMediaconvertRoute: ApiPublicHooksMediaconvertRoute,
