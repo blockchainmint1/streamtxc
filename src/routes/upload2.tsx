@@ -295,6 +295,7 @@ function Upload2Page() {
           setStage("done", "done");
           pushLog("ok", `transcode COMPLETE · hls cid: ${row?.hls_cid ?? "(missing)"}`);
           pushLog("step", `pipeline complete — /v2/${resultCid}`);
+          clearInflight();
           if (pollRef.current) window.clearInterval(pollRef.current);
           if (autoNavigate && resultCid) {
             pushLog("info", "auto-navigating to /v2 in 1500ms…");
@@ -306,6 +307,7 @@ function Upload2Page() {
         } else if (st === "failed") {
           setStage("transcode", "error", row?.transcode_error ?? "MediaConvert reported failure");
           pushLog("err", `transcode FAILED: ${row?.transcode_error ?? "no error message"}`);
+          clearInflight();
           if (pollRef.current) window.clearInterval(pollRef.current);
           return;
         }
