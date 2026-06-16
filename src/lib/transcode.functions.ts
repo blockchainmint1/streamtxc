@@ -344,24 +344,33 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
         return { height: m ? Number(m[1]) : null, playlist: rel };
       });
 
-    // 4. Build the canonical metadata JSON (v3 — what would be anchored to
-    //    chain in production) and pin it. Mirrors recordMetadataAnchor's
-    //    schema so the test path proves the exact blob shape.
-    const meta = {
-      v: 3,
-      videoCid: origPin.cid,
-      videoWallet: "<test>",
-      uploader: "<test>",
-      title: `s3-test ${data.cid}`,
-      description: "Test bundle pinned from /s3-test",
-      thumbnailCid: null,
-      hlsCid: pinned.cid,
-      renditions,
-      ts: new Date().toISOString(),
-    };
-    const metaPin = await pinJsonToIPFS(meta, `${data.cid}.meta.json`);
-
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await supabaseAdmin
+      .from("videos")
+      .select("video_wallet, owner_wallet, title, description, thumbnail_cid")
+      .eq("cid", data.cid)
+      .maybeSingle();
+
+    let newMetaCid: string | null = null;
+    let newMetaTx: string | null = null;
+    if (row && row.video_wallet && row.owner_wallet) {
+      const { recordMetadataAnchor } = await import("./chain-events.server");
+      const anchored = await recordMetadataAnchor({
+        videoCid: data.cid,
+        videoWallet: row.video_wallet,
+        uploaderWallet: row.owner_wallet,
+        title: row.title ?? "",
+        description: row.description ?? "",
+        thumbnailCid: row.thumbnail_cid ?? null,
+        hlsCid: pinned.cid,
+        renditions,
+      });
+      if (anchored) {
+        newMetaCid = anchored.metaCid;
+        newMetaTx = anchored.stamp.real ? anchored.stamp.txid : null;
+      }
+    }
+
     const { error: updErr, count } = await supabaseAdmin
       .from("videos")
       .update({
@@ -370,7 +379,8 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
         transcode_status: "ready",
         transcode_completed_at: new Date().toISOString(),
         transcode_error: null,
-        metadata_cid: metaPin.cid,
+        ...(newMetaCid ? { metadata_cid: newMetaCid } : {}),
+        ...(newMetaTx ? { tx_hash: newMetaTx } : {}),
       }, { count: "exact" })
       .eq("cid", data.cid)
       .eq("transcode_job_id", data.jobId);
@@ -379,13 +389,12 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
     return {
       status: 200,
       body: JSON.stringify({
-        originalCid: origPin.cid,
         hlsCid: pinned.cid,
-        metadataCid: metaPin.cid,
-        metadata: meta,
+        metadataCid: newMetaCid,
+        metadataTx: newMetaTx,
         keys: keys.length,
         rowsUpdated: count ?? 0,
-        timings: { originalMs: tOrig, listMs: tList, fetchMs: tFetch, pinMs: tPin },
+        timings: { listMs: tList, pinMs: tFetch },
       }),
       url: `inline://${data.cid}`,
     };
