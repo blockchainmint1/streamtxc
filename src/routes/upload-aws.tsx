@@ -408,6 +408,13 @@ function UploadPage() {
     if (!cidInput || !cidTitle) return;
     setDuplicate(null);
     setCidNotFound(null);
+    if (cidThumbPinning) {
+      toast("Waiting for thumbnail to finish pinning…");
+      const start = Date.now();
+      while (cidThumbPinning && Date.now() - start < 30_000) {
+        await new Promise((r) => setTimeout(r, 150));
+      }
+    }
     try {
       setCidStage("fetching");
       const result = await addCid({
@@ -417,7 +424,7 @@ function UploadPage() {
           title: cidTitle,
           description: cidDescription,
           months,
-          thumbnailCid: cidThumbnailCid ?? undefined,
+          thumbnailCid: cidThumbnailCidRef.current ?? cidThumbnailCid ?? undefined,
           nsfw: cidNsfw,
         },
       });
