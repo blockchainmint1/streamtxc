@@ -629,7 +629,7 @@ function EditVideoDialog({
           <Pencil className="mr-1 h-3 w-3" /> edit
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-mono text-sm">[ EDIT VIDEO ]</DialogTitle>
           <DialogDescription>
