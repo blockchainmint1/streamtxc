@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as Upload3RouteImport } from './routes/upload3'
 import { Route as Upload2RouteImport } from './routes/upload2'
 import { Route as UploadAwsRouteImport } from './routes/upload-aws'
 import { Route as UploadRouteImport } from './routes/upload'
@@ -36,6 +37,11 @@ import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/p
 import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
 
+const Upload3Route = Upload3RouteImport.update({
+  id: '/upload3',
+  path: '/upload3',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const Upload2Route = Upload2RouteImport.update({
   id: '/upload2',
   path: '/upload2',
@@ -184,6 +190,7 @@ export interface FileRoutesByFullPath {
   '/upload': typeof UploadRoute
   '/upload-aws': typeof UploadAwsRoute
   '/upload2': typeof Upload2Route
+  '/upload3': typeof Upload3Route
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
@@ -212,6 +219,7 @@ export interface FileRoutesByTo {
   '/upload': typeof UploadRoute
   '/upload-aws': typeof UploadAwsRoute
   '/upload2': typeof Upload2Route
+  '/upload3': typeof Upload3Route
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
@@ -241,6 +249,7 @@ export interface FileRoutesById {
   '/upload': typeof UploadRoute
   '/upload-aws': typeof UploadAwsRoute
   '/upload2': typeof Upload2Route
+  '/upload3': typeof Upload3Route
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
@@ -271,6 +280,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/upload-aws'
     | '/upload2'
+    | '/upload3'
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
@@ -299,6 +309,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/upload-aws'
     | '/upload2'
+    | '/upload3'
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
@@ -327,6 +338,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/upload-aws'
     | '/upload2'
+    | '/upload3'
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
@@ -356,6 +368,7 @@ export interface RootRouteChildren {
   UploadRoute: typeof UploadRoute
   UploadAwsRoute: typeof UploadAwsRoute
   Upload2Route: typeof Upload2Route
+  Upload3Route: typeof Upload3Route
   EmbedCidRoute: typeof EmbedCidRoute
   UWalletRoute: typeof UWalletRoute
   VCidRoute: typeof VCidRouteWithChildren
@@ -364,6 +377,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/upload3': {
+      id: '/upload3'
+      path: '/upload3'
+      fullPath: '/upload3'
+      preLoaderRoute: typeof Upload3RouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/upload2': {
       id: '/upload2'
       path: '/upload2'
@@ -608,6 +628,7 @@ const rootRouteChildren: RootRouteChildren = {
   UploadRoute: UploadRoute,
   UploadAwsRoute: UploadAwsRoute,
   Upload2Route: Upload2Route,
+  Upload3Route: Upload3Route,
   EmbedCidRoute: EmbedCidRoute,
   UWalletRoute: UWalletRoute,
   VCidRoute: VCidRouteWithChildren,
