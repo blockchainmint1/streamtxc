@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { CidField as Field } from "@/components/CidField";
@@ -92,5 +91,3 @@ export function OnChainProofPanel({
     </CollapsibleSection>
   );
 }
-// Link import kept to avoid unused tree-shake removal warnings later.
-void Link;
