@@ -64,10 +64,10 @@ export const Route = createFileRoute("/v/$cid")({
       links: [{ rel: "canonical", href: `https://streamtxc.com/v/${params.cid}` }],
     };
   },
-  component: V2WatchPage,
+  component: WatchPage,
 });
 
-function V2WatchPage() {
+function WatchPage() {
   const { cid } = Route.useParams();
   const { hls: hlsOverride, playlist: playlistOverride } = Route.useSearch();
   const fetchVideo = useServerFn(getVideo);

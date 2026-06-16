@@ -44,12 +44,12 @@ export const Route = createFileRoute("/upload")({
       },
     ],
   }),
-  component: Upload3Page,
+  component: UploadPage,
 });
 
 type TabKey = "file" | "cid" | "dropbox" | "import";
 
-function Upload3Page() {
+function UploadPage() {
   const { address } = useWallet();
   const [tab, setTab] = useState<TabKey>("file");
   const [duplicate, setDuplicate] = useState<DuplicateCidInfo | null>(null);
