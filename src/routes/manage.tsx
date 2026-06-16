@@ -538,11 +538,12 @@ function ManagePageInner() {
                           />
                           <Link to="/v/$cid" params={{ cid: v.cid }}>
                             <Button
-                              size="sm"
+                              size="icon"
                               variant="outline"
-                              className="font-mono"
+                              className="font-mono h-7 w-7"
+                              title="View"
                             >
-                              view <ArrowUpRight className="ml-1 h-3 w-3" />
+                              <ArrowUpRight className="h-3 w-3" />
                             </Button>
                           </Link>
                         </div>
