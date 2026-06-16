@@ -49,6 +49,7 @@ import {
 } from "lucide-react";
 import { CheckCircle2, Film, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { NotificationPrefs } from "@/components/NotificationPrefs";
 
 export const Route = createFileRoute("/manage")({
   head: () => ({
