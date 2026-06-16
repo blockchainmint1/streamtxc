@@ -47,6 +47,7 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
+import { CheckCircle2, Film, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/manage")({
@@ -359,6 +360,13 @@ function ManagePageInner() {
                         >
                           {v.hidden_at ? "hidden" : v.status}
                         </span>
+                        <div className="mt-1">
+                          <TranscodeBadge
+                            status={v.transcode_status ?? null}
+                            hlsCid={v.hls_cid ?? null}
+                            cid={v.cid}
+                          />
+                        </div>
                       </td>
                       <td className="px-4 py-3 font-mono text-xs">
                         <span
