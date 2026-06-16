@@ -12,7 +12,6 @@ needs at the end.
 
 ```bash
 export S3_BUCKET=your-mediaconvert-output-bucket
-curl -fsSL https://raw.githubusercontent.com/REPLACE_ME/txc-ipfs-deploy.sh -o txc-ipfs-deploy.sh || true
 bash txc-ipfs-deploy.sh
 ```
 
