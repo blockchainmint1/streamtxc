@@ -240,9 +240,9 @@ function ToggleVisibilityButton({
   const [busy, setBusy] = useState(false);
   return (
     <Button
-      size="sm"
+      size="icon"
       variant="outline"
-      className="font-mono"
+      className="font-mono h-7 w-7"
       disabled={busy}
       title={hidden ? "Show this video publicly" : "Hide from public listings"}
       onClick={async () => {
@@ -265,7 +265,6 @@ function ToggleVisibilityButton({
       ) : (
         <Eye className="h-3 w-3" />
       )}
-      <span className="ml-1">{hidden ? "show" : "hide"}</span>
     </Button>
   );
 }
