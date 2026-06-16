@@ -424,7 +424,7 @@ export function S3VideoUpload({
         const { jobId } = await startTx({ data: { cid: canonicalCid } });
         pushLog("ok", `MediaConvert job queued · ${jobId}`);
         setStage("transcode", "active", `job ${jobId}`);
-        setStage("pin-hls", "active", "waiting for MediaConvert webhook…");
+        setStage("pin-hls", "pending", "queued — will start after transcode finishes");
         saveInflight({ cid: result.cid, jobId, startedAt: Date.now() });
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Could not start transcode";
