@@ -34,6 +34,7 @@ import { useWallet, isSignableOwnershipTxcAddress } from "@/lib/wallet";
 import { listAnonUploads, removeAnonUpload, subscribeToAnonUploads } from "@/lib/anon-uploads";
 import { formatBytes, shortenHash } from "@/lib/fees";
 import { ipfsThumbUrl } from "@/lib/ipfs-gateway";
+import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 import {
   ArrowUpRight,
   AlertTriangle,
