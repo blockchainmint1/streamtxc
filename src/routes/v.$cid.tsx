@@ -235,7 +235,7 @@ function WatchPage() {
 
   // Prefer the adaptive HLS bundle when it's ready; fall back to the legacy
   // single-MP4 stream for older videos or while transcoding is in progress.
-  const hlsUrl = ipfsHlsUrl(video.hls_cid);
+  const hlsUrl = ipfsHlsUrl(video.hls_cid, video.cid);
   const streamUrl = hlsUrl ?? `/api/stream/${video.cid}`;
   const origin =
     typeof window !== "undefined" ? window.location.origin : "";
