@@ -287,6 +287,7 @@ export function S3VideoUpload({
                 setStage("pin-hls", "done", hlsCid ? `hls cid: ${hlsCid}` : "pinned via fallback");
                 setStage("done", "done");
                 pushLog("step", `pipeline complete`);
+                setRunning(false);
                 clearInflight();
                 if (pollRef.current) window.clearInterval(pollRef.current);
                 if (autoNavigate && resultCid) {
@@ -309,6 +310,7 @@ export function S3VideoUpload({
           setStage("pin-hls", "done", row?.hls_cid ? `hls cid: ${row.hls_cid}` : undefined);
           setStage("done", "done");
           pushLog("ok", `transcode COMPLETE · hls cid: ${row?.hls_cid ?? "(missing)"}`);
+          setRunning(false);
           clearInflight();
           if (pollRef.current) window.clearInterval(pollRef.current);
           if (autoNavigate && resultCid) {
@@ -320,6 +322,7 @@ export function S3VideoUpload({
         } else if (st === "failed") {
           setStage("transcode", "error", row?.transcode_error ?? "MediaConvert reported failure");
           pushLog("err", `transcode FAILED: ${row?.transcode_error ?? "no error message"}`);
+          setRunning(false);
           clearInflight();
           if (pollRef.current) window.clearInterval(pollRef.current);
           return;
