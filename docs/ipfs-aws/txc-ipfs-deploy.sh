@@ -43,6 +43,11 @@ cleanup_bad_stack() {
   local name="$1"
   local status
   status="$(aws cloudformation describe-stacks --region "$AWS_REGION" --stack-name "$name" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || true)"
+  while [[ "$status" == *IN_PROGRESS ]]; do
+    echo "=== Waiting for stack to finish current AWS action: $name ($status)"
+    sleep 15
+    status="$(aws cloudformation describe-stacks --region "$AWS_REGION" --stack-name "$name" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || true)"
+  done
   case "$status" in
     ROLLBACK_COMPLETE|CREATE_FAILED|DELETE_FAILED|UPDATE_ROLLBACK_FAILED)
       echo "=== Removing failed old stack: $name ($status)"
