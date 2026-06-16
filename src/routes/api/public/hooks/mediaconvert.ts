@@ -77,12 +77,35 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
         const outputBucket = process.env.AWS_S3_OUTPUT_BUCKET;
         if (!outputBucket) return new Response("S3 not configured", { status: 503 });
 
-        const { listObjects, getObjectBlob } = await import("@/lib/aws-s3.server");
+        const { listObjects, getObjectBlob, copyObject } = await import("@/lib/aws-s3.server");
 
         const prefix = `hls/${cid}/`;
-        const keys = await listObjects(outputBucket, prefix);
+        let keys = await listObjects(outputBucket, prefix);
         if (keys.length === 0) {
           return new Response("No outputs found", { status: 500 });
+        }
+
+        // Bundle the original input file inside the HLS pin so the wrap
+        // directory contains BOTH `original.<ext>` and the HLS ladder
+        // under a single CID. Copy the input object into the output
+        // bucket so the Lambda's single-bucket /pin can grab everything.
+        const inputBucket = process.env.AWS_S3_INPUT_BUCKET;
+        const originalSrcKey = `inputs/${cid}`;
+        const originalDstKey = `${prefix}original`;
+        let originalIncluded = false;
+        if (inputBucket) {
+          try {
+            await copyObject({
+              srcBucket: inputBucket,
+              srcKey: originalSrcKey,
+              dstBucket: outputBucket,
+              dstKey: originalDstKey,
+            });
+            keys = [originalDstKey, ...keys.filter((k) => k !== originalDstKey)];
+            originalIncluded = true;
+          } catch (err) {
+            console.warn(`hls-pin: failed to copy original ${originalSrcKey} → ${originalDstKey}:`, err);
+          }
         }
 
         // Derive a minimal rendition manifest from the keys we saw.
@@ -101,30 +124,31 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
           // Test path: don't pin to IPFS, don't touch the DB. Just report
           // what we found so /s3-test can verify the pipeline end-to-end.
           return new Response(
-            JSON.stringify({ dryRun: true, cid, jobId, keys, renditions }),
+            JSON.stringify({ dryRun: true, cid, jobId, keys, renditions, originalIncluded }),
             { status: 200, headers: { "content-type": "application/json" } },
           );
         }
 
-        // Prefer the self-hosted IPFS Lambda (streams S3 → kubo node, no
-        // Worker memory pressure). Fall back to direct Pinata directory
-        // pin when the Lambda isn't configured or fails.
+        // Prefer the self-hosted IPFS Lambda via direct AWS Invoke
+        // (bypasses the 30s API Gateway HTTP API timeout). Fall back to
+        // direct Pinata directory pin when the Lambda isn't reachable.
         let pinnedCid: string;
         let pinnedSize = 0;
-        const lambdaUrl = process.env.IPFS_LAMBDA_URL;
         const lambdaToken = process.env.IPFS_LAMBDA_TOKEN;
-        if (lambdaUrl && lambdaToken) {
-          const res = await fetch(`${lambdaUrl.replace(/\/$/, "")}/pin`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${lambdaToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ bucket: outputBucket, prefix }),
-          });
-          const text = await res.text();
-          if (!res.ok) {
-            console.warn(`hls-pin: lambda /pin failed [${res.status}]: ${text.slice(0, 400)} — falling back to Pinata`);
+        const lambdaUrl = process.env.IPFS_LAMBDA_URL;
+        const lambdaName = process.env.IPFS_LAMBDA_NAME;
+        if (lambdaToken && (lambdaName || lambdaUrl)) {
+          try {
+            const { callPinLambda } = await import("@/lib/ipfs-lambda.functions");
+            const json = await callPinLambda(
+              { bucket: outputBucket, keys },
+              lambdaToken,
+            );
+            if (!json.cid) throw new Error("Lambda /pin returned no cid");
+            pinnedCid = json.cid;
+            pinnedSize = json.totalBytes ?? 0;
+          } catch (err) {
+            console.warn(`hls-pin: lambda /pin failed (${err instanceof Error ? err.message : err}) — falling back to Pinata`);
             const { pinDirectoryToIPFS } = await import("@/lib/pinata.server");
             const files: Array<{ path: string; body: Blob; contentType?: string }> = [];
             for (const key of keys) {
@@ -138,10 +162,6 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
             const fb = await pinDirectoryToIPFS(files, `hls-${cid}`);
             pinnedCid = fb.cid;
             pinnedSize = fb.size;
-          } else {
-            const json = JSON.parse(text) as { cid: string; totalBytes?: number };
-            pinnedCid = json.cid;
-            pinnedSize = json.totalBytes ?? 0;
           }
         } else {
           const { pinDirectoryToIPFS } = await import("@/lib/pinata.server");
