@@ -79,6 +79,7 @@ import { Comments } from "@/components/Comments";
 import { ipfsThumbUrl, ipfsHlsUrl } from "@/lib/ipfs-gateway";
 import { CidField as Field } from "@/components/CidField";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { PaymentPanel } from "@/components/PaymentPanel";
 
 export const Route = createFileRoute("/v/$cid")({
   loader: async ({ params }) => {
