@@ -47,6 +47,7 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
+import { CheckCircle2, Film, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/manage")({
@@ -58,6 +59,56 @@ export const Route = createFileRoute("/manage")({
 
 function ManagePage() {
   return <ManagePageInner />;
+}
+
+function TranscodeBadge({
+  status,
+  hlsCid,
+  cid,
+}: {
+  status: string | null;
+  hlsCid: string | null;
+  cid: string;
+}) {
+  if (!status && !hlsCid) return null;
+  if (status === "complete" || hlsCid) {
+    return (
+      <Link
+        to="/v2/$cid"
+        params={{ cid }}
+        className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-primary hover:underline"
+        title="Open enhanced HLS player"
+      >
+        <CheckCircle2 className="h-3 w-3" /> hls ready · v2
+      </Link>
+    );
+  }
+  if (status === "processing") {
+    return (
+      <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-amber-500">
+        <Loader2 className="h-3 w-3 animate-spin" /> transcoding
+      </span>
+    );
+  }
+  if (status === "pending") {
+    return (
+      <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        <Clock className="h-3 w-3" /> queued
+      </span>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-destructive">
+        <AlertTriangle className="h-3 w-3" /> transcode failed
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+      <Film className="h-3 w-3" /> {status}
+    </span>
+  );
 }
 
 function RetryStampButton({ cid, wallet }: { cid: string; wallet: string }) {
@@ -359,6 +410,13 @@ function ManagePageInner() {
                         >
                           {v.hidden_at ? "hidden" : v.status}
                         </span>
+                        <div className="mt-1">
+                          <TranscodeBadge
+                            status={v.transcode_status ?? null}
+                            hlsCid={v.hls_cid ?? null}
+                            cid={v.cid}
+                          />
+                        </div>
                       </td>
                       <td className="px-4 py-3 font-mono text-xs">
                         <span

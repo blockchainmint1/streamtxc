@@ -1,90 +1,59 @@
-## Adaptive Video Streaming with AWS MediaConvert + IPFS (Pinata)
+## Goal
 
-Goal: replace single-file IPFS playback with HLS adaptive bitrate streaming. Originals stay pinned; three transcoded renditions (720p, 480p, 360p) plus an HLS master playlist get pinned to Pinata and recorded on-chain alongside the original CID.
+Stand up a parallel "v2" surface to test the MediaConvert → S3 → Pinata HLS pipeline without disturbing the live `/v/:cid` and `/upload` flows. Everything new lives at `/v2/:cid` and `/upload2` so we can iterate freely.
 
----
+## 1. New player route: `/v2/:cid`
 
-### Architecture
+New file: `src/routes/v2.$cid.tsx`. Forks the current `/v/:cid` page but swaps the player for an enhanced `VideoPlayerV2`.
+
+New file: `src/components/VideoPlayerV2.tsx`:
+- HLS-first: prefers `hls_cid` (served via existing `/api/stream/$cid/$` route, e.g. `master.m3u8`), falls back to the legacy single-file CID.
+- Quality selector built on `hls.levels` (Auto / 1080p / 720p / 480p / 360p), persists choice to `localStorage`.
+- Playback speed menu (0.5x – 2x).
+- Buffered / loading indicator overlay.
+- Small "Source" badge showing `HLS` vs `MP4 fallback` and which gateway is serving.
+- Keyboard shortcuts: space, ←/→ (5s), J/L (10s), M, F.
+
+The `/v2/:cid` page also shows a small dev panel (only visible to the video owner or in dev) with: `transcode_status`, `transcode_job_id`, `transcode_started_at/completed_at`, `hls_cid`, `renditions`, and any `transcode_error`.
+
+## 2. New upload route: `/upload2`
+
+New file: `src/routes/upload2.tsx`. Fork of `/upload` with the new pipeline language and a visible stage tracker:
 
 ```text
-Browser ─► our /api/uploads (existing) ─► Supabase Storage (video-uploads)
-                                              │
-                                              ▼
-                                  pin original → Pinata (CID_orig)
-                                              │
-                                              ▼
-                              copy to S3 input bucket (transcode-input)
-                                              │
-                                              ▼
-                              MediaConvert job (HLS, 3 renditions)
-                                              │
-                                              ▼
-                                   S3 output bucket (transcode-output)
-                                              │
-                                              ▼
-                       EventBridge → /api/public/hooks/mediaconvert
-                                              │
-                                              ▼
-              pin entire HLS folder to Pinata as a directory  →  CID_hls
-                                              │
-                                              ▼
-                update videos row: { cid, hls_cid, renditions[] }
-                                              │
-                                              ▼
-                stamp updated JSON to chain (existing flow, new schema)
+1. Sign upload   →   2. Upload to S3   →   3. Register video
+                                                   ↓
+4. Pin original to IPFS   ←   5. Transcoding (MediaConvert)   →   6. Pinning HLS to IPFS   →   7. Done
 ```
 
-Playback: `VideoPlayer.tsx` checks `hls_cid` first → loads `https://{gateway}/ipfs/{hls_cid}/master.m3u8` via hls.js (ABR auto). Falls back to direct MP4 from `cid` for legacy videos or while a job is still processing.
+Behavior:
+- Step 1–3 use the existing AWS S3 signed-upload + `registerUpload` flow (already on `/upload-aws`).
+- `registerUpload` is extended to set `transcode_status='pending'` and kick off MediaConvert when `AWS_MEDIACONVERT_ENDPOINT` is set; otherwise it stays `pending` and the UI shows "Transcoding queued (AWS not yet provisioned)".
+- After register, the page polls `getTranscodeStatus({ videoId })` (new tiny server fn over the existing columns) every 4s and advances the stage tracker.
+- On `transcode_status='complete'` the page auto-links to `/v2/:cid` and offers "Copy v2 link".
+- Copy doesn't change `/upload` at all.
 
----
+New language throughout: "Uploading to S3", "Transcoding (HLS, multi-bitrate)", "Pinning HLS directory to IPFS", "Re-anchoring metadata", "Ready to stream".
 
-### Phases
+## 3. What else (small, high-leverage additions)
 
-**Phase 1 — AWS wiring (infra + secrets)**
-- New secrets: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_S3_INPUT_BUCKET`, `AWS_S3_OUTPUT_BUCKET`, `AWS_MEDIACONVERT_ROLE_ARN`, `AWS_MEDIACONVERT_ENDPOINT`, `MEDIACONVERT_WEBHOOK_SECRET`.
-- User provisions in AWS: 2 S3 buckets, IAM role for MediaConvert, EventBridge rule → HTTPS destination pointed at `/api/public/hooks/mediaconvert` with HMAC signing.
-- I'll write a one-page setup checklist with the exact IAM policy JSON and EventBridge target config.
+- **`/manage` badges**: add a `TranscodeBadge` next to each video row — Pending / Processing / Ready / Failed, with a "Retry transcode" action on Failed (server fn already exists or stub). Links the Ready badge to `/v2/:cid` so you can A/B against `/v/:cid`.
+- **`getTranscodeStatus` server fn**: thin read-only fn used by both `/upload2` polling and `/manage` badges. No new tables.
+- **`ipfsHlsUrl` helper verification**: short pass on `src/lib/ipfs-gateway.ts` to confirm `master.m3u8` resolution + add a unit-test-style runtime check exposed at `/v2/:cid` dev panel ("HLS playlist reachable: yes/no, X variants").
+- **MediaConvert kickoff gating**: wrap the job-create call in `if (process.env.AWS_MEDIACONVERT_ENDPOINT)` so `/upload2` works end-to-end today (minus actual transcode) while the VPC limit increase is pending. The moment AWS comes back, no code change needed.
 
-**Phase 2 — Schema + migration**
-Add to `videos`:
-- `hls_cid text` — directory CID of the HLS bundle
-- `renditions jsonb` — `[{ height, bitrate, cid, playlist }]`
-- `transcode_status text` — `pending | processing | ready | failed`
-- `transcode_job_id text`
-- `transcode_error text`
+## Out of scope (explicit)
 
-Existing `cid` column keeps the original. Old rows render fine because `hls_cid` is null → player falls back.
+- No changes to `/v/:cid`, `/upload`, `/upload-aws`, or the webhook handler.
+- No DB migrations — all columns already exist.
+- No new auth/roles.
 
-**Phase 3 — Upload pipeline change**
-In the existing upload server fn, after pinning the original:
-1. Copy/upload the file to S3 input bucket.
-2. Kick off a MediaConvert job (HLS output, 3 renditions: 1280×720@2.5Mbps, 854×480@1.2Mbps, 640×360@600kbps, 6s segments).
-3. Set `transcode_status='processing'`, save `transcode_job_id`.
-4. Return immediately — UI shows "Processing higher-quality streams…" badge.
+## Technical notes
 
-**Phase 4 — Webhook + pinning**
-`src/routes/api/public/hooks/mediaconvert.ts`:
-- Verify HMAC signature.
-- On `COMPLETE`: list output S3 objects, stream each to Pinata as a single directory pin (`pinFileToIPFS` with `wrapWithDirectory`), get back the directory CID.
-- Update `videos`: `hls_cid`, `renditions[]`, `transcode_status='ready'`.
-- Re-stamp the updated JSON payload to chain (reuse existing stamp flow).
-- On `ERROR`: set status `failed` + error message.
+- Files created: `src/routes/v2.$cid.tsx`, `src/routes/upload2.tsx`, `src/components/VideoPlayerV2.tsx`. Possibly `src/lib/transcode-status.functions.ts` if we don't extend `transcode.functions.ts`.
+- Files touched: `src/routes/manage.tsx` (add badge column), `src/lib/transcode.functions.ts` (gate MediaConvert call on env var, add `getTranscodeStatus`).
+- `/v2/:cid` reuses the existing public `getVideoByCid` loader pattern from `/v/:cid` for SSR + OG tags — share links remain crawlable.
 
-**Phase 5 — Player**
-Add `hls.js` dep. Update `VideoPlayer.tsx`:
-- If `hls_cid` present and `hls.js` supported → attach HLS, let ABR handle quality switching.
-- Native HLS (Safari) → set `<video src>` directly.
-- Else / no `hls_cid` → existing MP4 path from `cid`.
-- Add a tiny quality indicator (Auto / 720 / 480 / 360) wired to hls.js levels.
+## Open question
 
-**Phase 6 — UI polish + backfill**
-- Upload page: show transcode status pill on the user's recent uploads.
-- Admin/creator action: "Re-transcode" button for legacy videos (re-runs Phase 3 against an existing original CID by fetching from gateway → S3 → MediaConvert).
-
----
-
-### What I need from you before I start coding
-
-The only blocker is the AWS credentials and bucket names from Phase 1. I'll write Phases 2–6 first (they don't need AWS to compile), wire the secrets last, and give you the AWS setup checklist in the same pass so you can provision while I build.
-
-Sound good? If yes, I'll start with Phase 2 (migration) and Phase 5 (player upgrade) in parallel, then move into the upload + webhook pipeline.
+For `/upload2`, should the page **auto-redirect** to `/v2/:cid` when transcode completes, or just show a "Watch on v2" button and stay put so you can keep testing? Default in the plan above is "stay put, show button" — say the word if you want auto-redirect.
