@@ -7,7 +7,6 @@ import { z } from "zod";
 import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireWalletSession } from "./wallet-auth.functions";
-import { sendAppEmail } from "./notifications.server";
 
 const TABLE = "wallet_notification_prefs";
 
@@ -99,6 +98,7 @@ export const setWalletEmail = createServerFn({ method: "POST" })
     const baseUrl =
       process.env.APP_PUBLIC_URL ?? "https://streamtxc.com";
     const verifyLink = `${baseUrl}/api/public/notify/verify-email?token=${token}`;
+    const { sendAppEmail } = await import("./notifications.server");
     const send = await sendAppEmail({
       templateName: "wallet-verify-email",
       recipientEmail: data.email,
