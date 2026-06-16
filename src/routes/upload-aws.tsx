@@ -683,7 +683,11 @@ function UploadPage() {
             </div>
 
             {file && !tooBig && (
-              <ThumbnailPicker file={file} onChange={setThumbnailCid} />
+              <ThumbnailPicker
+                file={file}
+                onChange={setThumbnailCid}
+                onPinningChange={setThumbPinning}
+              />
             )}
 
             <label className="flex items-start gap-3 border border-border bg-card rounded-sm p-4 cursor-pointer hover:border-primary/60 transition-colors">
@@ -881,6 +885,7 @@ function UploadPage() {
                     key={cidInput.trim()}
                     videoSrc={`/api/stream/${cidInput.trim()}`}
                     onChange={setCidThumbnailCid}
+                    onPinningChange={setCidThumbPinning}
                   />
                 )}
 
