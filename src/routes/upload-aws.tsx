@@ -167,6 +167,16 @@ function UploadPage() {
   useEffect(() => { thumbnailCidRef.current = thumbnailCid; }, [thumbnailCid]);
   const cidThumbnailCidRef = useRef<string | null>(null);
   useEffect(() => { cidThumbnailCidRef.current = cidThumbnailCid; }, [cidThumbnailCid]);
+  // Mirror pinning flags into refs too — the wait-loops in handleSubmit /
+  // handleCidSubmit run inside an already-scheduled async function, so they
+  // close over the React state at click-time and never observe updates.
+  // Without this, the loop either bails immediately (state was false at
+  // click) or hangs the full 30s (state was true at click) and register()
+  // runs with thumbnailCid=null — losing the pinned thumbnail.
+  const thumbPinningRef = useRef(false);
+  useEffect(() => { thumbPinningRef.current = thumbPinning; }, [thumbPinning]);
+  const cidThumbPinningRef = useRef(false);
+  useEffect(() => { cidThumbPinningRef.current = cidThumbPinning; }, [cidThumbPinning]);
   const [nsfw, setNsfw] = useState(false);
   const [cidNsfw, setCidNsfw] = useState(false);
   const [cidStage, setCidStage] = useState<
@@ -276,10 +286,10 @@ function UploadPage() {
     // so the chosen CID actually gets attached to the videos row.
     // Without this, clicking Upload mid-pin pins the thumbnail to IPFS
     // but register() runs with thumbnailCid=null and the picture is lost.
-    if (thumbPinning) {
+    if (thumbPinningRef.current) {
       toast("Waiting for thumbnail to finish pinning…");
       const start = Date.now();
-      while (thumbPinning && Date.now() - start < 30_000) {
+      while (thumbPinningRef.current && Date.now() - start < 30_000) {
         await new Promise((r) => setTimeout(r, 150));
       }
     }
@@ -408,10 +418,10 @@ function UploadPage() {
     if (!cidInput || !cidTitle) return;
     setDuplicate(null);
     setCidNotFound(null);
-    if (cidThumbPinning) {
+    if (cidThumbPinningRef.current) {
       toast("Waiting for thumbnail to finish pinning…");
       const start = Date.now();
-      while (cidThumbPinning && Date.now() - start < 30_000) {
+      while (cidThumbPinningRef.current && Date.now() - start < 30_000) {
         await new Promise((r) => setTimeout(r, 150));
       }
     }
