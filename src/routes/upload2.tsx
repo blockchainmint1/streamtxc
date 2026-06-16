@@ -295,12 +295,14 @@ function Upload2Page() {
           // directly; if the job is COMPLETE, run the pin/anchor inline.
           const jobId = row?.transcode_job_id;
           if (jobId && !pinTriggered) {
+            let fallbackStarted = false;
             try {
               const job = await describeJob({ data: { jobId } });
               const awsJob = (job as { job?: { status?: string; jobPercentComplete?: number; errorMessage?: string } } | null)?.job;
               const awsStatus = awsJob?.status;
               if (awsStatus === "COMPLETE") {
                 pinTriggered = true;
+                fallbackStarted = true;
                 pushLog("step", `AWS reports COMPLETE — webhook missed, pinning HLS bundle inline…`);
                 setStage("pin-hls", "active", "pinning HLS bundle (fallback path)");
                 const res = await runWebhook({ data: { cid: resultCid!, jobId } });
@@ -326,7 +328,7 @@ function Upload2Page() {
               }
             } catch (err) {
               pinTriggered = false;
-              pushLog("warn", `AWS describeJob failed: ${err instanceof Error ? err.message : String(err)}`);
+              pushLog("warn", `${fallbackStarted ? "HLS fallback pin failed" : "AWS describeJob failed"}: ${err instanceof Error ? err.message : String(err)}`);
             }
           }
         } else if (st === "complete" || st === "ready") {
