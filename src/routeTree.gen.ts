@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as Upload3RouteImport } from './routes/upload3'
 import { Route as Upload2RouteImport } from './routes/upload2'
 import { Route as UploadAwsRouteImport } from './routes/upload-aws'
 import { Route as UploadRouteImport } from './routes/upload'
@@ -22,7 +21,6 @@ import { Route as BrandRouteImport } from './routes/brand'
 import { Route as ApiRouteImport } from './routes/api'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as V2CidRouteImport } from './routes/v2.$cid'
 import { Route as VCidRouteImport } from './routes/v.$cid'
 import { Route as UWalletRouteImport } from './routes/u.$wallet'
 import { Route as EmbedCidRouteImport } from './routes/embed.$cid'
@@ -37,11 +35,6 @@ import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/p
 import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
 
-const Upload3Route = Upload3RouteImport.update({
-  id: '/upload3',
-  path: '/upload3',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const Upload2Route = Upload2RouteImport.update({
   id: '/upload2',
   path: '/upload2',
@@ -100,11 +93,6 @@ const AboutRoute = AboutRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const V2CidRoute = V2CidRouteImport.update({
-  id: '/v2/$cid',
-  path: '/v2/$cid',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VCidRoute = VCidRouteImport.update({
@@ -190,11 +178,9 @@ export interface FileRoutesByFullPath {
   '/upload': typeof UploadRoute
   '/upload-aws': typeof UploadAwsRoute
   '/upload2': typeof Upload2Route
-  '/upload3': typeof Upload3Route
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
-  '/v2/$cid': typeof V2CidRoute
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
@@ -219,11 +205,9 @@ export interface FileRoutesByTo {
   '/upload': typeof UploadRoute
   '/upload-aws': typeof UploadAwsRoute
   '/upload2': typeof Upload2Route
-  '/upload3': typeof Upload3Route
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
-  '/v2/$cid': typeof V2CidRoute
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
@@ -249,11 +233,9 @@ export interface FileRoutesById {
   '/upload': typeof UploadRoute
   '/upload-aws': typeof UploadAwsRoute
   '/upload2': typeof Upload2Route
-  '/upload3': typeof Upload3Route
   '/embed/$cid': typeof EmbedCidRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
-  '/v2/$cid': typeof V2CidRoute
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
@@ -280,11 +262,9 @@ export interface FileRouteTypes {
     | '/upload'
     | '/upload-aws'
     | '/upload2'
-    | '/upload3'
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
-    | '/v2/$cid'
     | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
@@ -309,11 +289,9 @@ export interface FileRouteTypes {
     | '/upload'
     | '/upload-aws'
     | '/upload2'
-    | '/upload3'
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
-    | '/v2/$cid'
     | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
@@ -338,11 +316,9 @@ export interface FileRouteTypes {
     | '/upload'
     | '/upload-aws'
     | '/upload2'
-    | '/upload3'
     | '/embed/$cid'
     | '/u/$wallet'
     | '/v/$cid'
-    | '/v2/$cid'
     | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
@@ -368,22 +344,13 @@ export interface RootRouteChildren {
   UploadRoute: typeof UploadRoute
   UploadAwsRoute: typeof UploadAwsRoute
   Upload2Route: typeof Upload2Route
-  Upload3Route: typeof Upload3Route
   EmbedCidRoute: typeof EmbedCidRoute
   UWalletRoute: typeof UWalletRoute
   VCidRoute: typeof VCidRouteWithChildren
-  V2CidRoute: typeof V2CidRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/upload3': {
-      id: '/upload3'
-      path: '/upload3'
-      fullPath: '/upload3'
-      preLoaderRoute: typeof Upload3RouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/upload2': {
       id: '/upload2'
       path: '/upload2'
@@ -466,13 +433,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/v2/$cid': {
-      id: '/v2/$cid'
-      path: '/v2/$cid'
-      fullPath: '/v2/$cid'
-      preLoaderRoute: typeof V2CidRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v/$cid': {
@@ -628,11 +588,9 @@ const rootRouteChildren: RootRouteChildren = {
   UploadRoute: UploadRoute,
   UploadAwsRoute: UploadAwsRoute,
   Upload2Route: Upload2Route,
-  Upload3Route: Upload3Route,
   EmbedCidRoute: EmbedCidRoute,
   UWalletRoute: UWalletRoute,
   VCidRoute: VCidRouteWithChildren,
-  V2CidRoute: V2CidRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

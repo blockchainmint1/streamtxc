@@ -44,7 +44,7 @@ const v2Search = z.object({
   playlist: z.string().min(1).optional().catch(undefined),
 });
 
-export const Route = createFileRoute("/v2/$cid")({
+export const Route = createFileRoute("/v/$cid")({
   validateSearch: zodValidator(v2Search),
   loader: async ({ params }) => {
     try {

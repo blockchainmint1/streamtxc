@@ -33,7 +33,7 @@ import {
   type DuplicateCidInfo,
 } from "@/lib/duplicate-cid";
 
-export const Route = createFileRoute("/upload3")({
+export const Route = createFileRoute("/upload")({
   head: () => ({
     meta: [
       { title: "Upload — streamTXC" },
