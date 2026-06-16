@@ -191,8 +191,11 @@ export async function pinByCid(cid: string, name?: string): Promise<void> {
 }
 
 export function gatewayUrl(cid: string): string {
-  const domain = process.env.PINATA_GATEWAY_DOMAIN;
-  if (domain) return `https://${domain}/ipfs/${cid}`;
+  // Prefer our self-hosted IPFS node when configured; fall back to Pinata.
+  const ownNode = process.env.IPFS_GATEWAY_DOMAIN;
+  if (ownNode) return `https://${ownNode}/ipfs/${cid}`;
+  const pinata = process.env.PINATA_GATEWAY_DOMAIN;
+  if (pinata) return `https://${pinata}/ipfs/${cid}`;
   return `https://gateway.pinata.cloud/ipfs/${cid}`;
 }
 
