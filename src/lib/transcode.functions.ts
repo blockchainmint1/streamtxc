@@ -300,15 +300,11 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
     if (!e.inputBucket || !e.outputBucket) throw new Error("AWS buckets not set");
 
     const { listObjects, getObjectBlob } = await import("./aws-s3.server");
-    const { pinDirectoryToIPFS, pinFileToIPFS, pinJsonToIPFS } = await import("./pinata.server");
 
-    // 1. Pin the ORIGINAL file (still living in the input bucket) to IPFS.
-    const tOrig0 = Date.now();
-    const origBlob = await getObjectBlob(e.inputBucket, `inputs/${data.cid}`);
-    const origPin = await pinFileToIPFS(origBlob, `${data.cid}.original`);
-    const tOrig = Date.now() - tOrig0;
-
-    // 2. Pin the HLS bundle as a single directory.
+    // 1. Pin the HLS bundle as a single directory. Do not fetch the original
+    // input object here: the already-registered video CID is the canonical
+    // original, and the app AWS user may intentionally only have write access
+    // to the input bucket.
     const prefix = `hls/${data.cid}/`;
     const t0 = Date.now();
     const keys = await listObjects(e.outputBucket, prefix);
@@ -316,19 +312,28 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
     const tList = Date.now() - t0;
 
     const t1 = Date.now();
-    const files = await mapWithConcurrency(keys, 8, async (key) => {
-      const blob = await getObjectBlob(e.outputBucket!, key);
-      return {
-        path: key.slice(prefix.length),
-        body: blob,
-        contentType: blob.type || undefined,
-      };
-    });
+    let pinned: { cid: string; size: number };
+    const lambdaToken = process.env.IPFS_LAMBDA_TOKEN;
+    const lambdaUrl = process.env.IPFS_LAMBDA_URL;
+    const lambdaName = process.env.IPFS_LAMBDA_NAME;
+    if (lambdaToken && (lambdaName || lambdaUrl)) {
+      const { callPinLambda } = await import("./ipfs-lambda.functions");
+      const json = await callPinLambda({ bucket: e.outputBucket, keys }, lambdaToken);
+      if (!json.cid) throw new Error("Lambda /pin returned no cid");
+      pinned = { cid: json.cid, size: json.totalBytes ?? 0 };
+    } else {
+      const { pinDirectoryToIPFS } = await import("./pinata.server");
+      const files = await mapWithConcurrency(keys, 8, async (key) => {
+        const blob = await getObjectBlob(e.outputBucket!, key);
+        return {
+          path: key.slice(prefix.length),
+          body: blob,
+          contentType: blob.type || undefined,
+        };
+      });
+      pinned = await pinDirectoryToIPFS(files, `hls-${data.cid}`);
+    }
     const tFetch = Date.now() - t1;
-
-    const t2 = Date.now();
-    const pinned = await pinDirectoryToIPFS(files, `hls-${data.cid}`);
-    const tPin = Date.now() - t2;
 
     // 3. Derive a rendition manifest (mirrors what the real webhook builds).
     const renditions = keys
@@ -339,24 +344,33 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
         return { height: m ? Number(m[1]) : null, playlist: rel };
       });
 
-    // 4. Build the canonical metadata JSON (v3 — what would be anchored to
-    //    chain in production) and pin it. Mirrors recordMetadataAnchor's
-    //    schema so the test path proves the exact blob shape.
-    const meta = {
-      v: 3,
-      videoCid: origPin.cid,
-      videoWallet: "<test>",
-      uploader: "<test>",
-      title: `s3-test ${data.cid}`,
-      description: "Test bundle pinned from /s3-test",
-      thumbnailCid: null,
-      hlsCid: pinned.cid,
-      renditions,
-      ts: new Date().toISOString(),
-    };
-    const metaPin = await pinJsonToIPFS(meta, `${data.cid}.meta.json`);
-
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await supabaseAdmin
+      .from("videos")
+      .select("video_wallet, owner_wallet, title, description, thumbnail_cid")
+      .eq("cid", data.cid)
+      .maybeSingle();
+
+    let newMetaCid: string | null = null;
+    let newMetaTx: string | null = null;
+    if (row && row.video_wallet && row.owner_wallet) {
+      const { recordMetadataAnchor } = await import("./chain-events.server");
+      const anchored = await recordMetadataAnchor({
+        videoCid: data.cid,
+        videoWallet: row.video_wallet,
+        uploaderWallet: row.owner_wallet,
+        title: row.title ?? "",
+        description: row.description ?? "",
+        thumbnailCid: row.thumbnail_cid ?? null,
+        hlsCid: pinned.cid,
+        renditions,
+      });
+      if (anchored) {
+        newMetaCid = anchored.metaCid;
+        newMetaTx = anchored.stamp.real ? anchored.stamp.txid : null;
+      }
+    }
+
     const { error: updErr, count } = await supabaseAdmin
       .from("videos")
       .update({
@@ -365,7 +379,8 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
         transcode_status: "ready",
         transcode_completed_at: new Date().toISOString(),
         transcode_error: null,
-        metadata_cid: metaPin.cid,
+        ...(newMetaCid ? { metadata_cid: newMetaCid } : {}),
+        ...(newMetaTx ? { tx_hash: newMetaTx } : {}),
       }, { count: "exact" })
       .eq("cid", data.cid)
       .eq("transcode_job_id", data.jobId);
@@ -374,13 +389,12 @@ export const simulateMediaConvertWebhook = createServerFn({ method: "POST" })
     return {
       status: 200,
       body: JSON.stringify({
-        originalCid: origPin.cid,
         hlsCid: pinned.cid,
-        metadataCid: metaPin.cid,
-        metadata: meta,
+        metadataCid: newMetaCid,
+        metadataTx: newMetaTx,
         keys: keys.length,
         rowsUpdated: count ?? 0,
-        timings: { originalMs: tOrig, listMs: tList, fetchMs: tFetch, pinMs: tPin },
+        timings: { listMs: tList, pinMs: tFetch },
       }),
       url: `inline://${data.cid}`,
     };
