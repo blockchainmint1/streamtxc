@@ -41,6 +41,31 @@ export async function createPresignedPutUrl(opts: {
   return signed.url;
 }
 
+/** Server-side PUT — stream a Blob/File/bytes straight into S3 from the Worker. */
+export async function s3PutObject(opts: {
+  bucket: string;
+  key: string;
+  body: Blob | ArrayBuffer | Uint8Array;
+  contentType: string;
+}): Promise<void> {
+  const client = s3Client();
+  const url = `${s3Host(opts.bucket)}/${encodeKey(opts.key)}`;
+  const body =
+    opts.body instanceof Blob
+      ? opts.body
+      : new Blob([opts.body as BlobPart], { type: opts.contentType });
+  const res = await client.fetch(url, {
+    method: "PUT",
+    headers: { "content-type": opts.contentType },
+    body,
+  });
+  if (!res.ok) {
+    throw new Error(
+      `S3 put failed [${res.status}]: ${await res.text().catch(() => "")}`,
+    );
+  }
+}
+
 /** List object keys under a prefix. Returns full keys (not stripped of prefix). */
 export async function listObjects(bucket: string, prefix: string): Promise<string[]> {
   const client = s3Client();
