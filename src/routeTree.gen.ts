@@ -34,6 +34,7 @@ import { Route as ApiPublicNotifyVerifyEmailRouteImport } from './routes/api/pub
 import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/hooks/telegram'
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
 import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
+import { Route as ApiPublicHooksIpfsPinCompleteRouteImport } from './routes/api/public/hooks/ipfs-pin-complete'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
 
 const UploadAwsRoute = UploadAwsRouteImport.update({
@@ -165,6 +166,12 @@ const ApiPublicHooksMediaconvertRoute =
     path: '/public/hooks/mediaconvert',
     getParentRoute: () => ApiRoute,
   } as any)
+const ApiPublicHooksIpfsPinCompleteRoute =
+  ApiPublicHooksIpfsPinCompleteRouteImport.update({
+    id: '/public/hooks/ipfs-pin-complete',
+    path: '/public/hooks/ipfs-pin-complete',
+    getParentRoute: () => ApiRoute,
+  } as any)
 const ApiPublicAdminRetryStampsRoute =
   ApiPublicAdminRetryStampsRouteImport.update({
     id: '/public/admin/retry-stamps',
@@ -194,6 +201,7 @@ export interface FileRoutesByFullPath {
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
@@ -222,6 +230,7 @@ export interface FileRoutesByTo {
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
@@ -251,6 +260,7 @@ export interface FileRoutesById {
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
@@ -281,6 +291,7 @@ export interface FileRouteTypes {
     | '/api/stream/$cid'
     | '/v/$cid/restore'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
@@ -309,6 +320,7 @@ export interface FileRouteTypes {
     | '/api/stream/$cid'
     | '/v/$cid/restore'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
@@ -337,6 +349,7 @@ export interface FileRouteTypes {
     | '/api/stream/$cid'
     | '/v/$cid/restore'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
@@ -538,6 +551,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksMediaconvertRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/public/hooks/ipfs-pin-complete': {
+      id: '/api/public/hooks/ipfs-pin-complete'
+      path: '/public/hooks/ipfs-pin-complete'
+      fullPath: '/api/public/hooks/ipfs-pin-complete'
+      preLoaderRoute: typeof ApiPublicHooksIpfsPinCompleteRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/public/admin/retry-stamps': {
       id: '/api/public/admin/retry-stamps'
       path: '/public/admin/retry-stamps'
@@ -567,6 +587,7 @@ interface ApiRouteChildren {
   ApiPublicUploadRoute: typeof ApiPublicUploadRoute
   ApiStreamCidRoute: typeof ApiStreamCidRouteWithChildren
   ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
+  ApiPublicHooksIpfsPinCompleteRoute: typeof ApiPublicHooksIpfsPinCompleteRoute
   ApiPublicHooksMediaconvertRoute: typeof ApiPublicHooksMediaconvertRoute
   ApiPublicHooksPaymentWatcherRoute: typeof ApiPublicHooksPaymentWatcherRoute
   ApiPublicHooksTelegramRoute: typeof ApiPublicHooksTelegramRoute
@@ -580,6 +601,7 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiPublicUploadRoute: ApiPublicUploadRoute,
   ApiStreamCidRoute: ApiStreamCidRouteWithChildren,
   ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
+  ApiPublicHooksIpfsPinCompleteRoute: ApiPublicHooksIpfsPinCompleteRoute,
   ApiPublicHooksMediaconvertRoute: ApiPublicHooksMediaconvertRoute,
   ApiPublicHooksPaymentWatcherRoute: ApiPublicHooksPaymentWatcherRoute,
   ApiPublicHooksTelegramRoute: ApiPublicHooksTelegramRoute,

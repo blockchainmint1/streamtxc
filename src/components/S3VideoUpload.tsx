@@ -26,12 +26,12 @@ import {
   isTranscodeConfigured,
   getTranscodeStatus,
   getMediaConvertJob,
-  simulateMediaConvertWebhook,
 } from "@/lib/transcode.functions";
 import {
   pinS3ToIpfs,
   ipfsLambdaHealth,
   isIpfsLambdaConfigured,
+  kickHlsPinAsync,
 } from "@/lib/ipfs-lambda.functions";
 import { computeCids } from "@/lib/ipfs-cid";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
@@ -159,7 +159,7 @@ export function S3VideoUpload({
   const checkConfig = useServerFn(isTranscodeConfigured);
   const checkStatus = useServerFn(getTranscodeStatus);
   const describeJob = useServerFn(getMediaConvertJob);
-  const runWebhook = useServerFn(simulateMediaConvertWebhook);
+  const kickPin = useServerFn(kickHlsPinAsync);
   const pinFromS3 = useServerFn(pinS3ToIpfs);
   const checkIpfs = useServerFn(isIpfsLambdaConfigured);
   const probeIpfs = useServerFn(ipfsLambdaHealth);
@@ -269,31 +269,21 @@ export function S3VideoUpload({
           pushLog("info", `transcode poll → processing (job ${row?.transcode_job_id ?? "?"})`);
           const jobId = row?.transcode_job_id;
           if (jobId && !pinTriggered) {
-            let fallbackStarted = false;
             try {
               const job = await describeJob({ data: { jobId } });
               const awsJob = (job as { job?: { status?: string; jobPercentComplete?: number; errorMessage?: string } } | null)?.job;
               const awsStatus = awsJob?.status;
               if (awsStatus === "COMPLETE") {
                 pinTriggered = true;
-                fallbackStarted = true;
-                pushLog("step", `AWS reports COMPLETE — webhook missed, pinning HLS bundle inline…`);
-                setStage("pin-hls", "active", "pinning HLS bundle (fallback path)");
-                const res = await runWebhook({ data: { cid: resultCid!, jobId } });
-                pushLog("ok", `inline pin done (${res.status})`);
-                const parsed = JSON.parse(res.body || "{}") as { hlsCid?: string; pinnedCid?: string };
-                const hlsCid = parsed.hlsCid ?? parsed.pinnedCid;
+                pushLog("step", `AWS reports COMPLETE — kicking async HLS pin (Lambda will call back when done)…`);
                 setStage("transcode", "done");
-                setStage("pin-hls", "done", hlsCid ? `hls cid: ${hlsCid}` : "pinned via fallback");
-                setStage("done", "done");
-                pushLog("step", `pipeline complete`);
-                setRunning(false);
-                clearInflight();
-                if (pollRef.current) window.clearInterval(pollRef.current);
-                if (autoNavigate && resultCid) {
-                  window.setTimeout(() => {
-                    void navigate({ to: destination === "v" ? "/v/$cid" : "/v/$cid", params: { cid: resultCid } });
-                  }, 1500);
+                setStage("pin-hls", "active", "pinning HLS bundle to IPFS (async)…");
+                try {
+                  const res = await kickPin({ data: { cid: resultCid!, jobId } });
+                  pushLog("ok", `async pin started · ${res.files} files · callback ${res.callbackUrl}`);
+                } catch (err) {
+                  pinTriggered = false;
+                  pushLog("warn", `async pin kick failed: ${err instanceof Error ? err.message : String(err)}`);
                 }
               } else if (awsStatus === "ERROR" || awsStatus === "CANCELED") {
                 pushLog("err", `AWS job ${jobId} ${awsStatus}${awsJob?.errorMessage ? `: ${awsJob.errorMessage}` : ""}`);
@@ -301,10 +291,14 @@ export function S3VideoUpload({
                 pushLog("info", `AWS job ${jobId} → ${awsStatus}${awsJob?.jobPercentComplete ? ` (${awsJob.jobPercentComplete}%)` : ""}`);
               }
             } catch (err) {
-              pinTriggered = false;
-              pushLog("warn", `${fallbackStarted ? "HLS fallback pin failed" : "AWS describeJob failed"}: ${err instanceof Error ? err.message : String(err)}`);
+              pushLog("warn", `AWS describeJob failed: ${err instanceof Error ? err.message : String(err)}`);
             }
           }
+        } else if (st === "pinning") {
+          setStage("transcode", "done");
+          setStage("pin-hls", "active", "pinning HLS bundle to IPFS…");
+          pinTriggered = true;
+          pushLog("info", `pin poll → pinning (job ${row?.transcode_job_id ?? "?"})`);
         } else if (st === "complete" || st === "ready") {
           setStage("transcode", "done");
           setStage("pin-hls", "done", row?.hls_cid ? `hls cid: ${row.hls_cid}` : undefined);
@@ -337,7 +331,7 @@ export function S3VideoUpload({
       cancelled = true;
       if (pollRef.current) window.clearInterval(pollRef.current);
     };
-  }, [resultCid, checkStatus, describeJob, runWebhook, pushLog, navigate, autoNavigate, destination]);
+  }, [resultCid, checkStatus, describeJob, kickPin, pushLog, navigate, autoNavigate, destination]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
