@@ -152,7 +152,7 @@ const STAGES: StageRow[] = [
   { key: "register", label: "Register video", blurb: "Write row + stamp TXC chain", icon: Anchor },
   { key: "transcode", label: "Transcode (HLS)", blurb: "MediaConvert builds multi-bitrate ladder", icon: Film },
   { key: "pin-hls", label: "Pin HLS bundle to IPFS", blurb: "Webhook re-anchors HLS directory CID", icon: Network },
-  { key: "done", label: "Ready to stream", blurb: "Adaptive HLS available on /v2/CID", icon: PartyPopper },
+  { key: "done", label: "Ready to stream", blurb: "Adaptive HLS available on /v/CID", icon: PartyPopper },
 ];
 
 type LogLevel = "info" | "ok" | "warn" | "err" | "step";
@@ -238,8 +238,8 @@ function Upload2Page() {
         const st = row?.transcode_status;
         if (st === "complete" || st === "ready") {
           clearInflight();
-          toast.success(`Previous upload finished — opening /v2/${inflight.cid.slice(0, 10)}…`);
-          void navigate({ to: "/v2/$cid", params: { cid: inflight.cid } });
+          toast.success(`Previous upload finished — opening /v/${inflight.cid.slice(0, 10)}…`);
+          void navigate({ to: "/v/$cid", params: { cid: inflight.cid } });
           return;
         }
         if (st === "failed") {
@@ -312,13 +312,13 @@ function Upload2Page() {
                 setStage("transcode", "done");
                 setStage("pin-hls", "done", hlsCid ? `hls cid: ${hlsCid}` : "pinned via fallback");
                 setStage("done", "done");
-                pushLog("step", `pipeline complete — /v2/${resultCid}`);
+                pushLog("step", `pipeline complete — /v/${resultCid}`);
                 clearInflight();
                 if (pollRef.current) window.clearInterval(pollRef.current);
                 if (autoNavigate && resultCid) {
                   pushLog("info", "auto-navigating to /v2 in 1500ms…");
                   window.setTimeout(() => {
-                    void navigate({ to: "/v2/$cid", params: { cid: resultCid } });
+                    void navigate({ to: "/v/$cid", params: { cid: resultCid } });
                   }, 1500);
                 }
               } else if (awsStatus === "ERROR" || awsStatus === "CANCELED") {
@@ -336,13 +336,13 @@ function Upload2Page() {
           setStage("pin-hls", "done", row?.hls_cid ? `hls cid: ${row.hls_cid}` : undefined);
           setStage("done", "done");
           pushLog("ok", `transcode COMPLETE · hls cid: ${row?.hls_cid ?? "(missing)"}`);
-          pushLog("step", `pipeline complete — /v2/${resultCid}`);
+          pushLog("step", `pipeline complete — /v/${resultCid}`);
           clearInflight();
           if (pollRef.current) window.clearInterval(pollRef.current);
           if (autoNavigate && resultCid) {
             pushLog("info", "auto-navigating to /v2 in 1500ms…");
             window.setTimeout(() => {
-              void navigate({ to: "/v2/$cid", params: { cid: resultCid } });
+              void navigate({ to: "/v/$cid", params: { cid: resultCid } });
             }, 1500);
           }
           return;
@@ -529,7 +529,7 @@ function Upload2Page() {
         setDuplicate(dup);
         toast.error(`Already on stream: "${dup.title}" — redirecting…`);
         setTimeout(() => {
-          void navigate({ to: "/v2/$cid", params: { cid: dup.cid } });
+          void navigate({ to: "/v/$cid", params: { cid: dup.cid } });
         }, 1500);
       } else {
         const msg = err instanceof Error ? err.message : String(err);
@@ -570,7 +570,7 @@ function Upload2Page() {
                 </div>
                 <div className="font-bold mb-2">"{duplicate.title}"</div>
                 <Link
-                  to="/v2/$cid"
+                  to="/v/$cid"
                   params={{ cid: duplicate.cid }}
                   className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline"
                 >
@@ -719,10 +719,10 @@ function Upload2Page() {
                 checked={autoNavigate}
                 onCheckedChange={(v) => setAutoNavigate(v === true)}
               />
-              auto-navigate to /v2/{resultCid.slice(0, 10)}… when HLS is ready
+              auto-navigate to /v/{resultCid.slice(0, 10)}… when HLS is ready
             </label>
             <div className="flex gap-2 flex-wrap">
-              <Link to="/v2/$cid" params={{ cid: resultCid }}>
+              <Link to="/v/$cid" params={{ cid: resultCid }}>
                 <Button size="sm" className="font-mono">
                   Watch on v2 <ArrowRight className="ml-2 h-3 w-3" />
                 </Button>
