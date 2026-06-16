@@ -164,6 +164,28 @@ export async function createPresignedUploadUrl(opts: {
  * Returns the queue entry id; pinning happens asynchronously on Pinata's side.
  */
 export async function pinByCid(cid: string, name?: string): Promise<void> {
+  // Prefer pinning to our self-hosted IPFS node (fast, no Pinata quota).
+  // Fall back to Pinata if the node isn't configured or the call fails.
+  const lambdaUrl = process.env.IPFS_LAMBDA_URL;
+  const lambdaToken = process.env.IPFS_LAMBDA_TOKEN;
+  if (lambdaUrl && lambdaToken) {
+    try {
+      const res = await fetch(`${lambdaUrl.replace(/\/$/, "")}/pin-by-hash`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${lambdaToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ cid, name: name ?? cid }),
+      });
+      if (res.ok) return;
+      const text = await res.text().catch(() => "");
+      console.warn(`self-node pin failed [${res.status}]: ${text} — falling back to Pinata`);
+    } catch (err) {
+      console.warn("self-node pin threw, falling back to Pinata", err);
+    }
+  }
+
   const jwt = process.env.PINATA_JWT;
   if (!jwt) throw new Error("PINATA_JWT is not configured");
 
