@@ -22,6 +22,8 @@ import {
   startTranscode,
   isTranscodeConfigured,
   getTranscodeStatus,
+  getMediaConvertJob,
+  simulateMediaConvertWebhook,
 } from "@/lib/transcode.functions";
 import {
   pinS3ToIpfs,
@@ -143,6 +145,8 @@ function Upload2Page() {
   const startTx = useServerFn(startTranscode);
   const checkConfig = useServerFn(isTranscodeConfigured);
   const checkStatus = useServerFn(getTranscodeStatus);
+  const describeJob = useServerFn(getMediaConvertJob);
+  const runWebhook = useServerFn(simulateMediaConvertWebhook);
   const pinFromS3 = useServerFn(pinS3ToIpfs);
   const checkIpfs = useServerFn(isIpfsLambdaConfigured);
   const probeIpfs = useServerFn(ipfsLambdaHealth);
@@ -212,6 +216,7 @@ function Upload2Page() {
   useEffect(() => {
     if (!resultCid) return;
     let cancelled = false;
+    let pinTriggered = false;
     async function tick() {
       try {
         const row = await checkStatus({ data: { cid: resultCid! } });
@@ -220,7 +225,28 @@ function Upload2Page() {
         if (st === "processing") {
           setStage("transcode", "active", `job ${row?.transcode_job_id ?? "?"}`);
           pushLog("info", `transcode poll → processing (job ${row?.transcode_job_id ?? "?"})`);
-        } else if (st === "complete") {
+          // Fallback: EventBridge webhook may not have fired. Check AWS
+          // directly; if the job is COMPLETE, run the pin/anchor inline.
+          const jobId = row?.transcode_job_id;
+          if (jobId && !pinTriggered) {
+            try {
+              const job = await describeJob({ data: { jobId } });
+              const awsStatus = (job as { status?: string } | null)?.status;
+              if (awsStatus === "COMPLETE") {
+                pinTriggered = true;
+                pushLog("step", `AWS reports COMPLETE — webhook missed, pinning HLS bundle inline…`);
+                setStage("pin-hls", "active", "pinning HLS bundle (fallback path)");
+                const res = await runWebhook({ data: { cid: resultCid!, jobId } });
+                pushLog("ok", `inline pin done (${res.status})`);
+              } else if (awsStatus === "ERROR") {
+                pushLog("err", `AWS job ${jobId} ERROR`);
+              }
+            } catch (err) {
+              pinTriggered = false;
+              pushLog("warn", `AWS describeJob failed: ${err instanceof Error ? err.message : String(err)}`);
+            }
+          }
+        } else if (st === "complete" || st === "ready") {
           setStage("transcode", "done");
           setStage("pin-hls", "done", row?.hls_cid ? `hls cid: ${row.hls_cid}` : undefined);
           setStage("done", "done");
