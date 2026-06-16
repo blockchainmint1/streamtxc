@@ -432,7 +432,10 @@ function Upload2Page() {
       if (dup) {
         pushLog("err", `duplicate CID — already on stream as "${dup.title}" (cid ${dup.cid})`);
         setDuplicate(dup);
-        toast.error("This video is already on stream.");
+        toast.error(`Already on stream: "${dup.title}" — redirecting…`);
+        setTimeout(() => {
+          void navigate({ to: "/v2/$cid", params: { cid: dup.cid } });
+        }, 1500);
       } else {
         const msg = err instanceof Error ? err.message : String(err);
         pushLog("err", msg);
