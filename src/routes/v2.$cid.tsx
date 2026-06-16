@@ -16,6 +16,9 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { OnChainProofPanel } from "@/components/OnChainProofPanel";
 import { PaymentPanel } from "@/components/PaymentPanel";
 import { EmbedPanel } from "@/components/EmbedPanel";
+import { ShareBar } from "@/components/ShareBar";
+import { ReportButton } from "@/components/ReportButton";
+import { Comments } from "@/components/Comments";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import {
   ArrowLeft,
@@ -28,6 +31,7 @@ import {
   Calendar,
   Wallet,
   Code2,
+  ShieldAlert,
 } from "lucide-react";
 import { formatBytes, formatDate, formatDateTime } from "@/lib/fees";
 import { shortWalletId } from "@/lib/wallet";
@@ -169,6 +173,9 @@ function V2WatchPage() {
   const confirmed = chainStatus === "active" && !!blockNumber;
   const stampFailed = chainStatus === "stamp_failed";
 
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const shareUrl = origin ? `${origin}/v/${video.cid}` : `/v/${video.cid}`;
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -198,6 +205,22 @@ function V2WatchPage() {
                 {video.description}
               </p>
             )}
+            {video.hidden_at && (
+              <div className="border-2 border-amber-500/60 bg-amber-500/5 rounded-sm p-4 flex items-start gap-3">
+                <ShieldAlert className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="font-mono text-xs text-amber-500">
+                    [ UNDER REVIEW · HIDDEN FROM HOMEPAGE ]
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    This video has been reported and is hidden from public
+                    listings while a moderator reviews it. The file remains on
+                    IPFS — direct links still work — but it won't appear on the
+                    homepage or search until the report is resolved.
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap gap-4 font-mono text-xs text-muted-foreground border-t border-border pt-4">
               <span className="flex items-center gap-1.5">
                 <Eye className="h-3.5 w-3.5" /> {video.view_count} views
@@ -221,7 +244,9 @@ function V2WatchPage() {
                   "anonymous"
                 )}
               </span>
+              <ReportButton cid={video.cid} />
             </div>
+            <ShareBar title={video.title} url={shareUrl} onCopy={copy} />
           </div>
 
           {/* Sidebar */}
@@ -296,6 +321,7 @@ function V2WatchPage() {
             </CollapsibleSection>
           </div>
         </div>
+        <Comments cid={video.cid} />
       </main>
       <Footer />
     </div>
