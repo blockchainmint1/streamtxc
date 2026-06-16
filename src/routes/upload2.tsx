@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,11 @@ import {
   isTranscodeConfigured,
   getTranscodeStatus,
 } from "@/lib/transcode.functions";
+import {
+  pinS3ToIpfs,
+  ipfsLambdaHealth,
+  isIpfsLambdaConfigured,
+} from "@/lib/ipfs-lambda.functions";
 import { computeCids } from "@/lib/ipfs-cid";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 import { recordAnonUpload } from "@/lib/anon-uploads";
@@ -38,6 +44,8 @@ import {
   Anchor,
   Network,
   PartyPopper,
+  Terminal,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { parseDuplicateCidError, type DuplicateCidInfo } from "@/lib/duplicate-cid";
@@ -45,7 +53,7 @@ import { parseDuplicateCidError, type DuplicateCidInfo } from "@/lib/duplicate-c
 export const Route = createFileRoute("/upload2")({
   head: () => ({
     meta: [
-      { title: "Upload v2 (HLS pipeline) — streamTXC" },
+      { title: "Upload v3 (S3 → self-hosted IPFS) — streamTXC" },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -90,42 +98,10 @@ function putWithProgress(
   });
 }
 
-// POST to our Worker → Pinata (existing pipeline). Same as /upload.
-function postToPinataViaWorker(
-  file: File,
-  filename: string,
-  onProgress: (pct: number) => void,
-): Promise<{ cid: string; size: number }> {
-  const form = new FormData();
-  form.append("file", file, filename);
-  form.append("filename", filename);
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/public/upload");
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress((e.loaded / e.total) * 100);
-    };
-    xhr.onload = () => {
-      try {
-        const json = JSON.parse(xhr.responseText) as { cid?: string; size?: number; error?: string };
-        if (xhr.status >= 200 && xhr.status < 300 && json.cid) {
-          resolve({ cid: json.cid, size: json.size ?? file.size });
-        } else {
-          reject(new Error(json.error || `Pinata upload failed (${xhr.status})`));
-        }
-      } catch {
-        reject(new Error(`Pinata upload failed (${xhr.status})`));
-      }
-    };
-    xhr.onerror = () => reject(new Error("Network error during Pinata upload"));
-    xhr.send(form);
-  });
-}
-
 type StageKey =
   | "prepare"
-  | "pin-original"
   | "s3-upload"
+  | "pin-ipfs"
   | "register"
   | "transcode"
   | "pin-hls"
@@ -141,24 +117,35 @@ interface StageRow {
 }
 
 const STAGES: StageRow[] = [
-  { key: "prepare", label: "Prepare", blurb: "Hash file, compute CID, quote", icon: Circle },
-  { key: "pin-original", label: "Pin original to IPFS", blurb: "Pinata pins the master file", icon: Cloud },
-  { key: "s3-upload", label: "Upload to S3", blurb: "Push to MediaConvert input bucket", icon: Upload },
+  { key: "prepare", label: "Prepare", blurb: "Hash file, compute v1 CID, dedupe check", icon: Circle },
+  { key: "s3-upload", label: "Upload to S3", blurb: "Browser PUTs file to AWS S3 (presigned)", icon: Upload },
+  { key: "pin-ipfs", label: "Pin S3 → self-hosted IPFS", blurb: "Lambda streams S3 object into kubo node", icon: Cloud },
   { key: "register", label: "Register video", blurb: "Write row + stamp TXC chain", icon: Anchor },
   { key: "transcode", label: "Transcode (HLS)", blurb: "MediaConvert builds multi-bitrate ladder", icon: Film },
   { key: "pin-hls", label: "Pin HLS bundle to IPFS", blurb: "Webhook re-anchors HLS directory CID", icon: Network },
   { key: "done", label: "Ready to stream", blurb: "Adaptive HLS available on /v2/CID", icon: PartyPopper },
 ];
 
+type LogLevel = "info" | "ok" | "warn" | "err" | "step";
+interface LogLine {
+  t: number;            // ms since pipeline start
+  level: LogLevel;
+  msg: string;
+}
+
 function Upload2Page() {
   const qc = useQueryClient();
   const { address } = useWallet();
+  const navigate = useNavigate();
   const register = useServerFn(registerUpload);
   const lookupCid = useServerFn(lookupPinnedCid);
   const getS3Url = useServerFn(getTranscodeUploadUrl);
   const startTx = useServerFn(startTranscode);
   const checkConfig = useServerFn(isTranscodeConfigured);
   const checkStatus = useServerFn(getTranscodeStatus);
+  const pinFromS3 = useServerFn(pinS3ToIpfs);
+  const checkIpfs = useServerFn(isIpfsLambdaConfigured);
+  const probeIpfs = useServerFn(ipfsLambdaHealth);
 
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
@@ -169,8 +156,8 @@ function Upload2Page() {
 
   const [stages, setStages] = useState<Record<StageKey, StageState>>({
     prepare: "pending",
-    "pin-original": "pending",
     "s3-upload": "pending",
+    "pin-ipfs": "pending",
     register: "pending",
     transcode: "pending",
     "pin-hls": "pending",
@@ -179,13 +166,34 @@ function Upload2Page() {
   const [stageDetail, setStageDetail] = useState<Partial<Record<StageKey, string>>>({});
   const [running, setRunning] = useState(false);
   const [s3Progress, setS3Progress] = useState(0);
-  const [pinProgress, setPinProgress] = useState(0);
   const [resultCid, setResultCid] = useState<string | null>(null);
   const [duplicate, setDuplicate] = useState<DuplicateCidInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [log, setLog] = useState<LogLine[]>([]);
+  const [autoNavigate, setAutoNavigate] = useState(true);
   const pollRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number>(0);
+  const logBoxRef = useRef<HTMLDivElement | null>(null);
 
   const tooBig = !!file && file.size > MAX_UPLOAD_BYTES;
+
+  const pushLog = useCallback((level: LogLevel, msg: string) => {
+    const t = startTimeRef.current
+      ? Date.now() - startTimeRef.current
+      : 0;
+    setLog((prev) => [...prev, { t, level, msg }]);
+    // Mirror to devtools console for offline inspection.
+    const tag = `[upload2:${level}]`;
+    if (level === "err") console.error(tag, msg);
+    else if (level === "warn") console.warn(tag, msg);
+    else console.log(tag, msg);
+  }, []);
+
+  // Auto-scroll the log to the bottom.
+  useEffect(() => {
+    const box = logBoxRef.current;
+    if (box) box.scrollTop = box.scrollHeight;
+  }, [log]);
 
   function setStage(key: StageKey, state: StageState, detail?: string) {
     setStages((s) => ({ ...s, [key]: state }));
@@ -211,19 +219,29 @@ function Upload2Page() {
         const st = row?.transcode_status;
         if (st === "processing") {
           setStage("transcode", "active", `job ${row?.transcode_job_id ?? "?"}`);
+          pushLog("info", `transcode poll → processing (job ${row?.transcode_job_id ?? "?"})`);
         } else if (st === "complete") {
           setStage("transcode", "done");
           setStage("pin-hls", "done", row?.hls_cid ? `hls cid: ${row.hls_cid}` : undefined);
           setStage("done", "done");
+          pushLog("ok", `transcode COMPLETE · hls cid: ${row?.hls_cid ?? "(missing)"}`);
+          pushLog("step", `pipeline complete — /v2/${resultCid}`);
           if (pollRef.current) window.clearInterval(pollRef.current);
+          if (autoNavigate && resultCid) {
+            pushLog("info", "auto-navigating to /v2 in 1500ms…");
+            window.setTimeout(() => {
+              void navigate({ to: "/v2/$cid", params: { cid: resultCid } });
+            }, 1500);
+          }
           return;
         } else if (st === "failed") {
           setStage("transcode", "error", row?.transcode_error ?? "MediaConvert reported failure");
+          pushLog("err", `transcode FAILED: ${row?.transcode_error ?? "no error message"}`);
           if (pollRef.current) window.clearInterval(pollRef.current);
           return;
         }
       } catch (err) {
-        // ignore transient
+        pushLog("warn", `transcode poll error: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
     void tick();
@@ -232,21 +250,22 @@ function Upload2Page() {
       cancelled = true;
       if (pollRef.current) window.clearInterval(pollRef.current);
     };
-  }, [resultCid, checkStatus]);
+  }, [resultCid, checkStatus, pushLog, navigate, autoNavigate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!file || !title || tooBig || running) return;
+    startTimeRef.current = Date.now();
+    setLog([]);
     setRunning(true);
     setError(null);
     setDuplicate(null);
     setResultCid(null);
     setS3Progress(0);
-    setPinProgress(0);
     setStages({
       prepare: "pending",
-      "pin-original": "pending",
       "s3-upload": "pending",
+      "pin-ipfs": "pending",
       register: "pending",
       transcode: "pending",
       "pin-hls": "pending",
@@ -255,57 +274,107 @@ function Upload2Page() {
     setStageDetail({});
 
     try {
-      // 1. Prepare
+      pushLog("step", `▶ pipeline v3 starting · ${file.name} · ${formatBytes(file.size)} · ${file.type || "video/mp4"}`);
+
+      // 0. Preflight — verify AWS + Lambda are reachable.
+      pushLog("info", "checking AWS + IPFS Lambda configuration…");
+      const [{ configured: awsConfigured }, ipfsCfg] = await Promise.all([
+        checkConfig(),
+        checkIpfs(),
+      ]);
+      pushLog(awsConfigured ? "ok" : "err", `aws transcode configured: ${awsConfigured}`);
+      pushLog(ipfsCfg.configured ? "ok" : "err", `ipfs lambda configured: ${ipfsCfg.configured}${ipfsCfg.gateway ? ` · gateway: ${ipfsCfg.gateway}` : ""}`);
+      if (!awsConfigured) throw new Error("AWS transcode pipeline not configured — set AWS_* env vars.");
+      if (!ipfsCfg.configured) throw new Error("IPFS Lambda not configured — set IPFS_LAMBDA_URL + IPFS_LAMBDA_TOKEN.");
+
+      const health = await probeIpfs();
+      pushLog(health.ok ? "ok" : "warn", `ipfs lambda /health → ${health.ok ? "ok" : "fail"} ${typeof health.body === "string" ? health.body : ""}`);
+      if (!health.ok) {
+        pushLog("warn", `health body: ${("reason" in health && health.reason) || ""}`);
+      }
+
+      // 1. Prepare — hash file, compute CIDs for dedupe.
       setStage("prepare", "active");
+      pushLog("info", "computing local CIDv1 + CIDv0 (this hashes the whole file)…");
+      const tCid = Date.now();
       const cids = await computeCids(file);
+      pushLog("ok", `cid v1: ${cids.v1}`);
+      pushLog("info", `cid v0: ${cids.v0} (legacy hash)`);
+      pushLog("info", `local CID hashing took ${Date.now() - tCid}ms`);
       setStage("prepare", "done", `cid v1: ${cids.v1.slice(0, 14)}…`);
 
-      // Detect duplicate / already-pinned before paying for double upload.
+      // Dedupe — has this CID been uploaded before?
+      pushLog("info", "checking videos table for an existing row with this CID…");
       const hit = await lookupCid({ data: { cidV1: cids.v1, cidV0: cids.v0 } });
       if (hit) {
-        // Already pinned to Pinata. Still need to push to S3 for transcoding.
-        setStage("pin-original", "skipped", "Already pinned to IPFS");
-      }
-
-      // 2. Pin original via Worker → Pinata (if not already pinned).
-      let pinnedCid = hit?.cid ?? null;
-      let pinnedSize = file.size;
-      if (!pinnedCid) {
-        setStage("pin-original", "active");
-        const safeName = sanitizeFilename(file.name);
-        const r = await postToPinataViaWorker(file, safeName, setPinProgress);
-        pinnedCid = r.cid;
-        pinnedSize = r.size;
-        setStage("pin-original", "done", `cid: ${pinnedCid.slice(0, 14)}…`);
-      }
-
-      // 3. Upload same bytes to S3 (only if AWS configured).
-      const { configured } = await checkConfig();
-      if (configured) {
-        setStage("s3-upload", "active");
-        const ct = file.type || "video/mp4";
-        const { url, bucket, key } = await getS3Url({ data: { cid: pinnedCid, contentType: ct } });
-        await putWithProgress(url, file, ct, setS3Progress);
-        setStage("s3-upload", "done", `s3://${bucket}/${key}`);
+        pushLog("warn", `duplicate hit: video already exists with cid ${hit.cid}`);
       } else {
-        setStage("s3-upload", "skipped", "AWS pipeline not provisioned yet");
+        pushLog("ok", "no existing video found — fresh upload");
+      }
+
+      // 2. S3 upload — push the file to the MediaConvert input bucket.
+      setStage("s3-upload", "active");
+      const ct = file.type || "video/mp4";
+      pushLog("info", `requesting presigned S3 PUT for content-type=${ct}…`);
+      const { url: s3Url, bucket, key } = await getS3Url({
+        data: { cid: cids.v1, contentType: ct },
+      });
+      pushLog("ok", `presigned url received · bucket=${bucket} · key=${key}`);
+      pushLog("info", `uploading ${formatBytes(file.size)} to s3://${bucket}/${key}…`);
+      const tUp = Date.now();
+      await putWithProgress(s3Url, file, ct, (p) => {
+        setS3Progress(p);
+      });
+      const upMs = Date.now() - tUp;
+      const mbps = ((file.size / (1024 * 1024)) / (upMs / 1000)).toFixed(2);
+      pushLog("ok", `S3 PUT complete in ${upMs}ms (${mbps} MiB/s)`);
+      setStage("s3-upload", "done", `s3://${bucket}/${key}`);
+
+      // 3. Pin S3 → self-hosted IPFS via Lambda.
+      setStage("pin-ipfs", "active");
+      pushLog("info", `calling IPFS Lambda POST /pin · bucket=${bucket} · keys=[${key}]…`);
+      const tPin = Date.now();
+      const pinned = await pinFromS3({
+        data: { bucket, keys: [key] },
+      });
+      pushLog("ok", `lambda responded in ${Date.now() - tPin}ms · server-measured: ${pinned.durationMs}ms`);
+      pushLog("info", `wrap dir cid: ${pinned.wrapCid}`);
+      pushLog("info", `inner file cid: ${pinned.fileCid ?? "(none)"} · files: ${pinned.files} · bytes: ${pinned.totalBytes}`);
+      for (const m of pinned.manifest.slice(0, 5)) {
+        pushLog("info", `  · ${m.path} → ${m.cid} (${m.size}B)`);
+      }
+
+      // Sanity-check the inner CID matches the locally computed v1 CID.
+      const canonicalCid = pinned.fileCid ?? cids.v1;
+      if (pinned.fileCid && pinned.fileCid !== cids.v1) {
+        pushLog("warn", `inner cid ${pinned.fileCid} != local cid ${cids.v1} — using inner. (chunker mismatch?)`);
+      } else {
+        pushLog("ok", `inner cid matches local v1 cid ✓`);
+      }
+      setStage("pin-ipfs", "done", `cid: ${canonicalCid.slice(0, 14)}… · wrap: ${pinned.wrapCid.slice(0, 14)}…`);
+
+      if (ipfsCfg.gateway) {
+        pushLog("info", `gateway URL: https://${ipfsCfg.gateway}/ipfs/${canonicalCid}`);
       }
 
       // 4. Register video row + stamp chain.
       setStage("register", "active");
+      pushLog("info", `registering video row · title="${title}" · wallet=${address ?? "(anonymous)"}`);
+      const tReg = Date.now();
       const result = await register({
         data: {
           wallet: address ?? undefined,
-          cid: pinnedCid,
+          cid: canonicalCid,
           title,
           description,
-          sizeBytes: pinnedSize || file.size,
+          sizeBytes: file.size,
           mimeType: file.type || "video/mp4",
           months: 1,
           thumbnailCid: thumbnailCid ?? undefined,
           nsfw,
         },
       });
+      pushLog("ok", `register OK in ${Date.now() - tReg}ms · cid=${result.cid} · chainStatus=${result.chainStatus}`);
       setStage(
         "register",
         "done",
@@ -317,38 +386,36 @@ function Upload2Page() {
       qc.invalidateQueries({ queryKey: ["recent-videos"] });
       setResultCid(result.cid);
 
-      // 5. Kick off MediaConvert (gated on config).
-      if (configured) {
-        setStage("transcode", "active", "queueing MediaConvert job…");
-        try {
-          const { jobId } = await startTx({ data: { cid: pinnedCid } });
-          setStage("transcode", "active", `job ${jobId}`);
-          setStage("pin-hls", "active", "waiting for webhook…");
-        } catch (err) {
-          setStage(
-            "transcode",
-            "error",
-            err instanceof Error ? err.message : "Could not start transcode",
-          );
-        }
-      } else {
-        setStage("transcode", "skipped", "AWS pipeline not provisioned yet");
-        setStage("pin-hls", "skipped");
-        setStage("done", "done", "Original is live; HLS will come online once AWS is up");
+      // 5. Kick off MediaConvert.
+      setStage("transcode", "active", "queueing MediaConvert job…");
+      pushLog("info", "queueing MediaConvert HLS job…");
+      try {
+        const { jobId } = await startTx({ data: { cid: canonicalCid } });
+        pushLog("ok", `MediaConvert job queued · jobId=${jobId}`);
+        setStage("transcode", "active", `job ${jobId}`);
+        setStage("pin-hls", "active", "waiting for MediaConvert webhook…");
+        pushLog("step", "waiting for MediaConvert webhook (polling every 5s)…");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Could not start transcode";
+        pushLog("err", `startTranscode failed: ${msg}`);
+        setStage("transcode", "error", msg);
       }
     } catch (err) {
       console.error(err);
       const dup = parseDuplicateCidError(err);
       if (dup) {
+        pushLog("err", `duplicate CID — already on stream as "${dup.title}" (cid ${dup.cid})`);
         setDuplicate(dup);
         toast.error("This video is already on stream.");
       } else {
         const msg = err instanceof Error ? err.message : String(err);
+        pushLog("err", msg);
         setError(msg);
         toast.error(msg);
       }
     } finally {
       setRunning(false);
+      pushLog("step", "◼ pipeline run complete");
     }
   }
 
@@ -358,13 +425,14 @@ function Upload2Page() {
       <main className="mx-auto w-full max-w-3xl px-6 py-12 flex-1 space-y-8">
         <div>
           <div className="font-mono text-xs text-primary mb-3">
-            [ V2 UPLOAD · HLS PIPELINE · EXPERIMENTAL ]
+            [ V3 UPLOAD · S3 → SELF-HOSTED IPFS · VERBOSE ]
           </div>
-          <h1 className="text-4xl font-bold tracking-tight mb-2">Upload (v2)</h1>
+          <h1 className="text-4xl font-bold tracking-tight mb-2">Upload (v3)</h1>
           <p className="text-muted-foreground">
-            Pin the original to IPFS, push to S3, transcode to multi-bitrate HLS
-            on MediaConvert, then pin the HLS bundle back to IPFS. Each step
-            below lights up as it runs.
+            Pushes the file to S3 first, then asks our self-hosted IPFS
+            Lambda to pin it directly from S3 (no Pinata in the hot path).
+            MediaConvert builds an HLS ladder and the webhook pins the
+            HLS bundle back to IPFS. Every step is logged verbosely below.
           </p>
         </div>
 
@@ -501,12 +569,14 @@ function Upload2Page() {
         </form>
 
         {(running || resultCid || error) && (
-          <StageTracker
-            stages={stages}
-            detail={stageDetail}
-            s3Progress={s3Progress}
-            pinProgress={pinProgress}
-          />
+          <>
+            <StageTracker
+              stages={stages}
+              detail={stageDetail}
+              s3Progress={s3Progress}
+            />
+            <LogPanel log={log} boxRef={logBoxRef} />
+          </>
         )}
 
         {resultCid && (
@@ -518,8 +588,15 @@ function Upload2Page() {
             <p className="text-sm text-muted-foreground">
               The original is live now. HLS playback will appear on the v2
               page as soon as MediaConvert finishes and the webhook pins the
-              bundle back to IPFS.
+              bundle back to IPFS. You'll be auto-redirected when it's ready.
             </p>
+            <label className="flex items-center gap-2 font-mono text-xs">
+              <Checkbox
+                checked={autoNavigate}
+                onCheckedChange={(v) => setAutoNavigate(v === true)}
+              />
+              auto-navigate to /v2/{resultCid.slice(0, 10)}… when HLS is ready
+            </label>
             <div className="flex gap-2 flex-wrap">
               <Link to="/v2/$cid" params={{ cid: resultCid }}>
                 <Button size="sm" className="font-mono">
@@ -550,12 +627,10 @@ function StageTracker({
   stages,
   detail,
   s3Progress,
-  pinProgress,
 }: {
   stages: Record<StageKey, StageState>;
   detail: Partial<Record<StageKey, string>>;
   s3Progress: number;
-  pinProgress: number;
 }) {
   return (
     <div className="border border-border rounded-sm overflow-hidden">
@@ -592,9 +667,6 @@ function StageTracker({
                 <div className="font-mono text-[11px] text-muted-foreground">
                   {detail[s.key] ?? s.blurb}
                 </div>
-                {s.key === "pin-original" && state === "active" && (
-                  <Progress value={pinProgress} className="h-1 mt-1" />
-                )}
                 {s.key === "s3-upload" && state === "active" && (
                   <Progress value={s3Progress} className="h-1 mt-1" />
                 )}
@@ -603,6 +675,64 @@ function StageTracker({
           );
         })}
       </ol>
+    </div>
+  );
+}
+
+function LogPanel({
+  log,
+  boxRef,
+}: {
+  log: LogLine[];
+  boxRef: React.MutableRefObject<HTMLDivElement | null>;
+}) {
+  const copyAll = () => {
+    const text = log
+      .map((l) => `[+${(l.t / 1000).toFixed(2)}s] ${l.level.toUpperCase().padEnd(4)} ${l.msg}`)
+      .join("\n");
+    void navigator.clipboard?.writeText(text);
+    toast.success("Log copied to clipboard");
+  };
+  return (
+    <div className="border border-border rounded-sm overflow-hidden">
+      <div className="px-4 py-3 border-b border-border bg-card flex items-center justify-between">
+        <div className="flex items-center gap-2 font-mono text-xs text-primary">
+          <Terminal className="h-3 w-3" />
+          [ LIVE LOG · {log.length} LINES ]
+        </div>
+        <button
+          type="button"
+          onClick={copyAll}
+          disabled={log.length === 0}
+          className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary disabled:opacity-40 flex items-center gap-1"
+        >
+          <Copy className="h-3 w-3" /> copy
+        </button>
+      </div>
+      <div
+        ref={boxRef}
+        className="bg-black text-green-300 font-mono text-[11px] leading-relaxed p-4 h-72 overflow-auto"
+      >
+        {log.length === 0 ? (
+          <div className="text-muted-foreground">// no log entries yet</div>
+        ) : (
+          log.map((l, i) => {
+            const color =
+              l.level === "ok" ? "text-emerald-400"
+              : l.level === "err" ? "text-red-400"
+              : l.level === "warn" ? "text-amber-300"
+              : l.level === "step" ? "text-cyan-300 font-bold"
+              : "text-green-300";
+            return (
+              <div key={i} className="whitespace-pre-wrap break-all">
+                <span className="text-muted-foreground">[+{(l.t / 1000).toFixed(2)}s]</span>{" "}
+                <span className={color}>{l.level.toUpperCase().padEnd(4)}</span>{" "}
+                <span className={color}>{l.msg}</span>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
