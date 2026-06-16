@@ -478,6 +478,11 @@ function ManagePageInner() {
                           {v.status === "stamp_failed" && (
                             <RetryStampButton cid={v.cid} wallet={address!} />
                           )}
+                          {!v.hls_cid &&
+                            (v.transcode_status === "processing" ||
+                              v.transcode_status === "failed") && (
+                              <RetryTranscodeButton cid={v.cid} wallet={address!} />
+                            )}
                           <ToggleVisibilityButton
                             cid={v.cid}
                             wallet={address!}
