@@ -25,6 +25,7 @@ import {
   getOwnershipChallenge,
   submitOwnershipProof,
   retryOwnStamp,
+  retryOwnTranscode,
   buildBulkExtendQuote,
   verifyBulkExtensionTx,
   setVideoVisibility,
@@ -145,6 +146,43 @@ function RetryStampButton({ cid, wallet }: { cid: string; wallet: string }) {
     >
       {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
       <span className="ml-1">retry stamp</span>
+    </Button>
+  );
+}
+
+function RetryTranscodeButton({ cid, wallet }: { cid: string; wallet: string }) {
+  const qc = useQueryClient();
+  const retry = useServerFn(retryOwnTranscode);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="font-mono"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const res = await retry({ data: { wallet, cid } });
+          if (res.ok) {
+            if ("alreadyTranscoded" in res && res.alreadyTranscoded) {
+              toast.success("Already transcoded");
+            } else {
+              toast.success("Transcoding restarted");
+            }
+            qc.invalidateQueries({ queryKey: ["my-videos"] });
+          } else {
+            toast.error("Retry failed");
+          }
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Retry failed");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+      <span className="ml-1">retry transcode</span>
     </Button>
   );
 }
@@ -440,6 +478,11 @@ function ManagePageInner() {
                           {v.status === "stamp_failed" && (
                             <RetryStampButton cid={v.cid} wallet={address!} />
                           )}
+                          {!v.hls_cid &&
+                            (v.transcode_status === "processing" ||
+                              v.transcode_status === "failed") && (
+                              <RetryTranscodeButton cid={v.cid} wallet={address!} />
+                            )}
                           <ToggleVisibilityButton
                             cid={v.cid}
                             wallet={address!}
