@@ -1,5 +1,5 @@
 // Reusable S3 → IPFS Lambda → MediaConvert pipeline.
-// Extracted from /upload2 so /upload3 can drop it inside a tab without
+// Extracted from /upload so the page can use it inside a tab without
 // duplicating ~600 lines of pipeline logic.
 
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -59,7 +59,7 @@ import {
   type DuplicateCidInfo,
 } from "@/lib/duplicate-cid";
 
-const INFLIGHT_KEY = "txc:upload2-inflight";
+const INFLIGHT_KEY = "txc:upload-inflight";
 interface InflightJob {
   cid: string;
   jobId?: string;
