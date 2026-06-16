@@ -272,6 +272,18 @@ function UploadPage() {
     }
     setDuplicate(null);
 
+    // If the thumbnail picker is still capturing/pinning, wait briefly
+    // so the chosen CID actually gets attached to the videos row.
+    // Without this, clicking Upload mid-pin pins the thumbnail to IPFS
+    // but register() runs with thumbnailCid=null and the picture is lost.
+    if (thumbPinning) {
+      toast("Waiting for thumbnail to finish pinning…");
+      const start = Date.now();
+      while (thumbPinning && Date.now() - start < 30_000) {
+        await new Promise((r) => setTimeout(r, 150));
+      }
+    }
+
     try {
       // 1. Reuse the CID + IPFS check computed when the file was selected.
       //    Falls back to recomputing if the user submitted before the
@@ -296,7 +308,7 @@ function UploadPage() {
             title,
             description,
             months,
-            thumbnailCid: thumbnailCid ?? undefined,
+            thumbnailCid: thumbnailCidRef.current ?? thumbnailCid ?? undefined,
             nsfw,
           },
         });
@@ -329,7 +341,7 @@ function UploadPage() {
           sizeBytes: pinResult.size || file.size,
           mimeType: file.type || "video/mp4",
           months,
-          thumbnailCid: thumbnailCid ?? undefined,
+          thumbnailCid: thumbnailCidRef.current ?? thumbnailCid ?? undefined,
           nsfw,
         },
       });
