@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { zodValidator } from "@tanstack/zod-adapter";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { VideoPlayerV2 } from "@/components/VideoPlayerV2";
@@ -22,10 +22,10 @@ import { formatBytes, formatDate } from "@/lib/fees";
 
 const v2Search = z.object({
   // Override the HLS directory CID (skip DB lookup of hls_cid).
-  hls: fallback(z.string().min(10).optional(), undefined),
+  hls: z.string().min(10).optional().catch(undefined),
   // Override the playlist filename within that directory.
   // Defaults to "master.m3u8" when omitted.
-  playlist: fallback(z.string().min(1).optional(), undefined),
+  playlist: z.string().min(1).optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/v2/$cid")({
