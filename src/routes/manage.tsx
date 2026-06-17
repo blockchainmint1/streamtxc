@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Header } from "@/components/Header";
@@ -52,7 +52,7 @@ import {
   EyeOff,
   CloudUpload,
 } from "lucide-react";
-import { CheckCircle2, Film, Clock } from "lucide-react";
+import { CheckCircle2, Film, Clock, ArrowUp, ArrowDown, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationPrefs } from "@/components/NotificationPrefs";
 
@@ -356,6 +356,90 @@ function ManagePageInner() {
     (v) => !v.owner_wallet || v.owner_proof_status !== "verified",
   );
 
+  // Sorting + pagination state for the videos table.
+  type SortKey = "title" | "size_bytes" | "view_count" | "status" | "expires_at";
+  const [sortKey, setSortKey] = useState<SortKey>("expires_at");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "view_count" || key === "size_bytes" ? "desc" : "asc");
+    }
+    setPage(1);
+  };
+
+  const sortedVideos = useMemo(() => {
+    if (!videos) return [] as NonNullable<typeof videos>;
+    const arr = [...videos] as NonNullable<typeof videos>;
+    const dir = sortDir === "asc" ? 1 : -1;
+    arr.sort((a, b) => {
+      let av: number | string;
+      let bv: number | string;
+      switch (sortKey) {
+        case "title":
+          av = (a.title ?? "").toLowerCase();
+          bv = (b.title ?? "").toLowerCase();
+          break;
+        case "size_bytes":
+          av = a.size_bytes ?? 0;
+          bv = b.size_bytes ?? 0;
+          break;
+        case "view_count":
+          av = a.view_count ?? 0;
+          bv = b.view_count ?? 0;
+          break;
+        case "status":
+          av = a.hidden_at ? "hidden" : (a.status ?? "");
+          bv = b.hidden_at ? "hidden" : (b.status ?? "");
+          break;
+        case "expires_at":
+        default:
+          av = new Date(a.expires_at).getTime();
+          bv = new Date(b.expires_at).getTime();
+      }
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
+    return arr;
+  }, [videos, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedVideos.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedVideos = sortedVideos.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  function SortHeader({ label, k }: { label: string; k: SortKey }) {
+    const active = sortKey === k;
+    const Icon = !active ? ChevronsUpDown : sortDir === "asc" ? ArrowUp : ArrowDown;
+    return (
+      <th className="text-left px-4 py-3">
+        <button
+          type="button"
+          onClick={() => toggleSort(k)}
+          className={
+            "inline-flex items-center gap-1 hover:text-foreground transition-colors " +
+            (active ? "text-foreground" : "")
+          }
+        >
+          {label}
+          <Icon className="h-3 w-3 opacity-70" />
+        </button>
+      </th>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -447,26 +531,21 @@ function ManagePageInner() {
             </Link>
           </div>
         ) : (
+          <>
           <div className="border border-border rounded-sm overflow-x-auto">
             <table className="w-full text-sm min-w-[800px]">
               <thead className="bg-card font-mono text-xs text-muted-foreground">
                 <tr>
-                  <th className="text-left px-4 py-3">Title</th>
-                  <th className="text-left px-4 py-3">Size</th>
-                  <th className="text-left px-4 py-3">Views</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                  <th className="text-left px-4 py-3">Expires</th>
+                  <SortHeader label="Title" k="title" />
+                  <SortHeader label="Size" k="size_bytes" />
+                  <SortHeader label="Views" k="view_count" />
+                  <SortHeader label="Status" k="status" />
+                  <SortHeader label="Expires" k="expires_at" />
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
-                {[...videos]
-                  .sort(
-                    (a, b) =>
-                      new Date(a.expires_at).getTime() -
-                      new Date(b.expires_at).getTime(),
-                  )
-                  .map((v) => {
+                {pagedVideos.map((v) => {
                   const exp = new Date(v.expires_at);
                   const daysLeft = Math.ceil(
                     (exp.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
@@ -591,6 +670,56 @@ function ManagePageInner() {
               </tbody>
             </table>
           </div>
+          {sortedVideos.length > 0 && (
+            <div className="mt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 font-mono text-xs text-muted-foreground">
+              <div>
+                Showing {(currentPage - 1) * pageSize + 1}–
+                {Math.min(currentPage * pageSize, sortedVideos.length)} of{" "}
+                {sortedVideos.length}
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2">
+                  <span>Per page</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    className="bg-card border border-border rounded-sm px-2 py-1 text-foreground"
+                  >
+                    {[10, 25, 50, 100].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="font-mono h-7"
+                    disabled={currentPage <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    Prev
+                  </Button>
+                  <span className="px-2">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="font-mono h-7"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          </>
         )}
       </main>
       <Footer />
