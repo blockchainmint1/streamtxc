@@ -566,6 +566,9 @@ function ManagePageInner() {
                             wallet={address!}
                             hidden={!!v.hidden_at}
                           />
+                          {address === SELF_NODE_ADMIN_WALLET_PUBLIC && (
+                            <MirrorToSelfNodeButton cid={v.cid} wallet={address!} />
+                          )}
                           <EditVideoDialog
                             cid={v.cid}
                             initialTitle={v.title}
