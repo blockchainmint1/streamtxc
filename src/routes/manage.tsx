@@ -535,22 +535,16 @@ function ManagePageInner() {
             <table className="w-full text-sm min-w-[800px]">
               <thead className="bg-card font-mono text-xs text-muted-foreground">
                 <tr>
-                  <th className="text-left px-4 py-3">Title</th>
-                  <th className="text-left px-4 py-3">Size</th>
-                  <th className="text-left px-4 py-3">Views</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                  <th className="text-left px-4 py-3">Expires</th>
+                  <SortHeader label="Title" k="title" />
+                  <SortHeader label="Size" k="size_bytes" />
+                  <SortHeader label="Views" k="view_count" />
+                  <SortHeader label="Status" k="status" />
+                  <SortHeader label="Expires" k="expires_at" />
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
-                {[...videos]
-                  .sort(
-                    (a, b) =>
-                      new Date(a.expires_at).getTime() -
-                      new Date(b.expires_at).getTime(),
-                  )
-                  .map((v) => {
+                {pagedVideos.map((v) => {
                   const exp = new Date(v.expires_at);
                   const daysLeft = Math.ceil(
                     (exp.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
