@@ -272,6 +272,40 @@ function ToggleVisibilityButton({
   );
 }
 
+function MirrorToSelfNodeButton({ cid, wallet }: { cid: string; wallet: string }) {
+  const mirror = useServerFn(mirrorOwnToSelfNode);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      size="icon"
+      variant="outline"
+      className="font-mono h-7 w-7"
+      title="Mirror CIDs to honest.money self-node"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const res = await mirror({ data: { wallet, cid } });
+          if (res.ok) {
+            toast.success(`Mirrored ${res.pinned} CID${res.pinned === 1 ? "" : "s"}`);
+          } else {
+            const firstErr = res.results.find((r) => !r.ok)?.error ?? "unknown";
+            toast.warning(
+              `Mirrored ${res.pinned}, ${res.failed} failed — ${firstErr}`,
+            );
+          }
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Mirror failed");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <CloudUpload className="h-3 w-3" />}
+    </Button>
+  );
+}
+
 function ManagePageInner() {
   const { address } = useWallet();
   const fetchMine = useServerFn(listMyVideos);
