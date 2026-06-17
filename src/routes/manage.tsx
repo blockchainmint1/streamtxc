@@ -374,8 +374,8 @@ function ManagePageInner() {
   };
 
   const sortedVideos = useMemo(() => {
-    if (!videos) return [] as typeof videos;
-    const arr = [...videos];
+    if (!videos) return [] as NonNullable<typeof videos>;
+    const arr = [...videos] as NonNullable<typeof videos>;
     const dir = sortDir === "asc" ? 1 : -1;
     arr.sort((a, b) => {
       let av: number | string;
