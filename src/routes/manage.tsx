@@ -531,6 +531,7 @@ function ManagePageInner() {
             </Link>
           </div>
         ) : (
+          <>
           <div className="border border-border rounded-sm overflow-x-auto">
             <table className="w-full text-sm min-w-[800px]">
               <thead className="bg-card font-mono text-xs text-muted-foreground">
