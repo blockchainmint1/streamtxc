@@ -719,6 +719,7 @@ function ManagePageInner() {
               </div>
             </div>
           )}
+          </>
         )}
       </main>
       <Footer />
