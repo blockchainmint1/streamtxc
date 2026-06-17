@@ -669,6 +669,55 @@ function ManagePageInner() {
               </tbody>
             </table>
           </div>
+          {sortedVideos.length > 0 && (
+            <div className="mt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 font-mono text-xs text-muted-foreground">
+              <div>
+                Showing {(currentPage - 1) * pageSize + 1}–
+                {Math.min(currentPage * pageSize, sortedVideos.length)} of{" "}
+                {sortedVideos.length}
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2">
+                  <span>Per page</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    className="bg-card border border-border rounded-sm px-2 py-1 text-foreground"
+                  >
+                    {[10, 25, 50, 100].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="font-mono h-7"
+                    disabled={currentPage <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    Prev
+                  </Button>
+                  <span className="px-2">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="font-mono h-7"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         )}
       </main>
       <Footer />
