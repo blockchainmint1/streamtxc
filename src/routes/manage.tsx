@@ -356,6 +356,90 @@ function ManagePageInner() {
     (v) => !v.owner_wallet || v.owner_proof_status !== "verified",
   );
 
+  // Sorting + pagination state for the videos table.
+  type SortKey = "title" | "size_bytes" | "view_count" | "status" | "expires_at";
+  const [sortKey, setSortKey] = useState<SortKey>("expires_at");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "view_count" || key === "size_bytes" ? "desc" : "asc");
+    }
+    setPage(1);
+  };
+
+  const sortedVideos = useMemo(() => {
+    if (!videos) return [] as typeof videos;
+    const arr = [...videos];
+    const dir = sortDir === "asc" ? 1 : -1;
+    arr.sort((a, b) => {
+      let av: number | string;
+      let bv: number | string;
+      switch (sortKey) {
+        case "title":
+          av = (a.title ?? "").toLowerCase();
+          bv = (b.title ?? "").toLowerCase();
+          break;
+        case "size_bytes":
+          av = a.size_bytes ?? 0;
+          bv = b.size_bytes ?? 0;
+          break;
+        case "view_count":
+          av = a.view_count ?? 0;
+          bv = b.view_count ?? 0;
+          break;
+        case "status":
+          av = a.hidden_at ? "hidden" : (a.status ?? "");
+          bv = b.hidden_at ? "hidden" : (b.status ?? "");
+          break;
+        case "expires_at":
+        default:
+          av = new Date(a.expires_at).getTime();
+          bv = new Date(b.expires_at).getTime();
+      }
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
+    return arr;
+  }, [videos, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedVideos.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedVideos = sortedVideos.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  function SortHeader({ label, k }: { label: string; k: SortKey }) {
+    const active = sortKey === k;
+    const Icon = !active ? ChevronsUpDown : sortDir === "asc" ? ArrowUp : ArrowDown;
+    return (
+      <th className="text-left px-4 py-3">
+        <button
+          type="button"
+          onClick={() => toggleSort(k)}
+          className={
+            "inline-flex items-center gap-1 hover:text-foreground transition-colors " +
+            (active ? "text-foreground" : "")
+          }
+        >
+          {label}
+          <Icon className="h-3 w-3 opacity-70" />
+        </button>
+      </th>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
