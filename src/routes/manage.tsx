@@ -31,7 +31,6 @@ import {
   verifyBulkExtensionTx,
   setVideoVisibility,
   mirrorOwnToSelfNode,
-  SELF_NODE_ADMIN_WALLET_PUBLIC,
 } from "@/lib/videos.functions";
 import { useWallet, isSignableOwnershipTxcAddress } from "@/lib/wallet";
 import { listAnonUploads, removeAnonUpload, subscribeToAnonUploads } from "@/lib/anon-uploads";
@@ -566,9 +565,7 @@ function ManagePageInner() {
                             wallet={address!}
                             hidden={!!v.hidden_at}
                           />
-                          {address === SELF_NODE_ADMIN_WALLET_PUBLIC && (
-                            <MirrorToSelfNodeButton cid={v.cid} wallet={address!} />
-                          )}
+                          <MirrorToSelfNodeButton cid={v.cid} wallet={address!} />
                           <EditVideoDialog
                             cid={v.cid}
                             initialTitle={v.title}

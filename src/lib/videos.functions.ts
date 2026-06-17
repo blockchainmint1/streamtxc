@@ -2305,9 +2305,6 @@ export const mirrorOwnToSelfNode = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const wallet = context.wallet;
-    if (wallet !== SELF_NODE_ADMIN_WALLET) {
-      throw new Error("Forbidden");
-    }
     const { data: v, error } = await supabaseAdmin
       .from("videos")
       .select("cid, hls_cid, metadata_cid, thumbnail_cid, title, owner_wallet")
