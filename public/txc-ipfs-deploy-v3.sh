@@ -8,6 +8,7 @@
 #   - An HTTP API Gateway in front of the Lambda with:
 #       POST /pin           (bearer auth, the main entrypoint)
 #       POST /pin-by-hash   (bearer auth, proxies to Pinata if PINATA_JWT set)
+#       POST /pin-cid       (bearer auth, pins an existing CID on our IPFS node)
 #       GET  /health        (no auth, returns {ok:true})
 #   - A CloudWatch log group with 30-day retention
 #   - A deploy-output.env file in $WORKDIR with every value Lovable needs
@@ -424,6 +425,9 @@ Resources:
   RoutePinByHash:
     Type: AWS::ApiGatewayV2::Route
     Properties: { ApiId: !Ref Api, RouteKey: "POST /pin-by-hash", Target: !Sub "integrations/${Integration}" }
+  RoutePinCid:
+    Type: AWS::ApiGatewayV2::Route
+    Properties: { ApiId: !Ref Api, RouteKey: "POST /pin-cid",     Target: !Sub "integrations/${Integration}" }
   RouteHealth:
     Type: AWS::ApiGatewayV2::Route
     Properties: { ApiId: !Ref Api, RouteKey: "GET /health",       Target: !Sub "integrations/${Integration}" }
@@ -466,6 +470,7 @@ exports.handler = async (event) => {
     if (auth !== `Bearer ${BEARER}`) return resp(401, { error: "unauthorized" });
     const body = JSON.parse(event.body || "{}");
     if (route === "POST /pin-by-hash") return await pinByHash(body);
+    if (route === "POST /pin-cid") return await pinCidOnNode(body);
     return await pinFromS3(body);
   } catch (err) {
     console.error(err);
@@ -572,6 +577,21 @@ async function pinByHash(body) {
   });
   const text = await r.text();
   return resp(r.ok ? 200 : 502, { ok: r.ok, status: r.status, response: safeJson(text) });
+}
+
+// Pin an already-existing CID on our self-hosted IPFS node via Kubo RPC.
+// Used to mirror Pinata-pinned CIDs to honest.money.
+async function pinCidOnNode(body) {
+  if (!IPFS_API) return resp(503, { error: "IPFS_API not configured" });
+  if (!body.cid) return resp(400, { error: "cid required" });
+  const url = `${IPFS_API}/api/v0/pin/add?arg=${encodeURIComponent(body.cid)}&recursive=true&progress=false`;
+  const r = await fetch(url, { method: "POST" });
+  const text = await r.text();
+  return resp(r.ok ? 200 : 502, {
+    ok: r.ok,
+    status: r.status,
+    response: safeJson(text),
+  });
 }
 
 async function listAll(bucket, prefix) {
