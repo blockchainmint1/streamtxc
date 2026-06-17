@@ -425,9 +425,6 @@ Resources:
   RoutePinByHash:
     Type: AWS::ApiGatewayV2::Route
     Properties: { ApiId: !Ref Api, RouteKey: "POST /pin-by-hash", Target: !Sub "integrations/${Integration}" }
-  RoutePinCid:
-    Type: AWS::ApiGatewayV2::Route
-    Properties: { ApiId: !Ref Api, RouteKey: "POST /pin-cid",     Target: !Sub "integrations/${Integration}" }
   RouteHealth:
     Type: AWS::ApiGatewayV2::Route
     Properties: { ApiId: !Ref Api, RouteKey: "GET /health",       Target: !Sub "integrations/${Integration}" }
@@ -692,6 +689,16 @@ aws cloudformation deploy --region "$AWS_REGION" --stack-name "${STACK}-lambda" 
 
 LAMBDA_NAME="$(aws cloudformation describe-stacks --region "$AWS_REGION" --stack-name "${STACK}-lambda" --query "Stacks[0].Outputs[?OutputKey=='LambdaName'].OutputValue" --output text)"
 API_URL="$(aws cloudformation describe-stacks --region "$AWS_REGION" --stack-name "${STACK}-lambda" --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text)"
+
+echo "=== Ensuring /pin-cid route exists..."
+API_ID="$(aws cloudformation describe-stack-resource --region "$AWS_REGION" --stack-name "${STACK}-lambda" --logical-resource-id Api --query 'StackResourceDetail.PhysicalResourceId' --output text)"
+INTEGRATION_ID="$(aws cloudformation describe-stack-resource --region "$AWS_REGION" --stack-name "${STACK}-lambda" --logical-resource-id Integration --query 'StackResourceDetail.PhysicalResourceId' --output text)"
+PIN_CID_ROUTE_ID="$(aws apigatewayv2 get-routes --region "$AWS_REGION" --api-id "$API_ID" --query "Items[?RouteKey=='POST /pin-cid'].RouteId | [0]" --output text)"
+if [ -n "$PIN_CID_ROUTE_ID" ] && [ "$PIN_CID_ROUTE_ID" != "None" ]; then
+  aws apigatewayv2 update-route --region "$AWS_REGION" --api-id "$API_ID" --route-id "$PIN_CID_ROUTE_ID" --target "integrations/$INTEGRATION_ID" >/dev/null
+else
+  aws apigatewayv2 create-route --region "$AWS_REGION" --api-id "$API_ID" --route-key "POST /pin-cid" --target "integrations/$INTEGRATION_ID" >/dev/null
+fi
 
 echo "=== Publishing Lambda code..."
 (cd lambda && zip -q -r ../function.zip index.js)
