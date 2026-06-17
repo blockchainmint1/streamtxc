@@ -2330,8 +2330,9 @@ export const mirrorOwnToSelfNode = createServerFn({ method: "POST" })
     if (v.thumbnail_cid) targets.push({ cid: v.thumbnail_cid, label: `thumb:${v.cid}` });
 
     let pinned = 0;
+    let queued = 0;
     let failed = 0;
-    const results: Array<{ cid: string; label: string; ok: boolean; error?: string }> = [];
+    const results: Array<{ cid: string; label: string; ok: boolean; queued?: boolean; error?: string }> = [];
     for (const t of targets) {
       try {
         const res = await fetch(endpoint, {
@@ -2343,8 +2344,10 @@ export const mirrorOwnToSelfNode = createServerFn({ method: "POST" })
           body: JSON.stringify({ cid: t.cid, name: t.label }),
         });
         if (res.ok) {
-          pinned++;
-          results.push({ cid: t.cid, label: t.label, ok: true });
+          const isQueued = res.status === 202;
+          if (isQueued) queued++;
+          else pinned++;
+          results.push({ cid: t.cid, label: t.label, ok: true, queued: isQueued });
         } else {
           failed++;
           const text = await res.text().catch(() => "");
@@ -2366,7 +2369,7 @@ export const mirrorOwnToSelfNode = createServerFn({ method: "POST" })
       }
     }
 
-    return { ok: failed === 0, pinned, failed, results };
+    return { ok: failed === 0, pinned, queued, failed, results };
   });
 
 export const SELF_NODE_ADMIN_WALLET_PUBLIC = SELF_NODE_ADMIN_WALLET;
