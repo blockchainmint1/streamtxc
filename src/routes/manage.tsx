@@ -30,6 +30,8 @@ import {
   buildBulkExtendQuote,
   verifyBulkExtensionTx,
   setVideoVisibility,
+  mirrorOwnToSelfNode,
+  SELF_NODE_ADMIN_WALLET_PUBLIC,
 } from "@/lib/videos.functions";
 import { useWallet, isSignableOwnershipTxcAddress } from "@/lib/wallet";
 import { listAnonUploads, removeAnonUpload, subscribeToAnonUploads } from "@/lib/anon-uploads";
@@ -49,6 +51,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  CloudUpload,
 } from "lucide-react";
 import { CheckCircle2, Film, Clock } from "lucide-react";
 import { toast } from "sonner";
