@@ -201,7 +201,7 @@ export const getTranscodeStatus = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin
       .from("videos")
-      .select("transcode_status, transcode_job_id, transcode_error, hls_cid, renditions")
+      .select("transcode_status, transcode_job_id, transcode_error, transcode_started_at, hls_cid, renditions")
       .eq("cid", data.cid)
       .maybeSingle();
     if (error) throw error;
