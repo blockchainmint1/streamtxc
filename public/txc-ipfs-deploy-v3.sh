@@ -585,13 +585,30 @@ async function pinCidOnNode(body) {
   if (!IPFS_API) return resp(503, { error: "IPFS_API not configured" });
   if (!body.cid) return resp(400, { error: "cid required" });
   const url = `${IPFS_API}/api/v0/pin/add?arg=${encodeURIComponent(body.cid)}&recursive=true&progress=false`;
-  const r = await fetch(url, { method: "POST" });
-  const text = await r.text();
-  return resp(r.ok ? 200 : 502, {
-    ok: r.ok,
-    status: r.status,
-    response: safeJson(text),
-  });
+  const controller = new AbortController();
+  const SOFT_TIMEOUT_MS = 20000;
+  const timer = setTimeout(() => controller.abort(), SOFT_TIMEOUT_MS);
+  try {
+    const r = await fetch(url, { method: "POST", signal: controller.signal });
+    clearTimeout(timer);
+    const text = await r.text();
+    return resp(r.ok ? 200 : 502, {
+      ok: r.ok,
+      status: r.status,
+      response: safeJson(text),
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    if (err && err.name === "AbortError") {
+      return resp(202, {
+        ok: true,
+        queued: true,
+        cid: body.cid,
+        message: "pin started; still fetching on node",
+      });
+    }
+    return resp(502, { ok: false, error: String(err?.message || err) });
+  }
 }
 
 async function listAll(bucket, prefix) {
