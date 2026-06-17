@@ -132,13 +132,36 @@ async function pinCidOnNode(body) {
   if (!IPFS_API) return resp(503, { error: "IPFS_API not configured" });
   if (!body.cid) return resp(400, { error: "cid required" });
   const url = `${IPFS_API}/api/v0/pin/add?arg=${encodeURIComponent(body.cid)}&recursive=true&progress=false`;
-  const r = await fetch(url, { method: "POST" });
-  const text = await r.text();
-  return resp(r.ok ? 200 : 502, {
-    ok: r.ok,
-    status: r.status,
-    response: safeJson(text),
-  });
+  // Kubo's /pin/add blocks until the whole DAG is fetched, which can take
+  // minutes for large CIDs and easily exceeds API Gateway's 30s timeout.
+  // Race the request against a short timeout: if it finishes fast, return
+  // the result; otherwise return 202 and let the node keep fetching in the
+  // background (Kubo continues the pin even after the HTTP client drops).
+  const controller = new AbortController();
+  const SOFT_TIMEOUT_MS = 20000;
+  const timer = setTimeout(() => controller.abort(), SOFT_TIMEOUT_MS);
+  try {
+    const r = await fetch(url, { method: "POST", signal: controller.signal });
+    clearTimeout(timer);
+    const text = await r.text();
+    return resp(r.ok ? 200 : 502, {
+      ok: r.ok,
+      status: r.status,
+      response: safeJson(text),
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    if (err && err.name === "AbortError") {
+      // Pin is still in progress on the node. Caller can poll /pin/ls later.
+      return resp(202, {
+        ok: true,
+        queued: true,
+        cid: body.cid,
+        message: "pin started; still fetching on node",
+      });
+    }
+    return resp(502, { ok: false, error: String(err?.message || err) });
+  }
 }
 
 async function listAll(bucket, prefix) {
