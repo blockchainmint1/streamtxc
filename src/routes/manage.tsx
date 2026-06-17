@@ -31,7 +31,6 @@ import {
   verifyBulkExtensionTx,
   setVideoVisibility,
   mirrorOwnToSelfNode,
-  SELF_NODE_ADMIN_WALLET_PUBLIC,
 } from "@/lib/videos.functions";
 import { useWallet, isSignableOwnershipTxcAddress } from "@/lib/wallet";
 import { listAnonUploads, removeAnonUpload, subscribeToAnonUploads } from "@/lib/anon-uploads";
