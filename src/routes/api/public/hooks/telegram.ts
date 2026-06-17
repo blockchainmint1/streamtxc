@@ -113,7 +113,16 @@ export const Route = createFileRoute("/api/public/hooks/telegram")({
             );
             return Response.json({ ok: true });
           }
+          // Detach this chat from any other wallet first — telegram_chat_id
+          // is UNIQUE, so re-pairing the same Telegram account to a new
+          // wallet would otherwise silently violate the constraint and the
+          // pairing would never persist.
           await (supabaseAdmin as any)
+            .from("wallet_notification_prefs")
+            .update({ telegram_chat_id: null, telegram_username: null })
+            .eq("telegram_chat_id", chatId)
+            .neq("wallet", row.wallet);
+          const { error: updErr } = await (supabaseAdmin as any)
             .from("wallet_notification_prefs")
             .update({
               telegram_chat_id: chatId,
@@ -122,6 +131,14 @@ export const Route = createFileRoute("/api/public/hooks/telegram")({
               telegram_pairing_expires_at: null,
             })
             .eq("wallet", row.wallet);
+          if (updErr) {
+            console.error("[telegram] pair update failed", updErr);
+            await reply(
+              chatId,
+              "⚠️ Pairing hit a database error. Try generating a fresh code.",
+            );
+            return Response.json({ ok: false, error: updErr.message });
+          }
           await reply(
             chatId,
             `✅ Paired with wallet <code>${row.wallet}</code>.\n\nYou'll get a heads-up before any of your videos expire. Send <code>/stop</code> here to unsubscribe.`,

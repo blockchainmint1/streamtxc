@@ -17,6 +17,7 @@ exports.handler = async (event) => {
     if (auth !== `Bearer ${BEARER}`) return resp(401, { error: "unauthorized" });
     const body = JSON.parse(event.body || "{}");
     if (route === "POST /pin-by-hash") return await pinByHash(body);
+    if (route === "POST /pin-cid") return await pinCidOnNode(body);
     return await pinFromS3(body);
   } catch (err) {
     console.error(err);
@@ -123,6 +124,21 @@ async function pinByHash(body) {
   });
   const text = await r.text();
   return resp(r.ok ? 200 : 502, { ok: r.ok, status: r.status, response: safeJson(text) });
+}
+
+// Pin an already-existing CID on our self-hosted IPFS node via Kubo RPC.
+// Used to mirror Pinata-pinned CIDs to honest.money.
+async function pinCidOnNode(body) {
+  if (!IPFS_API) return resp(503, { error: "IPFS_API not configured" });
+  if (!body.cid) return resp(400, { error: "cid required" });
+  const url = `${IPFS_API}/api/v0/pin/add?arg=${encodeURIComponent(body.cid)}&recursive=true&progress=false`;
+  const r = await fetch(url, { method: "POST" });
+  const text = await r.text();
+  return resp(r.ok ? 200 : 502, {
+    ok: r.ok,
+    status: r.status,
+    response: safeJson(text),
+  });
 }
 
 async function listAll(bucket, prefix) {

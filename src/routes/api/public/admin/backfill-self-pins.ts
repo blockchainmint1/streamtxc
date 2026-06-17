@@ -48,7 +48,7 @@ export const Route = createFileRoute("/api/public/admin/backfill-self-pins")({
           return Response.json({ ok: false, error: error.message }, { status: 500 });
         }
 
-        const endpoint = `${lambdaUrl.replace(/\/$/, "")}/pin-by-hash`;
+        const endpoint = `${lambdaUrl.replace(/\/$/, "")}/pin-cid`;
         async function mirror(cid: string, name: string): Promise<"ok" | "fail"> {
           try {
             const res = await fetch(endpoint, {

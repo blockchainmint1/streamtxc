@@ -21,7 +21,7 @@ async function alsoPinToSelfNode(cid: string, name?: string): Promise<void> {
   const lambdaToken = process.env.IPFS_LAMBDA_TOKEN;
   if (!lambdaUrl || !lambdaToken) return;
   try {
-    const res = await fetch(`${lambdaUrl.replace(/\/$/, "")}/pin-by-hash`, {
+    const res = await fetch(`${lambdaUrl.replace(/\/$/, "")}/pin-cid`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${lambdaToken}`,
