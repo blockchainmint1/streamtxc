@@ -299,6 +299,17 @@ export function S3VideoUpload({
           setStage("pin-hls", "active", "pinning HLS bundle to IPFS…");
           pinTriggered = true;
           pushLog("info", `pin poll → pinning (job ${row?.transcode_job_id ?? "?"})`);
+          const jobId = row?.transcode_job_id;
+          const startedAt = row?.transcode_started_at ? Date.parse(row.transcode_started_at) : 0;
+          if (jobId && startedAt && Date.now() - startedAt > 10 * 60 * 1000) {
+            try {
+              pushLog("warn", "pinning has been running over 10 minutes — re-kicking async HLS pin…");
+              const res = await kickPin({ data: { cid: resultCid!, jobId } });
+              pushLog("ok", `async pin re-kicked · ${res.files} files`);
+            } catch (err) {
+              pushLog("warn", `async pin re-kick failed: ${err instanceof Error ? err.message : String(err)}`);
+            }
+          }
         } else if (st === "complete" || st === "ready") {
           setStage("transcode", "done");
           setStage("pin-hls", "done", row?.hls_cid ? `hls cid: ${row.hls_cid}` : undefined);
