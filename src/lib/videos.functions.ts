@@ -20,6 +20,13 @@ import { retryStuckStampForVideo } from "./stamp-retry.server";
 import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES, MAX_S3_UPLOAD_BYTES, PAYMENT_GRACE_HOURS } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
 
+/**
+ * Admin wallet allowed to mirror any owned video's CIDs to the self-hosted
+ * IPFS node from the manage UI. Kept here (not in env) because it gates a
+ * UI button, not a secret. Owner check still applies on top.
+ */
+const SELF_NODE_ADMIN_WALLET = "TeiqbqMxQG4JrDfrzdvTZcqhhai8KT5JTc";
+
 // Accepts either an EVM-style 0x… (legacy mock-wallet rows) or a real TXC
 // base58 address (LTC clone — starts with L/M/T/3 etc. or bech32 txc1…).
 // Kept permissive so existing 0x rows in the DB keep working while the new
