@@ -37,6 +37,7 @@ import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/pub
 import { Route as ApiPublicHooksIpfsPinCompleteRouteImport } from './routes/api/public/hooks/ipfs-pin-complete'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
 import { Route as ApiPublicAdminFinalizeHlsRouteImport } from './routes/api/public/admin/finalize-hls'
+import { Route as ApiPublicAdminBackfillSelfPinsRouteImport } from './routes/api/public/admin/backfill-self-pins'
 
 const UploadAwsRoute = UploadAwsRouteImport.update({
   id: '/upload-aws',
@@ -185,6 +186,12 @@ const ApiPublicAdminFinalizeHlsRoute =
     path: '/public/admin/finalize-hls',
     getParentRoute: () => ApiRoute,
   } as any)
+const ApiPublicAdminBackfillSelfPinsRoute =
+  ApiPublicAdminBackfillSelfPinsRouteImport.update({
+    id: '/public/admin/backfill-self-pins',
+    path: '/public/admin/backfill-self-pins',
+    getParentRoute: () => ApiRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -207,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
   '/v/$cid/restore': typeof VCidRestoreRoute
+  '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
@@ -237,6 +245,7 @@ export interface FileRoutesByTo {
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
   '/v/$cid/restore': typeof VCidRestoreRoute
+  '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
@@ -268,6 +277,7 @@ export interface FileRoutesById {
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
   '/v/$cid/restore': typeof VCidRestoreRoute
+  '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
@@ -300,6 +310,7 @@ export interface FileRouteTypes {
     | '/api/public/upload'
     | '/api/stream/$cid'
     | '/v/$cid/restore'
+    | '/api/public/admin/backfill-self-pins'
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/ipfs-pin-complete'
@@ -330,6 +341,7 @@ export interface FileRouteTypes {
     | '/api/public/upload'
     | '/api/stream/$cid'
     | '/v/$cid/restore'
+    | '/api/public/admin/backfill-self-pins'
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/ipfs-pin-complete'
@@ -360,6 +372,7 @@ export interface FileRouteTypes {
     | '/api/public/upload'
     | '/api/stream/$cid'
     | '/v/$cid/restore'
+    | '/api/public/admin/backfill-self-pins'
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/ipfs-pin-complete'
@@ -585,6 +598,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAdminFinalizeHlsRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/public/admin/backfill-self-pins': {
+      id: '/api/public/admin/backfill-self-pins'
+      path: '/public/admin/backfill-self-pins'
+      fullPath: '/api/public/admin/backfill-self-pins'
+      preLoaderRoute: typeof ApiPublicAdminBackfillSelfPinsRouteImport
+      parentRoute: typeof ApiRoute
+    }
   }
 }
 
@@ -606,6 +626,7 @@ interface ApiRouteChildren {
   ApiPublicTxcVerifyMessageRoute: typeof ApiPublicTxcVerifyMessageRoute
   ApiPublicUploadRoute: typeof ApiPublicUploadRoute
   ApiStreamCidRoute: typeof ApiStreamCidRouteWithChildren
+  ApiPublicAdminBackfillSelfPinsRoute: typeof ApiPublicAdminBackfillSelfPinsRoute
   ApiPublicAdminFinalizeHlsRoute: typeof ApiPublicAdminFinalizeHlsRoute
   ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
   ApiPublicHooksIpfsPinCompleteRoute: typeof ApiPublicHooksIpfsPinCompleteRoute
@@ -621,6 +642,7 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiPublicTxcVerifyMessageRoute: ApiPublicTxcVerifyMessageRoute,
   ApiPublicUploadRoute: ApiPublicUploadRoute,
   ApiStreamCidRoute: ApiStreamCidRouteWithChildren,
+  ApiPublicAdminBackfillSelfPinsRoute: ApiPublicAdminBackfillSelfPinsRoute,
   ApiPublicAdminFinalizeHlsRoute: ApiPublicAdminFinalizeHlsRoute,
   ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
   ApiPublicHooksIpfsPinCompleteRoute: ApiPublicHooksIpfsPinCompleteRoute,
