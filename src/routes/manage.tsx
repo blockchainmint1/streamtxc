@@ -30,6 +30,8 @@ import {
   buildBulkExtendQuote,
   verifyBulkExtensionTx,
   setVideoVisibility,
+  mirrorOwnToSelfNode,
+  SELF_NODE_ADMIN_WALLET_PUBLIC,
 } from "@/lib/videos.functions";
 import { useWallet, isSignableOwnershipTxcAddress } from "@/lib/wallet";
 import { listAnonUploads, removeAnonUpload, subscribeToAnonUploads } from "@/lib/anon-uploads";
@@ -49,6 +51,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  CloudUpload,
 } from "lucide-react";
 import { CheckCircle2, Film, Clock } from "lucide-react";
 import { toast } from "sonner";
@@ -265,6 +268,40 @@ function ToggleVisibilityButton({
       ) : (
         <Eye className="h-3 w-3" />
       )}
+    </Button>
+  );
+}
+
+function MirrorToSelfNodeButton({ cid, wallet }: { cid: string; wallet: string }) {
+  const mirror = useServerFn(mirrorOwnToSelfNode);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      size="icon"
+      variant="outline"
+      className="font-mono h-7 w-7"
+      title="Mirror CIDs to honest.money self-node"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const res = await mirror({ data: { wallet, cid } });
+          if (res.ok) {
+            toast.success(`Mirrored ${res.pinned} CID${res.pinned === 1 ? "" : "s"}`);
+          } else {
+            const firstErr = res.results.find((r) => !r.ok)?.error ?? "unknown";
+            toast.warning(
+              `Mirrored ${res.pinned}, ${res.failed} failed — ${firstErr}`,
+            );
+          }
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Mirror failed");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <CloudUpload className="h-3 w-3" />}
     </Button>
   );
 }
@@ -529,6 +566,9 @@ function ManagePageInner() {
                             wallet={address!}
                             hidden={!!v.hidden_at}
                           />
+                          {address === SELF_NODE_ADMIN_WALLET_PUBLIC && (
+                            <MirrorToSelfNodeButton cid={v.cid} wallet={address!} />
+                          )}
                           <EditVideoDialog
                             cid={v.cid}
                             initialTitle={v.title}

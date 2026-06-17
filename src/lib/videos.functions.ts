@@ -20,6 +20,13 @@ import { retryStuckStampForVideo } from "./stamp-retry.server";
 import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES, MAX_S3_UPLOAD_BYTES, PAYMENT_GRACE_HOURS } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
 
+/**
+ * Admin wallet allowed to mirror any owned video's CIDs to the self-hosted
+ * IPFS node from the manage UI. Kept here (not in env) because it gates a
+ * UI button, not a secret. Owner check still applies on top.
+ */
+const SELF_NODE_ADMIN_WALLET = "TeiqbqMxQG4JrDfrzdvTZcqhhai8KT5JTc";
+
 // Accepts either an EVM-style 0x… (legacy mock-wallet rows) or a real TXC
 // base58 address (LTC clone — starts with L/M/T/3 etc. or bech32 txc1…).
 // Kept permissive so existing 0x rows in the DB keep working while the new
@@ -2279,3 +2286,90 @@ export const retryCommentPayout = createServerFn({ method: "POST" })
       throw new Error("Only the video owner can retry payouts");
     return await sweepCommentPayout(data.commentId);
   });
+
+/**
+ * Admin-only: mirror one video's CIDs (origin / hls / metadata / thumbnail)
+ * to our self-hosted IPFS node via the lambda's /pin-cid endpoint. Gated by
+ * both wallet ownership AND the SELF_NODE_ADMIN_WALLET allowlist so the UI
+ * button stays hidden / inert for everyone else.
+ */
+export const mirrorOwnToSelfNode = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
+  .inputValidator((input) =>
+    z
+      .object({
+        wallet: walletSchema,
+        cid: z.string().min(1).max(200),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const wallet = context.wallet;
+    if (wallet !== SELF_NODE_ADMIN_WALLET) {
+      throw new Error("Forbidden");
+    }
+    const { data: v, error } = await supabaseAdmin
+      .from("videos")
+      .select("cid, hls_cid, metadata_cid, thumbnail_cid, title, owner_wallet")
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!v) throw new Error("Video not found");
+    if (!ownerMatches(v.owner_wallet, wallet)) {
+      throw new Error("Not your video");
+    }
+
+    const lambdaUrl = process.env.IPFS_LAMBDA_URL;
+    const lambdaToken = process.env.IPFS_LAMBDA_TOKEN;
+    if (!lambdaUrl || !lambdaToken) {
+      throw new Error("Self-node lambda not configured");
+    }
+    const endpoint = `${lambdaUrl.replace(/\/$/, "")}/pin-cid`;
+
+    const targets: Array<{ cid: string; label: string }> = [];
+    if (v.cid) targets.push({ cid: v.cid, label: `origin:${v.title ?? v.cid}` });
+    if (v.hls_cid) targets.push({ cid: v.hls_cid, label: `hls:${v.cid}` });
+    if (v.metadata_cid) targets.push({ cid: v.metadata_cid, label: `meta:${v.cid}` });
+    if (v.thumbnail_cid) targets.push({ cid: v.thumbnail_cid, label: `thumb:${v.cid}` });
+
+    let pinned = 0;
+    let failed = 0;
+    const results: Array<{ cid: string; label: string; ok: boolean; error?: string }> = [];
+    for (const t of targets) {
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${lambdaToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ cid: t.cid, name: t.label }),
+        });
+        if (res.ok) {
+          pinned++;
+          results.push({ cid: t.cid, label: t.label, ok: true });
+        } else {
+          failed++;
+          const text = await res.text().catch(() => "");
+          results.push({
+            cid: t.cid,
+            label: t.label,
+            ok: false,
+            error: `${res.status} ${text}`.trim(),
+          });
+        }
+      } catch (err) {
+        failed++;
+        results.push({
+          cid: t.cid,
+          label: t.label,
+          ok: false,
+          error: err instanceof Error ? err.message : "fetch failed",
+        });
+      }
+    }
+
+    return { ok: failed === 0, pinned, failed, results };
+  });
+
+export const SELF_NODE_ADMIN_WALLET_PUBLIC = SELF_NODE_ADMIN_WALLET;
