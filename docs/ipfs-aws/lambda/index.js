@@ -17,6 +17,7 @@ exports.handler = async (event) => {
     if (auth !== `Bearer ${BEARER}`) return resp(401, { error: "unauthorized" });
     const body = JSON.parse(event.body || "{}");
     if (route === "POST /pin-by-hash") return await pinByHash(body);
+    if (route === "POST /pin-cid") return await pinCidOnNode(body);
     return await pinFromS3(body);
   } catch (err) {
     console.error(err);
