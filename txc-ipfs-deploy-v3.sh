@@ -26,6 +26,7 @@
 #   export EBS_GB=2000
 #   export IPFS_DOMAIN=ipfs.honest.money
 #   export VPC_ID=vpc-xxxx  PUBLIC_SUBNET=subnet-xxxx  PRIVATE_SUBNET=subnet-yyyy
+#   export BEARER_TOKEN=...  # optional; otherwise existing Lambda token is reused
 #   export PINATA_JWT=eyJ...   # optional, enables /pin-by-hash
 
 set -Eeuo pipefail
@@ -101,7 +102,18 @@ cleanup_bad_stack "${STACK}-lambda"
 cleanup_bad_stack "${STACK}-node"
 [ -z "$VPC_ID" ] && cleanup_bad_stack "${STACK}-vpc"
 
-BEARER_TOKEN="$(openssl rand -hex 32)"
+if [ -z "${BEARER_TOKEN:-}" ]; then
+  EXISTING_LAMBDA_NAME="$(aws cloudformation describe-stacks --region "$AWS_REGION" --stack-name "${STACK}-lambda" --query "Stacks[0].Outputs[?OutputKey=='LambdaName'].OutputValue" --output text 2>/dev/null || true)"
+  if [ -n "$EXISTING_LAMBDA_NAME" ] && [ "$EXISTING_LAMBDA_NAME" != "None" ]; then
+    BEARER_TOKEN="$(aws lambda get-function-configuration --region "$AWS_REGION" --function-name "$EXISTING_LAMBDA_NAME" --query 'Environment.Variables.BEARER_TOKEN' --output text 2>/dev/null || true)"
+  fi
+fi
+if [ -n "${BEARER_TOKEN:-}" ] && [ "$BEARER_TOKEN" != "None" ]; then
+  echo "Bearer token: reusing existing/provided token"
+else
+  BEARER_TOKEN="$(openssl rand -hex 32)"
+  echo "Bearer token: generated new token"
+fi
 
 # ───────────────────────────────────────────────────────────────
 # 01 VPC
