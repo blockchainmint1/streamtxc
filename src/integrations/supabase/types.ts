@@ -324,6 +324,42 @@ export type Database = {
           },
         ]
       }
+      video_drafts: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_nsfw: boolean
+          owner_token: string
+          thumbnail_cid: string | null
+          title: string
+          updated_at: string
+          wallet: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_nsfw?: boolean
+          owner_token: string
+          thumbnail_cid?: string | null
+          title?: string
+          updated_at?: string
+          wallet?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_nsfw?: boolean
+          owner_token?: string
+          thumbnail_cid?: string | null
+          title?: string
+          updated_at?: string
+          wallet?: string | null
+        }
+        Relationships: []
+      }
       video_reports: {
         Row: {
           created_at: string
@@ -364,11 +400,10 @@ export type Database = {
         Row: {
           block_hash: string | null
           block_number: number | null
-          cid: string | null
+          cid: string
           created_at: string
           derivation_index: number | null
           description: string | null
-          draft_owner_token: string | null
           duration_s: number | null
           escrowed_creator_txc: number
           expires_at: string
@@ -379,7 +414,6 @@ export type Database = {
           hidden_reason: string | null
           hls_cid: string | null
           hosting_credit_txc: number
-          id: string
           is_nsfw: boolean
           metadata_cid: string | null
           mime_type: string | null
@@ -421,11 +455,10 @@ export type Database = {
         Insert: {
           block_hash?: string | null
           block_number?: number | null
-          cid?: string | null
+          cid: string
           created_at?: string
           derivation_index?: number | null
           description?: string | null
-          draft_owner_token?: string | null
           duration_s?: number | null
           escrowed_creator_txc?: number
           expires_at?: string
@@ -436,7 +469,6 @@ export type Database = {
           hidden_reason?: string | null
           hls_cid?: string | null
           hosting_credit_txc?: number
-          id?: string
           is_nsfw?: boolean
           metadata_cid?: string | null
           mime_type?: string | null
@@ -461,7 +493,7 @@ export type Database = {
           source?: string
           status?: string
           thumbnail_cid?: string | null
-          title?: string
+          title: string
           transcode_completed_at?: string | null
           transcode_error?: string | null
           transcode_job_id?: string | null
@@ -478,11 +510,10 @@ export type Database = {
         Update: {
           block_hash?: string | null
           block_number?: number | null
-          cid?: string | null
+          cid?: string
           created_at?: string
           derivation_index?: number | null
           description?: string | null
-          draft_owner_token?: string | null
           duration_s?: number | null
           escrowed_creator_txc?: number
           expires_at?: string
@@ -493,7 +524,6 @@ export type Database = {
           hidden_reason?: string | null
           hls_cid?: string | null
           hosting_credit_txc?: number
-          id?: string
           is_nsfw?: boolean
           metadata_cid?: string | null
           mime_type?: string | null
