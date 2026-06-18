@@ -4,8 +4,9 @@ import { createFileRoute } from "@tanstack/react-router";
  * Cron-driven reconciler for HLS transcodes that finished on MediaConvert
  * but whose EventBridge webhook never reached us (so the row is stuck on
  * transcode_status='processing'). Looks at every row in 'processing' older
- * than ~3 minutes, checks if the S3 output prefix exists, and runs the
- * same finalize-pin pipeline the webhook would have run.
+ * than ~3 minutes, checks the real MediaConvert job state, and then queues
+ * async IPFS pinning. It does not pin inline because that can exceed request
+ * timeouts and leave rows spinning forever.
  *
  * Auth: standard pg_cron `apikey` header (Supabase anon/publishable key).
  * The /api/public/* prefix bypasses Lovable's published-site auth, so
@@ -37,14 +38,14 @@ export const Route = createFileRoute("/api/public/hooks/finalize-stuck-hls")({
         const { supabaseAdmin } = await import(
           "@/integrations/supabase/client.server"
         );
-        const { retryFinalizePinFromS3 } = await import(
-          "@/lib/finalize-hls-pin.server"
-        );
+        const { describeJob } = await import("@/lib/aws-mediaconvert.server");
+        const { kickHlsPinAsyncForJob } = await import("@/lib/ipfs-lambda.functions");
 
         const { data: rows, error } = await supabaseAdmin
           .from("videos")
-          .select("cid, transcode_started_at")
+          .select("cid, transcode_job_id, transcode_started_at")
           .eq("transcode_status", "processing")
+          .not("transcode_job_id", "is", null)
           .lt("transcode_started_at", cutoff)
           .order("transcode_started_at", { ascending: true })
           .limit(limit);
@@ -58,17 +59,39 @@ export const Route = createFileRoute("/api/public/hooks/finalize-stuck-hls")({
         const results: Array<Record<string, unknown>> = [];
         for (const row of rows ?? []) {
           try {
-            const r = await retryFinalizePinFromS3(row.cid);
-            results.push({ cid: row.cid, action: "finalized", ...r });
+            const jobId = row.transcode_job_id;
+            if (!jobId) {
+              results.push({ cid: row.cid, action: "failed", error: "missing job id" });
+              continue;
+            }
+
+            const job = (await describeJob(jobId)).job;
+            const status = job?.status ?? "UNKNOWN";
+
+            if (status === "COMPLETE") {
+              const queued = await kickHlsPinAsyncForJob({ cid: row.cid, jobId });
+              results.push({ cid: row.cid, action: "pin-queued", ...queued });
+              continue;
+            }
+
+            if (status === "ERROR" || status === "CANCELED") {
+              await supabaseAdmin
+                .from("videos")
+                .update({
+                  transcode_status: "failed",
+                  transcode_error: job?.errorMessage ?? `MediaConvert ${status.toLowerCase()}`,
+                  transcode_completed_at: new Date().toISOString(),
+                })
+                .eq("cid", row.cid)
+                .eq("transcode_job_id", jobId);
+              results.push({ cid: row.cid, action: "marked-failed", status });
+              continue;
+            }
+
+            results.push({ cid: row.cid, action: "still-processing", status });
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            // "No HLS outputs" just means MediaConvert hasn't finished
-            // yet — skip quietly so we don't spam errors.
-            if (msg.startsWith("No HLS outputs")) {
-              results.push({ cid: row.cid, action: "not-ready" });
-            } else {
-              results.push({ cid: row.cid, action: "failed", error: msg });
-            }
+            results.push({ cid: row.cid, action: "failed", error: msg });
           }
         }
         return Response.json({
