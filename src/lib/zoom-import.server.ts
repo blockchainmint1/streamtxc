@@ -131,21 +131,11 @@ function tryExtract(html: string, shareUrl: string): ResolvedImport | null {
     directUrl,
     filename,
     sizeBytes: null, // Zoom's signed mp4 doesn't expose Content-Length on HEAD reliably; streaming endpoint reads it from upstream.
-    // Pass the title forward via a custom property; resolveImport callers
-    // don't read it today but the Zoom tab can extract it from sourceUrl.
-    // Note: ResolvedImport doesn't carry arbitrary fields, so we attach
-    // the title as part of the URL's hash so the tab can pick it up.
     fetchHeaders: {
       "User-Agent": UA,
       Referer: shareUrl,
-      // Custom marker the Zoom tab reads back via resolveImportUrl response
-      // — we tunnel the suggested title through here because the
-      // ResolvedImport contract doesn't have a `title` field. Stripped
-      // before the actual upstream fetch (the streamer only sends headers
-      // whose key looks like an HTTP header — keys starting with "X-" are
-      // safe to send, others are passed through verbatim).
-      "X-Zoom-Title": title,
     },
+    suggestedTitle: title,
   };
 }
 

@@ -28,6 +28,8 @@ export const resolveImportUrl = createServerFn({ method: "POST" })
             sizeBytes: z.number().int().positive(),
           })
           .optional(),
+        // Optional: Zoom share passcode for password-protected recordings.
+        passcode: z.string().min(1).max(200).optional(),
       })
       .parse(input),
   )
@@ -39,8 +41,9 @@ export const resolveImportUrl = createServerFn({ method: "POST" })
           filename: data.prefetched.filename,
           sizeBytes: data.prefetched.sizeBytes,
           fetchHeaders: undefined as Record<string, string> | undefined,
+          suggestedTitle: undefined as string | undefined,
         }
-      : await resolveImport(data.url);
+      : await resolveImport(data.url, { passcode: data.passcode });
 
     if (resolved.sizeBytes !== null && resolved.sizeBytes > IMPORT_MAX_BYTES) {
       const gb = (IMPORT_MAX_BYTES / (1024 ** 3)).toFixed(0);
@@ -63,6 +66,7 @@ export const resolveImportUrl = createServerFn({ method: "POST" })
       source: resolved.source,
       filename: resolved.filename,
       sizeBytes: resolved.sizeBytes,
+      suggestedTitle: resolved.suggestedTitle ?? null,
       token,
     };
   });

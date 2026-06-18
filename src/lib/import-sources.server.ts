@@ -16,6 +16,8 @@ export interface ResolvedImport {
   sizeBytes: number | null;
   /** Optional headers to send when fetching the directUrl (cookies, etc). */
   fetchHeaders?: Record<string, string>;
+  /** Optional human-friendly title (Zoom share pages provide this). */
+  suggestedTitle?: string;
 }
 
 const UA =
