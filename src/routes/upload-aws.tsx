@@ -30,6 +30,7 @@ import {
   CheckCircle2,
   Sparkles,
   Cloud,
+  Video,
 } from "lucide-react";
 import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
 import { computeCids } from "@/lib/ipfs-cid";
