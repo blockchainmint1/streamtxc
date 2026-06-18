@@ -36,6 +36,7 @@ import { computeCids } from "@/lib/ipfs-cid";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 import { recordAnonUpload } from "@/lib/anon-uploads";
 import { UrlImportTab } from "@/components/UrlImportTab";
+import { ZoomImportTab } from "@/components/ZoomImportTab";
 import {
   getTranscodeUploadUrl,
   startTranscode,
@@ -516,7 +517,7 @@ function UploadPage() {
               </div>
             </div>
           )}
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="file" className="font-mono text-xs">
               <Upload className="mr-2 h-3 w-3" /> Upload file
             </TabsTrigger>
@@ -528,6 +529,9 @@ function UploadPage() {
             </TabsTrigger>
             <TabsTrigger value="import" className="font-mono text-xs">
               <Sparkles className="mr-2 h-3 w-3" /> Import URL
+            </TabsTrigger>
+            <TabsTrigger value="zoom" className="font-mono text-xs">
+              <Video className="mr-2 h-3 w-3" /> Zoom
             </TabsTrigger>
           </TabsList>
 
