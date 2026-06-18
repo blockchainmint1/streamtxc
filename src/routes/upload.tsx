@@ -288,6 +288,7 @@ function CidTab({
           id="cid-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
+          onBlur={() => pushDraft({ title })}
           required
           maxLength={200}
           className="font-mono"
@@ -300,6 +301,7 @@ function CidTab({
           id="cid-description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+          onBlur={() => pushDraft({ description })}
           maxLength={2000}
           rows={3}
         />
@@ -309,12 +311,17 @@ function CidTab({
         <ThumbnailPicker
           key={cid.trim()}
           videoSrc={`/api/stream/${cid.trim()}`}
-          onChange={setThumbnailCid}
+          onChange={(c) => {
+            setThumbnailCid(c);
+            if (c) pushDraft({ thumbnailCid: c });
+          }}
         />
       )}
 
       <label className="flex items-start gap-3 border border-border bg-card rounded-sm p-4 cursor-pointer">
-        <Checkbox checked={nsfw} onCheckedChange={(v) => setNsfw(v === true)} className="mt-0.5" />
+        <Checkbox checked={nsfw} onCheckedChange={(v) => {
+          const next = v === true; setNsfw(next); pushDraft({ nsfw: next });
+        }} className="mt-0.5" />
         <div className="flex-1">
           <div className="font-mono text-xs">[ NSFW / ADULT CONTENT ]</div>
           <p className="text-xs text-muted-foreground mt-1">
