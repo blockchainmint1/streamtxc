@@ -2427,7 +2427,13 @@ export const patchUploadDraft = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
-    const patch: Record<string, unknown> = {};
+    const patch: {
+      title?: string;
+      description?: string | null;
+      thumbnail_cid?: string | null;
+      is_nsfw?: boolean;
+      wallet?: string | null;
+    } = {};
     if (data.title !== undefined) patch.title = data.title;
     if (data.description !== undefined) patch.description = data.description;
     if (data.thumbnailCid !== undefined) patch.thumbnail_cid = data.thumbnailCid;
