@@ -14,22 +14,40 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/about")({
-  head: () => ({
-    meta: [
-      { title: "About — streamTXC" },
-      {
-        name: "description",
-        content:
-          "Why streamTXC exists: immutable CID filenames, on-chain receipts, no platform middleman. Pay-per-MB video hosting on IPFS, anchored to TXC.",
-      },
-      { property: "og:title", content: "About — streamTXC" },
-      {
-        property: "og:description",
-        content:
-          "Immutable CID filenames, on-chain receipts, no platform middleman. Video hosting that's actually verifiable.",
-      },
-    ],
-  }),
+  head: () => {
+    const faqs = [
+      { q: "Who actually hosts my video?", a: "Pinata pins it on IPFS. Anyone else can pin the same CID too — that's the point. If we disappeared tomorrow, the CID still works on any IPFS gateway someone else is running." },
+      { q: "What happens if I stop paying?", a: "After the prepaid window plus a 24h grace period, we unpin. The CID still resolves anywhere else it's pinned, and the on-chain record of it ever existing never goes away." },
+      { q: "Can I delete a video?", a: "We can unpin from our infrastructure, but no one can un-publish a CID from IPFS as a whole, and the on-chain stamp is permanent. Treat upload as a permanent decision." },
+      { q: "Is this censorship-resistant?", a: "More than a normal platform. We can refuse to serve content through our gateway, but we can't rewrite history, change the CID, or stop someone else from re-pinning and streaming the file." },
+      { q: "Why TXC instead of just dollars?", a: "Because the chain is the receipt. Stripe can reverse a charge; an OP_RETURN can't. TXC is fast, cheap, and lets us anchor every action — uploads, comments, boosts — into a public ledger." },
+    ];
+    return {
+      meta: [
+        { title: "About — streamTXC" },
+        { name: "description", content: "Why streamTXC exists: immutable CID filenames, on-chain receipts, no platform middleman. Pay-per-MB video hosting on IPFS, anchored to TXC." },
+        { property: "og:title", content: "About — streamTXC" },
+        { property: "og:description", content: "Immutable CID filenames, on-chain receipts, no platform middleman. Video hosting that's actually verifiable." },
+        { property: "og:url", content: "https://streamtxc.com/about" },
+        { property: "og:type", content: "article" },
+      ],
+      links: [{ rel: "canonical", href: "https://streamtxc.com/about" }],
+      scripts: [
+        {
+          type: "application/ld+json",
+          children: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: faqs.map((f) => ({
+              "@type": "Question",
+              name: f.q,
+              acceptedAnswer: { "@type": "Answer", text: f.a },
+            })),
+          }),
+        },
+      ],
+    };
+  },
   component: AboutPage,
 });
 

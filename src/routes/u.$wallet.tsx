@@ -13,20 +13,23 @@ import { Copy, Check, Play, MessageSquare, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/u/$wallet")({
-  head: ({ params }) => ({
-    meta: [
-      { title: `Videos by ${params.wallet} — streamTXC` },
-      {
-        name: "description",
-        content: `All videos uploaded by wallet ${params.wallet} on streamTXC.`,
-      },
-      { property: "og:title", content: `Videos by ${shortWalletId(params.wallet)} — streamTXC` },
-      {
-        property: "og:description",
-        content: `All videos uploaded by wallet ${params.wallet} on streamTXC.`,
-      },
-    ],
-  }),
+  head: ({ params }) => {
+    const short = shortWalletId(params.wallet);
+    const title = `Videos by ${short} — streamTXC`;
+    const desc = `All videos uploaded by wallet ${params.wallet} on streamTXC — content-addressed on IPFS, paid in TXC.`;
+    const url = `https://streamtxc.com/u/${params.wallet}`;
+    return {
+      meta: [
+        { title },
+        { name: "description", content: desc },
+        { property: "og:title", content: title },
+        { property: "og:description", content: desc },
+        { property: "og:url", content: url },
+        { property: "og:type", content: "profile" },
+      ],
+      links: [{ rel: "canonical", href: url }],
+    };
+  },
   component: WalletPage,
   errorComponent: ({ error }) => (
     <div className="min-h-screen bg-background text-foreground">

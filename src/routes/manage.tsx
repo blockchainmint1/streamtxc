@@ -127,6 +127,7 @@ function RetryStampButton({ cid, wallet }: { cid: string; wallet: string }) {
       variant="outline"
       className="font-mono h-7 w-7"
       title="Retry stamp"
+      aria-label="Retry on-chain stamp"
       disabled={busy}
       onClick={async () => {
         setBusy(true);
@@ -164,6 +165,7 @@ function RetryTranscodeButton({ cid, wallet }: { cid: string; wallet: string }) 
       variant="outline"
       className="font-mono h-7 w-7 text-[10px]"
       title="Retry transcode"
+      aria-label="Retry transcode"
       disabled={busy}
       onClick={async () => {
         setBusy(true);
@@ -201,6 +203,7 @@ function FinalizeTranscodeButton({ cid, wallet }: { cid: string; wallet: string 
       variant="outline"
       className="font-mono h-7 w-7 text-[10px]"
       title="Finalize HLS"
+      aria-label="Finalize HLS"
       disabled={busy}
       onClick={async () => {
         setBusy(true);
@@ -247,6 +250,7 @@ function ToggleVisibilityButton({
       className="font-mono h-7 w-7"
       disabled={busy}
       title={hidden ? "Show this video publicly" : "Hide from public listings"}
+      aria-label={hidden ? "Show this video publicly" : "Hide from public listings"}
       onClick={async () => {
         setBusy(true);
         try {
@@ -280,6 +284,7 @@ function MirrorToSelfNodeButton({ cid, wallet }: { cid: string; wallet: string }
       variant="outline"
       className="font-mono h-7 w-7"
       title="Mirror CIDs to honest.money self-node"
+      aria-label="Mirror CIDs to honest.money self-node"
       disabled={busy}
       onClick={async () => {
         setBusy(true);
