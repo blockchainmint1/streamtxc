@@ -923,6 +923,7 @@ function UploadPage() {
                   id="cid-title"
                   value={cidTitle}
                   onChange={(e) => setCidTitle(e.target.value)}
+                  onBlur={() => pushDraft("cid", { title: cidTitle })}
                   required
                   maxLength={200}
                   className="font-mono"
@@ -935,6 +936,7 @@ function UploadPage() {
                   id="cid-description"
                   value={cidDescription}
                   onChange={(e) => setCidDescription(e.target.value)}
+                  onBlur={() => pushDraft("cid", { description: cidDescription })}
                   maxLength={2000}
                   rows={3}
                 />
@@ -943,7 +945,11 @@ function UploadPage() {
               <label className="flex items-start gap-3 border border-border bg-card rounded-sm p-4 cursor-pointer hover:border-primary/60 transition-colors">
                 <Checkbox
                   checked={cidNsfw}
-                  onCheckedChange={(v) => setCidNsfw(v === true)}
+                  onCheckedChange={(v) => {
+                    const next = v === true;
+                    setCidNsfw(next);
+                    pushDraft("cid", { nsfw: next });
+                  }}
                   className="mt-0.5"
                 />
                 <div className="flex-1 min-w-0">
@@ -962,7 +968,10 @@ function UploadPage() {
                   <ThumbnailPicker
                     key={cidInput.trim()}
                     videoSrc={`/api/stream/${cidInput.trim()}`}
-                    onChange={setCidThumbnailCid}
+                    onChange={(cid) => {
+                      setCidThumbnailCid(cid);
+                      if (cid) pushDraft("cid", { thumbnailCid: cid });
+                    }}
                     onPinningChange={setCidThumbPinning}
                   />
                 )}
