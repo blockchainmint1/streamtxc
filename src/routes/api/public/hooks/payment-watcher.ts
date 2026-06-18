@@ -227,7 +227,7 @@ async function processBackfillHls() {
   for (const row of candidates) {
     try {
       const r = await backfillOneHls(row.cid);
-      results.push({ cid: row.cid, action: "backfill_queued", ...r });
+      results.push({ action: "backfill_queued", ...r });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       // Mark failed so the same row doesn't get retried every tick.
