@@ -26,6 +26,15 @@ export async function resolveZoom(
 ): Promise<ResolvedImport> {
   const shareUrl = url.toString();
 
+  // /rec/play/... is the *personal* playback URL Zoom shows the recording
+  // owner while signed in — it's not a shareable link and we can't resolve
+  // it server-side. Tell the user where to get the right URL.
+  if (/\/rec\/play\//i.test(url.pathname)) {
+    throw new Error(
+      "That's a personal Zoom playback URL (/rec/play/...), which only works while you're signed in. Open the recording in Zoom, click \"Share\", and paste the /rec/share/... link instead.",
+    );
+  }
+
   // 1) Optionally unlock with passcode → harvest cookies.
   let cookieHeader = "";
   if (passcode) {
@@ -70,6 +79,18 @@ export async function resolveZoom(
     throw new Error(`Zoom returned ${pageRes.status} loading the share page.`);
   }
   const html = await pageRes.text();
+
+  // Zoom returns the generic marketing homepage (HTTP 200) when a share
+  // has expired, been deleted, or is restricted to a signed-in audience
+  // outside the share token. Detect that and say so.
+  const isGenericHome =
+    /<title>[^<]*Video Conferencing[^<]*Zoom<\/title>/i.test(html) &&
+    !MP4_RE.test(html);
+  if (isGenericHome) {
+    throw new Error(
+      "Zoom didn't return a recording page for that link — the recording is likely expired, deleted, or restricted to signed-in viewers in your account. Open it in Zoom and confirm the share link is publicly accessible.",
+    );
+  }
 
   // Passcode wall detection — page is HTML 200 but shows the passcode form.
   if (
