@@ -185,7 +185,7 @@ function UploadPage() {
     "idle" | "fetching" | "registering"
   >("idle");
   const [cidNotFound, setCidNotFound] = useState<string | null>(null);
-  type TabKey = "file" | "cid" | "dropbox" | "import";
+  type TabKey = "file" | "cid" | "dropbox" | "import" | "zoom";
   const [activeTab, setActiveTab] = useState<TabKey>("file");
   const tab = activeTab;
   const months = 1;
@@ -977,6 +977,13 @@ function UploadPage() {
               ownerWallet={address ?? null}
               onDuplicate={(info) => setDuplicate(info)}
               mode="dropbox"
+            />
+          </TabsContent>
+
+          <TabsContent value="zoom">
+            <ZoomImportTab
+              ownerWallet={address ?? null}
+              onDuplicate={(info) => setDuplicate(info)}
             />
           </TabsContent>
         </Tabs>
