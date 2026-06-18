@@ -142,6 +142,9 @@ export const registerUpload = createServerFn({ method: "POST" })
         months: z.number().int().min(1).max(12).default(1),
         thumbnailCid: cidStringSchema.optional(),
         nsfw: z.boolean().optional().default(false),
+        source: z
+          .enum(["upload", "url-import", "dropbox", "zoom"])
+          .optional(),
       })
       .parse(input),
   )
