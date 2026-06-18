@@ -195,6 +195,7 @@ export const registerUpload = createServerFn({ method: "POST" })
       metadata_cid: meta?.metaCid ?? null,
       thumbnail_cid: data.thumbnailCid ?? null,
       is_nsfw: data.nsfw,
+      source: data.source ?? "upload",
     });
     if (vErr) {
       // Race condition: someone registered the same CID between our check
@@ -391,6 +392,9 @@ export const addByCid = createServerFn({ method: "POST" })
         months: z.number().int().min(1).max(12).default(1),
         thumbnailCid: cidStringSchema.optional(),
         nsfw: z.boolean().optional().default(false),
+        source: z
+          .enum(["upload", "url-import", "dropbox", "zoom"])
+          .optional(),
       })
       .parse(input),
   )
