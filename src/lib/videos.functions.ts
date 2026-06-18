@@ -408,12 +408,19 @@ export const addByCid = createServerFn({ method: "POST" })
         source: z
           .enum(["upload", "url-import", "dropbox", "zoom"])
           .optional(),
+        draftId: z.string().uuid().optional(),
+        draftToken: z.string().min(8).max(128).optional(),
       })
       .parse(input),
   )
   .handler(async ({ data }) => {
     // Reject if already registered (with structured details for the UI)
     await assertCidUnclaimed(data.cid);
+    const draft = await consumeDraftForFinalize(data.draftId, data.draftToken);
+    const title = (draft?.title?.trim() || data.title).slice(0, 200);
+    const description = draft?.description ?? data.description ?? "";
+    const thumbnailCid = draft?.thumbnailCid ?? data.thumbnailCid ?? null;
+    const nsfw = draft?.nsfw ?? data.nsfw;
 
     // 1) Kick off Pinata's "fetch this CID from the IPFS network" job FIRST.
     //    Without this, the gateway HEAD probe below has nothing to serve and
@@ -494,9 +501,9 @@ export const addByCid = createServerFn({ method: "POST" })
       videoCid: data.cid,
       videoWallet: videoWallet.address,
       uploaderWallet: opReturnWallet,
-      title: data.title,
-      description: data.description ?? "",
-      thumbnailCid: data.thumbnailCid ?? null,
+      title,
+      description,
+      thumbnailCid,
     });
 
     // 7-day free grace; payment extends from created_at.
@@ -505,8 +512,8 @@ export const addByCid = createServerFn({ method: "POST" })
     const { error: vErr } = await supabaseAdmin.from("videos").insert({
       cid: data.cid,
       owner_wallet: ownerWallet,
-      title: data.title,
-      description: data.description || null,
+      title,
+      description: description || null,
       size_bytes: sizeBytes,
       mime_type: mimeType,
       status: videoStatus,
@@ -518,8 +525,8 @@ export const addByCid = createServerFn({ method: "POST" })
       derivation_index: videoWallet.derivationIndex,
       payment_required_txc: fee,
       metadata_cid: meta?.metaCid ?? null,
-      thumbnail_cid: data.thumbnailCid ?? null,
-      is_nsfw: data.nsfw,
+      thumbnail_cid: thumbnailCid,
+      is_nsfw: nsfw,
     });
     if (vErr) {
       if (vErr.code === "23505") await assertCidUnclaimed(data.cid);
