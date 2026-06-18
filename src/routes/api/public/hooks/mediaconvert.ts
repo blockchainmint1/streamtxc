@@ -181,6 +181,21 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
         const finalized = await finalizeHlsPin({
           cid, jobId, hlsCid: pinned.cid, renditions,
         });
+
+        // For Zoom imports: transcribe the audio-only MediaConvert output
+        // and stamp the transcript CID onto the row. Best-effort —
+        // failures don't block the HLS flow.
+        let transcript: { cid: string; bytes: number } | null = null;
+        try {
+          const { maybeTranscribeZoomVideo } = await import(
+            "@/lib/transcription.server"
+          );
+          const t = await maybeTranscribeZoomVideo(cid);
+          if (t) transcript = { cid: t.transcriptCid, bytes: t.vttBytes };
+        } catch (err) {
+          console.warn(`[mediaconvert ${cid}] transcription failed:`, err);
+        }
+
         return new Response(
           JSON.stringify({
             pinnedCid: pinned.cid,
@@ -189,6 +204,8 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
             rowsUpdated: finalized.rowsUpdated,
             metadataCid: finalized.metadataCid,
             metadataTx: finalized.metadataTx,
+            transcriptCid: transcript?.cid ?? null,
+            transcriptBytes: transcript?.bytes ?? null,
           }),
           { status: 200, headers: { "content-type": "application/json" } },
         );
