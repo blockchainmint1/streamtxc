@@ -37,6 +37,37 @@ export const isTranscodeConfigured = createServerFn({ method: "GET" }).handler(
   },
 );
 
+/**
+ * Public server fn: pull a video's bytes from IPFS (gateway → S3 input
+ * bucket) and kick off MediaConvert. Idempotent — backfillOneHls bails
+ * early if the row already has hls_cid or is already in flight, so
+ * accidental re-calls don't double-bill MediaConvert. Used by the URL
+ * importers (Zoom, future Dropbox HLS) to start the transcode after
+ * addByCid finishes.
+ */
+export const kickoffHlsFromCid = createServerFn({ method: "POST" })
+  .inputValidator((d: { cid: string }) => {
+    if (!d.cid || typeof d.cid !== "string" || d.cid.length > 200) {
+      throw new Error("Invalid cid");
+    }
+    return d;
+  })
+  .handler(async ({ data }) => {
+    const e = transcodeEnv();
+    if (!e.inputBucket || !e.outputBucket) {
+      return { ok: false, reason: "transcode_not_configured" as const };
+    }
+    const { backfillOneHls } = await import("./backfill-hls.server");
+    try {
+      const r = await backfillOneHls(data.cid);
+      return { ok: true, jobId: r.jobId, mode: r.mode, bytes: r.bytes };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`kickoffHlsFromCid(${data.cid}) failed:`, msg);
+      return { ok: false, reason: msg };
+    }
+  });
+
 export const getPinataGateway = createServerFn({ method: "GET" }).handler(
   async () => ({ gateway: process.env.PINATA_GATEWAY_DOMAIN ?? null }),
 );
