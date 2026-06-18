@@ -21,6 +21,8 @@ export interface CreateJobOpts {
   inputUri: string;
   /** S3 output prefix, e.g. s3://my-output/hls/<videoId>/ — trailing slash matters */
   outputPrefix: string;
+  /** S3 audio-only output prefix, e.g. s3://my-output/audio/<videoId>/ — trailing slash matters. Optional; when omitted no mp3 audio is produced. */
+  audioPrefix?: string;
   /** Opaque ID round-tripped via userMetadata so the webhook can find the video */
   videoId: string;
 }
@@ -69,6 +71,44 @@ export async function startHlsTranscode(opts: CreateJobOpts): Promise<{ jobId: s
             rendition("360p", 640, 360, 600_000, 64_000),
           ],
         },
+        ...(opts.audioPrefix
+          ? [
+              {
+                // Audio-only mp4 (AAC) for transcription. Lands at
+                // s3://<output-bucket>/audio/<cid>/source.mp4 (sibling of
+                // hls/<cid>/). Small (~50KB/min) and lives outside the
+                // hls/<cid>/ prefix so it never gets pinned with the HLS
+                // bundle. MediaConvert's MP3 codec settings are picky about
+                // sample rate; AAC-LC at low bitrate is universally
+                // supported and the transcription model accepts either.
+                Name: "Audio Only",
+                OutputGroupSettings: {
+                  Type: "FILE_GROUP_SETTINGS",
+                  FileGroupSettings: {
+                    Destination: opts.audioPrefix,
+                  },
+                },
+                Outputs: [
+                  {
+                    NameModifier: "source",
+                    ContainerSettings: { Container: "MP4", Mp4Settings: {} },
+                    AudioDescriptions: [
+                      {
+                        CodecSettings: {
+                          Codec: "AAC",
+                          AacSettings: {
+                            Bitrate: 64_000,
+                            CodingMode: "CODING_MODE_1_0",
+                            SampleRate: 22_050,
+                          },
+                        },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ]
+          : []),
       ],
     },
   };

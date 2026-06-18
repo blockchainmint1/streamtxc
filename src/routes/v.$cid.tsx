@@ -196,6 +196,36 @@ function WatchPage() {
                 {video.description}
               </p>
             )}
+            {(video.transcript_text || video.transcript_cid) && (
+              <CollapsibleSection title="[ TRANSCRIPT ]" defaultOpen={false}>
+                <div className="space-y-3">
+                  {video.transcript_text ? (
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto pr-2">
+                      {video.transcript_text}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground font-mono">
+                      Transcript is being generated — refresh in a minute.
+                    </p>
+                  )}
+                  {video.transcript_cid && (
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
+                      <span className="font-mono text-[11px] text-muted-foreground">
+                        Source-of-truth WebVTT on IPFS
+                      </span>
+                      <a
+                        href={`https://ipfs.honest.money/ipfs/${video.transcript_cid}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-mono text-[11px] text-primary hover:underline"
+                      >
+                        open .vtt →
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </CollapsibleSection>
+            )}
             {video.hidden_at && (
               <div className="border-2 border-amber-500/60 bg-amber-500/5 rounded-sm p-4 flex items-start gap-3">
                 <ShieldAlert className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />

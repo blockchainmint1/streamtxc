@@ -1,98 +1,63 @@
-# Notifications + expiring lifecycle
+## What you get
 
-Two related pieces:
-1. Let a wallet register Telegram and/or email so we can warn them before their videos die.
-2. Add a real "expiring → unpinned → archived" lifecycle so a wipe isn't instant and metadata is never lost.
+A new tab in the upload flow next to "Upload" / "URL Import": paste a Zoom share URL (and optional passcode), hit Import, and the backend pulls down the mp4 + transcript, runs your existing transcode → HLS → IPFS pin pipeline, and stamps everything on-chain.
 
----
+## How it works
 
-## 1. Wallet notification prefs
+### 1. New UI: "Zoom" tab in `/upload-aws`
 
-New table `wallet_notification_prefs` keyed by `wallet` (no users table — wallet signature is identity):
+- Inputs: share URL, optional passcode, optional title override.
+- On submit: calls a new server fn `startZoomImport({ url, passcode })`.
+- Server fn returns `{ cid_placeholder, video_id }`. Page then polls existing video status the same way it does for normal uploads.
 
-| column | notes |
-|---|---|
-| `wallet` (pk) | the owner_wallet string |
-| `email` | nullable, plain text |
-| `email_verified_at` | set after click-through verification |
-| `telegram_chat_id` | nullable, set after they DM the bot with their pairing code |
-| `telegram_username` | display only |
-| `pairing_code` | short random token they paste into our Telegram bot to link the chat to their wallet |
-| `pairing_expires_at` | 15-min TTL |
-| `notify_expiry` | bool, default true |
-| `created_at` / `updated_at` | |
+### 2. New server fn: `src/lib/zoom-import.functions.ts`
 
-RLS: locked. All reads/writes via server functions gated by `requireWalletSignature` (same pattern used elsewhere for wallet-owned rows).
+Steps inside `.handler()`:
 
-UI lives in `src/routes/manage.tsx` as a new "Notifications" card above the videos list:
-- Email field with "Send verification" button → emails a magic verify link (`/api/public/notify/verify-email?token=…`).
-- Telegram block: shows "Connect Telegram", reveals pairing code + a `https://t.me/<bot>?start=<code>` deep link. Once the bot sees `/start <code>` it stores chat_id and the UI auto-refreshes.
-- Toggle per alert type (only "expiry" for now).
+1. **Resolve passcode (if any)** — POST to `https://zoom.us/rec/share/<token>` with `{ passwd: <code> }` form body to get a `_zm_ssid` cookie. Skip if no passcode.
+2. **Fetch share page HTML** with that cookie + a real `User-Agent`.
+3. **Extract recording metadata**:
+   - Title — regex on `<meta property="og:title">` or page `<title>`.
+   - Signed mp4 URL — regex on `https://ssrweb.zoom.us/cmr/replay/...\.mp4?...Signature=...` (confirmed present in the SSR HTML).
+   - Transcript URL — Zoom inlines a JSON blob `__data__` / `window.__INITIAL_STATE__` with the share's `clipId`. We hit `https://zoom.us/nws/recording/1.0/play/share-info?canPlayFromShare=true&from=share_recording_detail&continueMode=true&componentName=rec-play&originRequestUrl=<encoded share url>` which returns JSON listing all 4 download files including `transcript_vtt_url`. If that endpoint shape changes, we fall back to the audio-only mp3 from MediaConvert + Lovable AI transcription (see step 6).
+4. **Stream mp4 → S3 input bucket** using the existing multipart helper in `src/lib/backfill-hls.server.ts` (16MB chunks, up to 4GB). Key: `zoom/<random>/source.mp4`.
+5. **Kick off HLS transcode** via `startHlsTranscode` (existing). Insert/update the `videos` row with `transcode_status='processing'`, source=`'zoom'`, title from page.
+6. **Transcript**:
+   - Preferred path: download the .vtt directly from Zoom (uses same cookies), store the raw text on the `videos` row in a new `transcript` text column, pin it to IPFS as `transcript.vtt`, and store `transcript_cid`.
+   - Fallback path (no inline transcript): add an audio-only output to the MediaConvert job (mp3, mono, 64kbps), and after the job completes, send the audio to Lovable AI Gateway (`google/gemini-2.5-flash` with audio input — already free in the gateway) for transcription. Save same way.
+7. **Stamp on-chain**: reuse existing `finalize-hls-pin` flow which already writes `hls_cid` + metadata; add `transcript_cid` to the on-chain metadata JSON so the proof includes it.
 
-## 2. Expiring lifecycle for videos
+### 3. DB migration
 
-Today: grace expired → immediate `unpinByCid` + `status=unpinned`. We replace that with a softer 3-state machine on existing `videos` rows (no row deletion ever):
+- Add `transcript_cid text`, `transcript_text text`, `source text default 'upload'` to `public.videos`.
+- Backfill source='upload' for existing rows.
+- No new RLS — uses existing video RLS.
 
-```text
-active ──expires_at passed──▶ expiring (1-week pin grace)
-                                  │
-                                  ├─owner pays──▶ active
-                                  │
-                                  └─grace passed──▶ unpinned (Pinata removed,
-                                                              row + metadata kept forever)
-```
+### 4. UI surface for transcript
 
-New columns on `videos`:
-- `expiring_at timestamptz` — when we entered expiring (= original expires_at).
-- `unpin_after timestamptz` — `expiring_at + 7 days`; cron only unpins past this.
-- `notified_pre_expiry_at` / `notified_expiring_at` / `notified_unpinned_at` — dedupe alert sends.
+- On `/v/$cid`, if `transcript_text` or `transcript_cid` is present, add a collapsible "Transcript" panel below the player. Plain text view + "Open .vtt on IPFS" link.
 
-Status enum gains `expiring`. `unpinned` rows keep all metadata (title, thumbnail_cid, chain events, comments) so a renewal payment re-pins and restores.
+## Known limits (calling these out upfront)
 
-### Payment watcher changes (`src/routes/api/public/hooks/payment-watcher.ts`)
-- When `expires_at` passes for a paid video: set `status='expiring'`, `expiring_at=now`, `unpin_after=now+7d`. Don't unpin.
-- Only call `unpinByCid` once `now > unpin_after`.
-- Restore flow already clears `unpinned_at` and bumps `expires_at`; extend it to also clear `expiring_at` / `unpin_after`.
+- **Passcode-protected shares**: handled if user provides the passcode. If Zoom has added a captcha (rare on share links), the import will fail with a clear "Zoom requires a captcha — download manually and use the regular upload tab" error.
+- **Login-required ("only signed-in users in your account can view") shares**: not supported. Cloudflare Workers can't run a headless browser, and Zoom's SSO flow needs one. Error message will say so.
+- **Very large recordings (>4GB)**: rejected at the multipart step with a clear error. Zoom recordings are almost always well under this.
+- **Transcript availability**: only works if Zoom generated one (host had "Audio transcript" enabled in cloud recording settings). If absent, fallback Whisper-style transcription on the extracted audio runs automatically; quality varies.
 
-### Pre-expiry alerts
-Same cron pass enqueues notifications:
-- 7 days before `expires_at` → "your video expires in 7 days" (sets `notified_pre_expiry_at`).
-- On entry to `expiring` → "video is in 7-day grace, pay to keep it" (sets `notified_expiring_at`).
-- On actual unpin → "video unpinned; metadata kept, repay anytime to restore" (sets `notified_unpinned_at`).
+## Technical details
 
-Each alert lookups `wallet_notification_prefs` for the row's `owner_wallet` and fans out to whichever channels are configured & verified.
+- All Zoom HTTP calls happen in the server fn; nothing leaks to the client.
+- Signed mp4 URLs from Zoom expire (~7 days), so we stream into S3 immediately rather than storing the URL.
+- The `zoom-import.functions.ts` file pattern matches existing imports (`imports.functions.ts`, `imports.server.ts`).
+- No new secrets. No new connectors.
+- Files changed/created:
+  - `src/lib/zoom-import.functions.ts` (new)
+  - `src/lib/zoom-import.server.ts` (new — html parsing + cookie helpers)
+  - `src/components/ZoomImportTab.tsx` (new)
+  - `src/routes/upload-aws.tsx` (add tab)
+  - `src/components/VideoPlayer.tsx` or new `TranscriptPanel.tsx` + `src/routes/v.$cid.tsx` (transcript display)
+  - `src/lib/finalize-hls-pin.server.ts` (include `transcript_cid` in stamp)
+  - `src/lib/aws-mediaconvert.server.ts` (optional audio-only output for fallback)
+  - one new Supabase migration
 
-## 3. Delivery
-
-### Telegram
-Use the Telegram connector (gateway). New public route `src/routes/api/public/hooks/telegram.ts` receives bot webhooks, handles `/start <code>` to bind chat_id ↔ wallet. Outbound sends use `sendMessage` via the gateway. Bot token / connector linking is handled via `standard_connectors--connect telegram` — I'll prompt for that when wiring up.
-
-### Email
-Use Lovable Emails (built-in). Requires `email_domain--setup_email_infra` + `scaffold_transactional_email`. Templates:
-- `wallet-verify-email` (verification link)
-- `video-expiry-warning` (7-day heads-up)
-- `video-expiring` (entered grace)
-- `video-unpinned` (post-unpin notice with restore link)
-
-If you don't already have an email domain configured I'll trigger the setup dialog first.
-
-## 4. Migrations (one file)
-
-1. `CREATE TABLE public.wallet_notification_prefs` + GRANTs + RLS (deny-all; server-side only).
-2. `ALTER TABLE public.videos ADD COLUMN expiring_at, unpin_after, notified_*`.
-3. Backfill: for rows currently `status='unpinned'`, leave alone. For active rows, no change.
-
-## 5. Out of scope (will do later when you ask)
-- SMS / push.
-- Per-video opt-out.
-- Notifications dashboard / history.
-- Other alert types (comment paid, view milestones, etc.) — table is already shaped for them.
-
----
-
-## Open questions before I build
-
-1. **Telegram bot**: do you already have a bot (BotFather token) you want to use, or should I have you connect one via the Telegram connector?
-2. **Email domain**: is one configured on this project, or should I kick off email-domain setup first?
-3. **Grace length**: you said 1 week — confirm 7 days exactly (vs. 7 calendar days from local midnight, etc.)?
-4. **"Hold metadata forever"** — I'll keep unpinned rows indefinitely. OK to also keep `thumbnail_cid` pinned so the manage page still shows a poster after unpin?
+Want me to ship it?

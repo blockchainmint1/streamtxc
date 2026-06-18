@@ -30,12 +30,14 @@ import {
   CheckCircle2,
   Sparkles,
   Cloud,
+  Video,
 } from "lucide-react";
 import { parseDuplicateCidError, shortWallet, type DuplicateCidInfo } from "@/lib/duplicate-cid";
 import { computeCids } from "@/lib/ipfs-cid";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 import { recordAnonUpload } from "@/lib/anon-uploads";
 import { UrlImportTab } from "@/components/UrlImportTab";
+import { ZoomImportTab } from "@/components/ZoomImportTab";
 import {
   getTranscodeUploadUrl,
   startTranscode,
@@ -183,7 +185,7 @@ function UploadPage() {
     "idle" | "fetching" | "registering"
   >("idle");
   const [cidNotFound, setCidNotFound] = useState<string | null>(null);
-  type TabKey = "file" | "cid" | "dropbox" | "import";
+  type TabKey = "file" | "cid" | "dropbox" | "import" | "zoom";
   const [activeTab, setActiveTab] = useState<TabKey>("file");
   const tab = activeTab;
   const months = 1;
@@ -516,7 +518,7 @@ function UploadPage() {
               </div>
             </div>
           )}
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="file" className="font-mono text-xs">
               <Upload className="mr-2 h-3 w-3" /> Upload file
             </TabsTrigger>
@@ -528,6 +530,9 @@ function UploadPage() {
             </TabsTrigger>
             <TabsTrigger value="import" className="font-mono text-xs">
               <Sparkles className="mr-2 h-3 w-3" /> Import URL
+            </TabsTrigger>
+            <TabsTrigger value="zoom" className="font-mono text-xs">
+              <Video className="mr-2 h-3 w-3" /> Zoom
             </TabsTrigger>
           </TabsList>
 
@@ -972,6 +977,13 @@ function UploadPage() {
               ownerWallet={address ?? null}
               onDuplicate={(info) => setDuplicate(info)}
               mode="dropbox"
+            />
+          </TabsContent>
+
+          <TabsContent value="zoom">
+            <ZoomImportTab
+              ownerWallet={address ?? null}
+              onDuplicate={(info) => setDuplicate(info)}
             />
           </TabsContent>
         </Tabs>

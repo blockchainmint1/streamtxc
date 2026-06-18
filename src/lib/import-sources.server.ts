@@ -7,7 +7,7 @@
 // Adding a new source = add a host to `HOST_ALLOWLIST` and wire one
 // resolver function below.
 
-export type ImportSource = "wetransfer" | "dropbox" | "google-drive";
+export type ImportSource = "wetransfer" | "dropbox" | "google-drive" | "zoom";
 
 export interface ResolvedImport {
   source: ImportSource;
@@ -16,6 +16,8 @@ export interface ResolvedImport {
   sizeBytes: number | null;
   /** Optional headers to send when fetching the directUrl (cookies, etc). */
   fetchHeaders?: Record<string, string>;
+  /** Optional human-friendly title (Zoom share pages provide this). */
+  suggestedTitle?: string;
 }
 
 const UA =
@@ -29,9 +31,18 @@ export const HOST_ALLOWLIST = [
   "dl.dropboxusercontent.com",
   "drive.google.com",
   "docs.google.com",
+  "zoom.us",
+  "www.zoom.us",
+  "us02web.zoom.us",
+  "us04web.zoom.us",
+  "us05web.zoom.us",
+  "us06web.zoom.us",
 ];
 
-export async function resolveImport(rawUrl: string): Promise<ResolvedImport> {
+export async function resolveImport(
+  rawUrl: string,
+  opts?: { passcode?: string },
+): Promise<ResolvedImport> {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -53,6 +64,10 @@ export async function resolveImport(rawUrl: string): Promise<ResolvedImport> {
   }
   if (host === "drive.google.com" || host === "docs.google.com") {
     return resolveGoogleDrive(parsed);
+  }
+  if (host.endsWith("zoom.us")) {
+    const { resolveZoom } = await import("./zoom-import.server");
+    return resolveZoom(parsed, opts?.passcode);
   }
   throw new Error(`No resolver for ${host}`);
 }
