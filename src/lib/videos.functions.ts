@@ -2380,3 +2380,96 @@ export const mirrorOwnToSelfNode = createServerFn({ method: "POST" })
   });
 
 export const SELF_NODE_ADMIN_WALLET_PUBLIC = SELF_NODE_ADMIN_WALLET;
+
+// ---- Upload drafts -------------------------------------------------------
+//
+// Draft-first upload: the browser creates an empty draft row as soon as the
+// upload page mounts, then patches title/description/thumbnail/NSFW into it
+// as the user fills the form. Finalize (registerUpload / addByCid) reads
+// the draft server-side so the chosen thumbnail can't be dropped between
+// the picker and the final RPC. Drafts older than 24h are GC'd by pg_cron.
+
+function randomToken(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  let s = "";
+  for (const b of bytes) s += b.toString(16).padStart(2, "0");
+  return s;
+}
+
+export const createUploadDraft = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z.object({ wallet: optionalWalletSchema }).parse(input ?? {}),
+  )
+  .handler(async ({ data }) => {
+    const token = randomToken();
+    const { data: row, error } = await supabaseAdmin
+      .from("video_drafts")
+      .insert({ owner_token: token, wallet: data.wallet ?? null })
+      .select("id")
+      .single();
+    if (error || !row) throw new Error(`Failed to create draft: ${error?.message ?? "unknown"}`);
+    return { id: row.id, token };
+  });
+
+export const patchUploadDraft = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        token: z.string().min(8).max(128),
+        title: z.string().max(200).optional(),
+        description: z.string().max(2000).optional(),
+        thumbnailCid: cidStringSchema.nullable().optional(),
+        nsfw: z.boolean().optional(),
+        wallet: optionalWalletSchema,
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const patch: Record<string, unknown> = {};
+    if (data.title !== undefined) patch.title = data.title;
+    if (data.description !== undefined) patch.description = data.description;
+    if (data.thumbnailCid !== undefined) patch.thumbnail_cid = data.thumbnailCid;
+    if (data.nsfw !== undefined) patch.is_nsfw = data.nsfw;
+    if (data.wallet !== undefined) patch.wallet = data.wallet ?? null;
+    if (Object.keys(patch).length === 0) return { ok: true };
+    const { error } = await supabaseAdmin
+      .from("video_drafts")
+      .update(patch)
+      .eq("id", data.id)
+      .eq("owner_token", data.token);
+    if (error) throw new Error(`Failed to patch draft: ${error.message}`);
+    return { ok: true };
+  });
+
+/**
+ * Server-only helper: load a draft for finalize, deleting it on success.
+ * Returns null when id/token don't match (caller falls back to client values).
+ */
+export async function consumeDraftForFinalize(
+  draftId: string | undefined,
+  draftToken: string | undefined,
+): Promise<{
+  title?: string;
+  description?: string;
+  thumbnailCid?: string | null;
+  nsfw?: boolean;
+} | null> {
+  if (!draftId || !draftToken) return null;
+  const { data: row } = await supabaseAdmin
+    .from("video_drafts")
+    .select("title, description, thumbnail_cid, is_nsfw")
+    .eq("id", draftId)
+    .eq("owner_token", draftToken)
+    .maybeSingle();
+  if (!row) return null;
+  // Best-effort delete; the cron cleans up anyway.
+  await supabaseAdmin.from("video_drafts").delete().eq("id", draftId);
+  return {
+    title: row.title || undefined,
+    description: row.description ?? undefined,
+    thumbnailCid: row.thumbnail_cid ?? null,
+    nsfw: row.is_nsfw ?? undefined,
+  };
+}
