@@ -352,6 +352,8 @@ function UploadPage() {
             months,
             thumbnailCid: thumbnailCidRef.current ?? thumbnailCid ?? undefined,
             nsfw,
+            draftId: fileDraftRef.current?.id,
+            draftToken: fileDraftRef.current?.token,
           },
         });
         if (result.chainStatus === "stamp_failed") {
@@ -385,6 +387,8 @@ function UploadPage() {
           months,
           thumbnailCid: thumbnailCidRef.current ?? thumbnailCid ?? undefined,
           nsfw,
+          draftId: fileDraftRef.current?.id,
+          draftToken: fileDraftRef.current?.token,
         },
       });
 
@@ -468,6 +472,8 @@ function UploadPage() {
           months,
           thumbnailCid: cidThumbnailCidRef.current ?? cidThumbnailCid ?? undefined,
           nsfw: cidNsfw,
+          draftId: cidDraftRef.current?.id,
+          draftToken: cidDraftRef.current?.token,
         },
       });
       if (result.chainStatus === "stamp_failed") {
