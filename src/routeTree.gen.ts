@@ -36,6 +36,7 @@ import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
 import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
 import { Route as ApiPublicHooksIpfsPinCompleteRouteImport } from './routes/api/public/hooks/ipfs-pin-complete'
+import { Route as ApiPublicHooksFinalizeStuckHlsRouteImport } from './routes/api/public/hooks/finalize-stuck-hls'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
 import { Route as ApiPublicAdminFinalizeHlsRouteImport } from './routes/api/public/admin/finalize-hls'
 import { Route as ApiPublicAdminBackfillSelfPinsRouteImport } from './routes/api/public/admin/backfill-self-pins'
@@ -181,6 +182,12 @@ const ApiPublicHooksIpfsPinCompleteRoute =
     path: '/public/hooks/ipfs-pin-complete',
     getParentRoute: () => ApiRoute,
   } as any)
+const ApiPublicHooksFinalizeStuckHlsRoute =
+  ApiPublicHooksFinalizeStuckHlsRouteImport.update({
+    id: '/public/hooks/finalize-stuck-hls',
+    path: '/public/hooks/finalize-stuck-hls',
+    getParentRoute: () => ApiRoute,
+  } as any)
 const ApiPublicAdminRetryStampsRoute =
   ApiPublicAdminRetryStampsRouteImport.update({
     id: '/public/admin/retry-stamps',
@@ -232,6 +239,7 @@ export interface FileRoutesByFullPath {
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/hooks/finalize-stuck-hls': typeof ApiPublicHooksFinalizeStuckHlsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
@@ -265,6 +273,7 @@ export interface FileRoutesByTo {
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/hooks/finalize-stuck-hls': typeof ApiPublicHooksFinalizeStuckHlsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
@@ -299,6 +308,7 @@ export interface FileRoutesById {
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/hooks/finalize-stuck-hls': typeof ApiPublicHooksFinalizeStuckHlsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
@@ -334,6 +344,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/backfill-self-pins'
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/hooks/finalize-stuck-hls'
     | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
@@ -367,6 +378,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/backfill-self-pins'
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/hooks/finalize-stuck-hls'
     | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
@@ -400,6 +412,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/backfill-self-pins'
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/hooks/finalize-stuck-hls'
     | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
@@ -617,6 +630,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksIpfsPinCompleteRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/public/hooks/finalize-stuck-hls': {
+      id: '/api/public/hooks/finalize-stuck-hls'
+      path: '/public/hooks/finalize-stuck-hls'
+      fullPath: '/api/public/hooks/finalize-stuck-hls'
+      preLoaderRoute: typeof ApiPublicHooksFinalizeStuckHlsRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/public/admin/retry-stamps': {
       id: '/api/public/admin/retry-stamps'
       path: '/public/admin/retry-stamps'
@@ -670,6 +690,7 @@ interface ApiRouteChildren {
   ApiPublicAdminBackfillSelfPinsRoute: typeof ApiPublicAdminBackfillSelfPinsRoute
   ApiPublicAdminFinalizeHlsRoute: typeof ApiPublicAdminFinalizeHlsRoute
   ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
+  ApiPublicHooksFinalizeStuckHlsRoute: typeof ApiPublicHooksFinalizeStuckHlsRoute
   ApiPublicHooksIpfsPinCompleteRoute: typeof ApiPublicHooksIpfsPinCompleteRoute
   ApiPublicHooksMediaconvertRoute: typeof ApiPublicHooksMediaconvertRoute
   ApiPublicHooksPaymentWatcherRoute: typeof ApiPublicHooksPaymentWatcherRoute
@@ -687,6 +708,7 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiPublicAdminBackfillSelfPinsRoute: ApiPublicAdminBackfillSelfPinsRoute,
   ApiPublicAdminFinalizeHlsRoute: ApiPublicAdminFinalizeHlsRoute,
   ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
+  ApiPublicHooksFinalizeStuckHlsRoute: ApiPublicHooksFinalizeStuckHlsRoute,
   ApiPublicHooksIpfsPinCompleteRoute: ApiPublicHooksIpfsPinCompleteRoute,
   ApiPublicHooksMediaconvertRoute: ApiPublicHooksMediaconvertRoute,
   ApiPublicHooksPaymentWatcherRoute: ApiPublicHooksPaymentWatcherRoute,
