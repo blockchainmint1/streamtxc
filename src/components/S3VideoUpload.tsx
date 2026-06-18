@@ -19,7 +19,12 @@ import {
 } from "@/components/ui/collapsible";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, MAX_S3_UPLOAD_BYTES } from "@/lib/fees";
-import { registerUpload, lookupPinnedCid } from "@/lib/videos.functions";
+import {
+  registerUpload,
+  lookupPinnedCid,
+  createUploadDraft,
+  patchUploadDraft,
+} from "@/lib/videos.functions";
 import {
   getTranscodeUploadUrl,
   startTranscode,
@@ -154,6 +159,8 @@ export function S3VideoUpload({
   const navigate = useNavigate();
   const register = useServerFn(registerUpload);
   const lookupCid = useServerFn(lookupPinnedCid);
+  const createDraft = useServerFn(createUploadDraft);
+  const patchDraft = useServerFn(patchUploadDraft);
   const getS3Url = useServerFn(getTranscodeUploadUrl);
   const startTx = useServerFn(startTranscode);
   const checkConfig = useServerFn(isTranscodeConfigured);
@@ -170,6 +177,29 @@ export function S3VideoUpload({
   const [thumbnailCid, setThumbnailCid] = useState<string | null>(null);
   const [nsfw, setNsfw] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  // Draft row — created lazily on first patch so the chosen thumbnail
+  // (and title/desc/NSFW) is persisted to the DB the moment the user
+  // picks it. Finalize reads the draft so React state can't drop it.
+  const draftRef = useRef<{ id: string; token: string } | null>(null);
+  async function ensureDraft() {
+    if (draftRef.current) return draftRef.current;
+    const d = await createDraft({ data: { wallet: address ?? undefined } });
+    draftRef.current = d;
+    return d;
+  }
+  async function pushDraft(patch: {
+    title?: string;
+    description?: string;
+    thumbnailCid?: string | null;
+    nsfw?: boolean;
+  }) {
+    try {
+      const d = await ensureDraft();
+      await patchDraft({ data: { id: d.id, token: d.token, wallet: address ?? undefined, ...patch } });
+    } catch (err) {
+      console.error("draft patch failed", err);
+    }
+  }
 
   const [stages, setStages] = useState<Record<StageKey, StageState>>({
     prepare: "pending",
