@@ -446,6 +446,8 @@ export function S3VideoUpload({
           months: 1,
           thumbnailCid: thumbnailCid ?? undefined,
           nsfw,
+          draftId: draftRef.current?.id,
+          draftToken: draftRef.current?.token,
         },
       });
       pushLog("ok", `registered · ${result.chainStatus}`);
