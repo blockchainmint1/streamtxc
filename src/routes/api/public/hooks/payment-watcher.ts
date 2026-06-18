@@ -241,7 +241,7 @@ async function processVideos() {
       "cid, title, owner_wallet, video_wallet, payment_required_txc, months_prepaid, created_at, paid_at, expires_at, payment_received_txc, unpinned_at, status, expiring_at, unpin_after, notified_pre_expiry_at, notified_expiring_at, notified_unpinned_at",
     )
     .not("video_wallet", "is", null)
-    .limit(100);
+    .limit(1000);
 
   if (error) {
     return { ok: false, error: error.message };
