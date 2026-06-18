@@ -19,7 +19,12 @@ import {
 } from "@/components/ui/collapsible";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, MAX_S3_UPLOAD_BYTES } from "@/lib/fees";
-import { registerUpload, lookupPinnedCid } from "@/lib/videos.functions";
+import {
+  registerUpload,
+  lookupPinnedCid,
+  createUploadDraft,
+  patchUploadDraft,
+} from "@/lib/videos.functions";
 import {
   getTranscodeUploadUrl,
   startTranscode,
@@ -154,6 +159,8 @@ export function S3VideoUpload({
   const navigate = useNavigate();
   const register = useServerFn(registerUpload);
   const lookupCid = useServerFn(lookupPinnedCid);
+  const createDraft = useServerFn(createUploadDraft);
+  const patchDraft = useServerFn(patchUploadDraft);
   const getS3Url = useServerFn(getTranscodeUploadUrl);
   const startTx = useServerFn(startTranscode);
   const checkConfig = useServerFn(isTranscodeConfigured);
@@ -170,6 +177,29 @@ export function S3VideoUpload({
   const [thumbnailCid, setThumbnailCid] = useState<string | null>(null);
   const [nsfw, setNsfw] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  // Draft row — created lazily on first patch so the chosen thumbnail
+  // (and title/desc/NSFW) is persisted to the DB the moment the user
+  // picks it. Finalize reads the draft so React state can't drop it.
+  const draftRef = useRef<{ id: string; token: string } | null>(null);
+  async function ensureDraft() {
+    if (draftRef.current) return draftRef.current;
+    const d = await createDraft({ data: { wallet: address ?? undefined } });
+    draftRef.current = d;
+    return d;
+  }
+  async function pushDraft(patch: {
+    title?: string;
+    description?: string;
+    thumbnailCid?: string | null;
+    nsfw?: boolean;
+  }) {
+    try {
+      const d = await ensureDraft();
+      await patchDraft({ data: { id: d.id, token: d.token, wallet: address ?? undefined, ...patch } });
+    } catch (err) {
+      console.error("draft patch failed", err);
+    }
+  }
 
   const [stages, setStages] = useState<Record<StageKey, StageState>>({
     prepare: "pending",
@@ -416,6 +446,8 @@ export function S3VideoUpload({
           months: 1,
           thumbnailCid: thumbnailCid ?? undefined,
           nsfw,
+          draftId: draftRef.current?.id,
+          draftToken: draftRef.current?.token,
         },
       });
       pushLog("ok", `registered · ${result.chainStatus}`);
@@ -527,20 +559,38 @@ export function S3VideoUpload({
 
         <div className="space-y-2">
           <Label htmlFor="title" className="font-mono text-xs">TITLE</Label>
-          <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)}
+          <Input id="title" value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={() => pushDraft({ title })}
             required maxLength={200} className="font-mono" />
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="description" className="font-mono text-xs">DESCRIPTION (optional)</Label>
-          <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)}
+          <Textarea id="description" value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            onBlur={() => pushDraft({ description })}
             maxLength={2000} rows={3} />
         </div>
 
-        {file && !tooBig && <ThumbnailPicker file={file} onChange={setThumbnailCid} />}
+        {file && !tooBig && (
+          <ThumbnailPicker
+            file={file}
+            onChange={(cid) => {
+              setThumbnailCid(cid);
+              if (cid) pushDraft({ thumbnailCid: cid });
+            }}
+          />
+        )}
 
         <label className="flex items-start gap-3 border border-border bg-card rounded-sm p-4 cursor-pointer">
-          <Checkbox checked={nsfw} onCheckedChange={(v) => setNsfw(v === true)} className="mt-0.5" />
+          <Checkbox checked={nsfw}
+            onCheckedChange={(v) => {
+              const next = v === true;
+              setNsfw(next);
+              pushDraft({ nsfw: next });
+            }}
+            className="mt-0.5" />
           <div className="flex-1">
             <div className="font-mono text-xs">[ NSFW / ADULT CONTENT ]</div>
             <p className="text-xs text-muted-foreground mt-1">Hidden from homepage and public listings.</p>

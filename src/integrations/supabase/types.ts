@@ -324,6 +324,42 @@ export type Database = {
           },
         ]
       }
+      video_drafts: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_nsfw: boolean
+          owner_token: string
+          thumbnail_cid: string | null
+          title: string
+          updated_at: string
+          wallet: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_nsfw?: boolean
+          owner_token: string
+          thumbnail_cid?: string | null
+          title?: string
+          updated_at?: string
+          wallet?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_nsfw?: boolean
+          owner_token?: string
+          thumbnail_cid?: string | null
+          title?: string
+          updated_at?: string
+          wallet?: string | null
+        }
+        Relationships: []
+      }
       video_reports: {
         Row: {
           created_at: string

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useWallet } from "@/lib/wallet";
 import { formatDate } from "@/lib/fees";
-import { addByCid } from "@/lib/videos.functions";
+import { addByCid, createUploadDraft, patchUploadDraft } from "@/lib/videos.functions";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 import { recordAnonUpload } from "@/lib/anon-uploads";
 import { UrlImportTab } from "@/components/UrlImportTab";
@@ -171,6 +171,8 @@ function CidTab({
   const navigate = useNavigate();
   const qc = useQueryClient();
   const addCid = useServerFn(addByCid);
+  const createDraft = useServerFn(createUploadDraft);
+  const patchDraft = useServerFn(patchUploadDraft);
   const [cid, setCid] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -178,6 +180,23 @@ function CidTab({
   const [nsfw, setNsfw] = useState(false);
   const [stage, setStage] = useState<"idle" | "fetching" | "registering">("idle");
   const [notFound, setNotFound] = useState<string | null>(null);
+  const draftRef = useRef<{ id: string; token: string } | null>(null);
+  async function ensureDraft() {
+    if (draftRef.current) return draftRef.current;
+    const d = await createDraft({ data: { wallet: ownerWallet ?? undefined } });
+    draftRef.current = d;
+    return d;
+  }
+  async function pushDraft(patch: {
+    title?: string; description?: string; thumbnailCid?: string | null; nsfw?: boolean;
+  }) {
+    try {
+      const d = await ensureDraft();
+      await patchDraft({ data: { id: d.id, token: d.token, wallet: ownerWallet ?? undefined, ...patch } });
+    } catch (err) {
+      console.error("draft patch failed", err);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -194,6 +213,8 @@ function CidTab({
           months: 1,
           thumbnailCid: thumbnailCid ?? undefined,
           nsfw,
+          draftId: draftRef.current?.id,
+          draftToken: draftRef.current?.token,
         },
       });
       if (result.chainStatus === "stamp_failed") {
@@ -266,6 +287,7 @@ function CidTab({
           id="cid-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
+          onBlur={() => pushDraft({ title })}
           required
           maxLength={200}
           className="font-mono"
@@ -278,6 +300,7 @@ function CidTab({
           id="cid-description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+          onBlur={() => pushDraft({ description })}
           maxLength={2000}
           rows={3}
         />
@@ -287,12 +310,17 @@ function CidTab({
         <ThumbnailPicker
           key={cid.trim()}
           videoSrc={`/api/stream/${cid.trim()}`}
-          onChange={setThumbnailCid}
+          onChange={(c) => {
+            setThumbnailCid(c);
+            if (c) pushDraft({ thumbnailCid: c });
+          }}
         />
       )}
 
       <label className="flex items-start gap-3 border border-border bg-card rounded-sm p-4 cursor-pointer">
-        <Checkbox checked={nsfw} onCheckedChange={(v) => setNsfw(v === true)} className="mt-0.5" />
+        <Checkbox checked={nsfw} onCheckedChange={(v) => {
+          const next = v === true; setNsfw(next); pushDraft({ nsfw: next });
+        }} className="mt-0.5" />
         <div className="flex-1">
           <div className="font-mono text-xs">[ NSFW / ADULT CONTENT ]</div>
           <p className="text-xs text-muted-foreground mt-1">
