@@ -729,6 +729,7 @@ function UploadPage() {
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                onBlur={() => pushDraft("file", { title })}
                 required
                 maxLength={200}
                 className="font-mono"
@@ -741,6 +742,7 @@ function UploadPage() {
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                onBlur={() => pushDraft("file", { description })}
                 maxLength={2000}
                 rows={3}
               />
@@ -749,7 +751,10 @@ function UploadPage() {
             {file && !tooBig && (
               <ThumbnailPicker
                 file={file}
-                onChange={setThumbnailCid}
+                onChange={(cid) => {
+                  setThumbnailCid(cid);
+                  if (cid) pushDraft("file", { thumbnailCid: cid });
+                }}
                 onPinningChange={setThumbPinning}
               />
             )}
@@ -757,7 +762,11 @@ function UploadPage() {
             <label className="flex items-start gap-3 border border-border bg-card rounded-sm p-4 cursor-pointer hover:border-primary/60 transition-colors">
               <Checkbox
                 checked={nsfw}
-                onCheckedChange={(v) => setNsfw(v === true)}
+                onCheckedChange={(v) => {
+                  const next = v === true;
+                  setNsfw(next);
+                  pushDraft("file", { nsfw: next });
+                }}
                 className="mt-0.5"
               />
               <div className="flex-1 min-w-0">
