@@ -16,6 +16,8 @@ import {
   addByCid,
   getQuote,
   lookupPinnedCid,
+  createUploadDraft,
+  patchUploadDraft,
 } from "@/lib/videos.functions";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
@@ -130,6 +132,8 @@ function UploadPage() {
   const { address } = useWallet();
   const register = useServerFn(registerUpload);
   const addCid = useServerFn(addByCid);
+  const createDraft = useServerFn(createUploadDraft);
+  const patchDraft = useServerFn(patchUploadDraft);
   const quoteFn = useServerFn(getQuote);
   const lookupCid = useServerFn(lookupPinnedCid);
   const getS3Url = useServerFn(getTranscodeUploadUrl);
@@ -162,6 +166,32 @@ function UploadPage() {
   // to IPFS but never attaches the CID to the videos row.
   const [thumbPinning, setThumbPinning] = useState(false);
   const [cidThumbPinning, setCidThumbPinning] = useState(false);
+  // Draft rows — one per submit-tab. Created lazily on first patch so
+  // we don't insert empty drafts when the page just loads. The server's
+  // finalize handler reads the draft to recover the chosen thumbnail
+  // even if the React picker state was reset between pick and submit.
+  const fileDraftRef = useRef<{ id: string; token: string } | null>(null);
+  const cidDraftRef = useRef<{ id: string; token: string } | null>(null);
+  async function ensureDraft(target: "file" | "cid"): Promise<{ id: string; token: string }> {
+    const ref = target === "file" ? fileDraftRef : cidDraftRef;
+    if (ref.current) return ref.current;
+    const d = await createDraft({ data: { wallet: address ?? undefined } });
+    ref.current = d;
+    return d;
+  }
+  async function pushDraft(
+    target: "file" | "cid",
+    patch: { title?: string; description?: string; thumbnailCid?: string | null; nsfw?: boolean },
+  ) {
+    try {
+      const d = await ensureDraft(target);
+      await patchDraft({ data: { id: d.id, token: d.token, wallet: address ?? undefined, ...patch } });
+    } catch (err) {
+      // Draft patches are best-effort — never block the UI on them. The
+      // finalize fallback still has the React state if the patch fails.
+      console.error("draft patch failed", err);
+    }
+  }
   // Mirror state into a ref so handleSubmit always reads the latest CID
   // even if the user picked a frame between clicking Upload and the
   // register() call (the closure would otherwise hold the click-time value).
