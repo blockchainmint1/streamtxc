@@ -181,12 +181,49 @@ async function handler({ request }: { request: Request }) {
   const videoResults = await processVideos();
   const commentResults = await processPendingComments();
   const boostResults = await processPendingBoosts();
+  const pinningResults = await processStuckPinning();
   return Response.json({
     ok: true,
     videos: videoResults,
     comments: commentResults,
     boosts: boostResults,
+    stuckPinning: pinningResults,
   });
+}
+
+/**
+ * Auto-retry videos whose MediaConvert outputs are in S3 but the IPFS pin
+ * step never completed. Rows are left in `transcode_status='pinning'` with
+ * no `hls_cid` when the webhook crashes / times out mid-pin. Anything
+ * stuck >10 min gets re-finalized by re-reading the S3 prefix and pinning.
+ */
+async function processStuckPinning() {
+  const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const { data: stuck, error } = await supabaseAdmin
+    .from("videos")
+    .select("cid, transcode_started_at")
+    .eq("transcode_status", "pinning")
+    .is("hls_cid", null)
+    .lt("transcode_started_at", cutoff)
+    .limit(20);
+  if (error) return { ok: false, error: error.message };
+  if (!stuck || stuck.length === 0) return { retried: 0 };
+
+  const { retryFinalizePinFromS3 } = await import("@/lib/finalize-hls-pin.server");
+  const results: Array<Record<string, unknown>> = [];
+  for (const row of stuck) {
+    try {
+      const r = await retryFinalizePinFromS3(row.cid);
+      results.push({ cid: row.cid, action: "auto_finalized", ...r });
+    } catch (err) {
+      results.push({
+        cid: row.cid,
+        action: "auto_finalize_failed",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return { retried: stuck.length, results };
 }
 
 async function retryFailedPaymentStampForPaidVideo(v: {
