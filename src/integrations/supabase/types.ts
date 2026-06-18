@@ -399,6 +399,7 @@ export type Database = {
           renditions: Json | null
           report_count: number
           size_bytes: number
+          source: string
           status: string
           thumbnail_cid: string | null
           title: string
@@ -407,6 +408,8 @@ export type Database = {
           transcode_job_id: string | null
           transcode_started_at: string | null
           transcode_status: string | null
+          transcript_cid: string | null
+          transcript_text: string | null
           tx_hash: string | null
           unpin_after: string | null
           unpinned_at: string | null
@@ -451,6 +454,7 @@ export type Database = {
           renditions?: Json | null
           report_count?: number
           size_bytes: number
+          source?: string
           status?: string
           thumbnail_cid?: string | null
           title: string
@@ -459,6 +463,8 @@ export type Database = {
           transcode_job_id?: string | null
           transcode_started_at?: string | null
           transcode_status?: string | null
+          transcript_cid?: string | null
+          transcript_text?: string | null
           tx_hash?: string | null
           unpin_after?: string | null
           unpinned_at?: string | null
@@ -503,6 +509,7 @@ export type Database = {
           renditions?: Json | null
           report_count?: number
           size_bytes?: number
+          source?: string
           status?: string
           thumbnail_cid?: string | null
           title?: string
@@ -511,6 +518,8 @@ export type Database = {
           transcode_job_id?: string | null
           transcode_started_at?: string | null
           transcode_status?: string | null
+          transcript_cid?: string | null
+          transcript_text?: string | null
           tx_hash?: string | null
           unpin_after?: string | null
           unpinned_at?: string | null
