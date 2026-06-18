@@ -59,7 +59,6 @@ function IndexPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main>
       {/* Hero */}
       <section className="mx-auto w-full max-w-7xl px-6 pt-24 pb-16">
         <div className="font-mono text-xs text-primary mb-6">
@@ -236,7 +235,6 @@ function IndexPage() {
           </>
         )}
       </section>
-      </main>
       <Footer />
     </div>
   );
