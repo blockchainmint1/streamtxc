@@ -1,0 +1,24 @@
+# streamTXC
+
+> Decentralized video streaming powered by IPFS and TEXITcoin (TXC). Files are pinned to IPFS, addressed by content hash (CID), and every upload + hosting payment is stamped on-chain — no accounts, no algorithm, no silent takedowns.
+
+## How it works
+
+- Upload a video. The file is hashed and pinned to IPFS; the CID is the permanent filename.
+- A per-video TXC deposit address is generated. Pay-per-MB hosting in TXC, prepaid by month.
+- The CID + payment is broadcast as a TXCV1M OP_RETURN on the TEXITcoin chain — a public, verifiable receipt.
+- Anyone can stream, embed, or re-pin the CID. There are no accounts and no region locks.
+
+## Pages
+
+- [Home](/): Browse recent uploads.
+- [About](/about): Why streamTXC exists, how it works, common questions.
+- [Manifesto](/manifesto): The case for content-addressed, on-chain video.
+- [Brand](/brand): Logos, colors, and brand assets.
+- [Terms](/terms): Terms of service.
+- [Privacy](/privacy): Privacy policy.
+- [API](/api): Public API surface for streaming and embedding by CID.
+
+## Optional
+
+- [Sitemap](/sitemap.xml): All public, indexable URLs.

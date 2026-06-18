@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+Disallow: /manage
+Disallow: /upload
+Disallow: /upload-aws
+Disallow: /s3-test
+Disallow: /api/
+
+Sitemap: https://streamtxc.com/sitemap.xml
