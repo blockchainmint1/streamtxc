@@ -1065,18 +1065,25 @@ export const buildBulkExtendQuote = createServerFn({ method: "POST" })
     z
       .object({
         wallet: walletSchema,
-        months: z.number().int().min(1).max(12).default(1),
+        months: z.number().int().min(1).max(24).default(1),
+        // Only include videos whose expires_at falls within now + windowDays.
+        // null/undefined => include every video the wallet owns.
+        windowDays: z.number().int().min(0).max(3650).nullable().optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const wallet = context.wallet;
-    const { data: rows, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("videos")
       .select("cid, title, video_wallet, size_bytes, expires_at")
       .eq("owner_wallet", wallet)
-      .not("video_wallet", "is", null)
-      .order("created_at", { ascending: false });
+      .not("video_wallet", "is", null);
+    if (data.windowDays != null) {
+      const cutoff = new Date(Date.now() + data.windowDays * 86_400_000).toISOString();
+      query = query.lte("expires_at", cutoff);
+    }
+    const { data: rows, error } = await query.order("expires_at", { ascending: true });
     if (error) throw new Error(error.message);
 
     const price = await getTxcUsdPrice();
@@ -1112,6 +1119,7 @@ export const buildBulkExtendQuote = createServerFn({ method: "POST" })
 
     return {
       months: data.months,
+      windowDays: data.windowDays ?? null,
       txcUsd: price.usd,
       priceSource: price.source,
       totalTxc,
