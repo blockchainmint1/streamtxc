@@ -154,7 +154,6 @@ export async function backfillOneHls(cid: string): Promise<BackfillResult> {
   const { jobId } = await startHlsTranscode({
     inputUri: `s3://${inputBucket}/${key}`,
     outputPrefix: `s3://${outputBucket}/hls/${cid}/`,
-    audioPrefix: `s3://${outputBucket}/audio/${cid}/`,
     videoId: cid,
   });
 

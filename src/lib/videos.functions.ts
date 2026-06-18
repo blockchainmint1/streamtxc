@@ -1614,7 +1614,6 @@ export const retryOwnTranscode = createServerFn({ method: "POST" })
     const { jobId } = await startHlsTranscode({
       inputUri: `s3://${inputBucket}/inputs/${data.cid}`,
       outputPrefix: `s3://${outputBucket}/hls/${data.cid}/`,
-      audioPrefix: `s3://${outputBucket}/audio/${data.cid}/`,
       videoId: data.cid,
     });
 
