@@ -207,7 +207,6 @@ export const startTranscode = createServerFn({ method: "POST" })
     const { jobId } = await startHlsTranscode({
       inputUri: `s3://${e.inputBucket}/inputs/${data.cid}`,
       outputPrefix: `s3://${e.outputBucket}/hls/${data.cid}/`,
-      audioPrefix: `s3://${e.outputBucket}/audio/${data.cid}/`,
       videoId: data.cid,
     });
 
@@ -257,7 +256,6 @@ export const startTranscodeTest = createServerFn({ method: "POST" })
     const { jobId } = await startHlsTranscode({
       inputUri: `s3://${e.inputBucket}/${data.key}`,
       outputPrefix: `s3://${e.outputBucket}/hls/${id}/`,
-      audioPrefix: `s3://${e.outputBucket}/audio/${id}/`,
       videoId: id,
     });
     return {
