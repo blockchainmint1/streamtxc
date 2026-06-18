@@ -99,7 +99,7 @@ export async function startHlsTranscode(opts: CreateJobOpts): Promise<{ jobId: s
                           AacSettings: {
                             Bitrate: 64_000,
                             CodingMode: "CODING_MODE_1_0",
-                            SampleRate: 22_050,
+                            SampleRate: 32_000,
                           },
                         },
                       },
