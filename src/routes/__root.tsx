@@ -75,15 +75,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "streamTXC - IPFS & TEXITcoin powered video streaming" },
-      { name: "description", content: "TEXITcoin powered IPFS video streaming platform." },
-      { name: "author", content: "Lovable" },
+      { name: "description", content: "Decentralized video streaming on IPFS, anchored to the TEXITcoin (TXC) blockchain. Pay-per-MB hosting, content-addressed CIDs, on-chain receipts — no accounts, no takedowns." },
       { property: "og:title", content: "streamTXC - IPFS & TEXITcoin powered video streaming" },
-      { property: "og:description", content: "TEXITcoin powered IPFS video streaming platform." },
+      { property: "og:description", content: "Decentralized, content-addressed video on IPFS with on-chain TXC receipts. No accounts, no algorithm, no silent takedowns." },
       { property: "og:type", content: "website" },
+      { property: "og:site_name", content: "streamTXC" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "streamTXC - IPFS & TEXITcoin powered video streaming" },
-      { name: "twitter:description", content: "TEXITcoin powered IPFS video streaming platform." },
+      { name: "twitter:description", content: "Decentralized, content-addressed video on IPFS with on-chain TXC receipts." },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7122b5e1-7558-4979-9fc7-80ae9d3b65b0/id-preview-72d5cdc5--d4d0978e-e0a5-482f-8316-fceaa9ec6a46.lovable.app-1778568491574.png" },
       { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/7122b5e1-7558-4979-9fc7-80ae9d3b65b0/id-preview-72d5cdc5--d4d0978e-e0a5-482f-8316-fceaa9ec6a46.lovable.app-1778568491574.png" },
     ],
@@ -91,6 +90,27 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         rel: "stylesheet",
         href: appCss,
+      },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "Organization",
+              name: "streamTXC",
+              url: "https://streamtxc.com",
+              logo: "https://streamtxc.com/favicon.ico",
+            },
+            {
+              "@type": "WebSite",
+              name: "streamTXC",
+              url: "https://streamtxc.com",
+            },
+          ],
+        }),
       },
     ],
   }),

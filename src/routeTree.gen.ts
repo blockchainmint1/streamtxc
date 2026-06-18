@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as UploadAwsRouteImport } from './routes/upload-aws'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as S3TestRouteImport } from './routes/s3-test'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ManifestoRouteImport } from './routes/manifesto'
@@ -53,6 +54,11 @@ const UploadRoute = UploadRouteImport.update({
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const S3TestRoute = S3TestRouteImport.update({
@@ -209,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
   '/s3-test': typeof S3TestRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
   '/upload-aws': typeof UploadAwsRoute
@@ -241,6 +248,7 @@ export interface FileRoutesByTo {
   '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
   '/s3-test': typeof S3TestRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
   '/upload-aws': typeof UploadAwsRoute
@@ -274,6 +282,7 @@ export interface FileRoutesById {
   '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
   '/s3-test': typeof S3TestRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/terms': typeof TermsRoute
   '/upload': typeof UploadRoute
   '/upload-aws': typeof UploadAwsRoute
@@ -308,6 +317,7 @@ export interface FileRouteTypes {
     | '/manifesto'
     | '/privacy'
     | '/s3-test'
+    | '/sitemap.xml'
     | '/terms'
     | '/upload'
     | '/upload-aws'
@@ -340,6 +350,7 @@ export interface FileRouteTypes {
     | '/manifesto'
     | '/privacy'
     | '/s3-test'
+    | '/sitemap.xml'
     | '/terms'
     | '/upload'
     | '/upload-aws'
@@ -372,6 +383,7 @@ export interface FileRouteTypes {
     | '/manifesto'
     | '/privacy'
     | '/s3-test'
+    | '/sitemap.xml'
     | '/terms'
     | '/upload'
     | '/upload-aws'
@@ -405,6 +417,7 @@ export interface RootRouteChildren {
   ManifestoRoute: typeof ManifestoRoute
   PrivacyRoute: typeof PrivacyRoute
   S3TestRoute: typeof S3TestRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
   UploadRoute: typeof UploadRoute
   UploadAwsRoute: typeof UploadAwsRoute
@@ -434,6 +447,13 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/s3-test': {
@@ -695,6 +715,7 @@ const rootRouteChildren: RootRouteChildren = {
   ManifestoRoute: ManifestoRoute,
   PrivacyRoute: PrivacyRoute,
   S3TestRoute: S3TestRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,
   UploadRoute: UploadRoute,
   UploadAwsRoute: UploadAwsRoute,

@@ -55,14 +55,50 @@ export const Route = createFileRoute("/v/$cid")({
   },
   head: ({ loaderData, params }) => {
     const v = loaderData?.video;
+    const url = `https://streamtxc.com/v/${params.cid}`;
+    const title = v ? `${v.title} · streamTXC` : "streamTXC";
+    const desc = v?.description
+      ? v.description.slice(0, 160)
+      : "Watch this content-addressed video on streamTXC — pinned to IPFS, receipted on the TEXITcoin chain.";
+    const thumb = v?.thumbnail_cid
+      ? `https://ipfs.honest.money/ipfs/${v.thumbnail_cid}`
+      : undefined;
+    const meta: Array<Record<string, string>> = [
+      { title },
+      { name: "description", content: desc },
+      { property: "og:title", content: title },
+      { property: "og:description", content: desc },
+      { property: "og:url", content: url },
+      { property: "og:type", content: "video.other" },
+      { name: "twitter:card", content: thumb ? "summary_large_image" : "summary" },
+      { name: "twitter:title", content: title },
+      { name: "twitter:description", content: desc },
+    ];
+    if (thumb) {
+      meta.push({ property: "og:image", content: thumb });
+      meta.push({ name: "twitter:image", content: thumb });
+    }
+    const scripts = v
+      ? [
+          {
+            type: "application/ld+json",
+            children: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "VideoObject",
+              name: v.title,
+              description: desc,
+              thumbnailUrl: thumb ? [thumb] : undefined,
+              uploadDate: v.created_at,
+              contentUrl: `https://streamtxc.com/api/stream/${v.cid}`,
+              embedUrl: `https://streamtxc.com/embed/${v.cid}`,
+            }),
+          },
+        ]
+      : undefined;
     return {
-      meta: [
-        { title: v ? `${v.title} · streamTXC` : "streamTXC" },
-        ...(v?.description
-          ? [{ name: "description", content: v.description.slice(0, 160) }]
-          : []),
-      ],
-      links: [{ rel: "canonical", href: `https://streamtxc.com/v/${params.cid}` }],
+      meta,
+      links: [{ rel: "canonical", href: url }],
+      ...(scripts ? { scripts } : {}),
     };
   },
   component: WatchPage,
