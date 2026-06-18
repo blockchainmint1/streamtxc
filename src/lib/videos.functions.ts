@@ -145,11 +145,21 @@ export const registerUpload = createServerFn({ method: "POST" })
         source: z
           .enum(["upload", "url-import", "dropbox", "zoom"])
           .optional(),
+        draftId: z.string().uuid().optional(),
+        draftToken: z.string().min(8).max(128).optional(),
       })
       .parse(input),
   )
   .handler(async ({ data }) => {
     await assertCidUnclaimed(data.cid);
+    // Draft (created at page load) is the source of truth for the chosen
+    // thumbnail / title / description / NSFW flag — protects against
+    // client state being lost between picker and submit.
+    const draft = await consumeDraftForFinalize(data.draftId, data.draftToken);
+    const title = (draft?.title?.trim() || data.title).slice(0, 200);
+    const description = draft?.description ?? data.description ?? "";
+    const thumbnailCid = draft?.thumbnailCid ?? data.thumbnailCid ?? null;
+    const nsfw = draft?.nsfw ?? data.nsfw;
     const _price = (await getTxcUsdPrice()).usd;
     const fee = usdToTxc(quoteUsd(data.sizeBytes, data.months), _price);
     const ownerWallet = data.wallet ?? null;
@@ -171,9 +181,9 @@ export const registerUpload = createServerFn({ method: "POST" })
       videoCid: data.cid,
       videoWallet: videoWallet.address,
       uploaderWallet: opReturnWallet,
-      title: data.title,
-      description: data.description ?? "",
-      thumbnailCid: data.thumbnailCid ?? null,
+      title,
+      description,
+      thumbnailCid,
     });
 
     // New uploads get a 7-day free grace window. Payment extends from created_at
@@ -183,8 +193,8 @@ export const registerUpload = createServerFn({ method: "POST" })
     const { error: vErr } = await supabaseAdmin.from("videos").insert({
       cid: data.cid,
       owner_wallet: ownerWallet,
-      title: data.title,
-      description: data.description || null,
+      title,
+      description: description || null,
       size_bytes: data.sizeBytes,
       mime_type: data.mimeType,
       status: videoStatus,
@@ -196,8 +206,8 @@ export const registerUpload = createServerFn({ method: "POST" })
       derivation_index: videoWallet.derivationIndex,
       payment_required_txc: fee,
       metadata_cid: meta?.metaCid ?? null,
-      thumbnail_cid: data.thumbnailCid ?? null,
-      is_nsfw: data.nsfw,
+      thumbnail_cid: thumbnailCid,
+      is_nsfw: nsfw,
       source: data.source ?? "upload",
     });
     if (vErr) {
