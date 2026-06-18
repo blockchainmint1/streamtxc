@@ -229,6 +229,10 @@ export const kickHlsPinAsync = createServerFn({ method: "POST" })
     return d;
   })
   .handler(async ({ data }) => {
+    return kickHlsPinAsyncForJob(data);
+  });
+
+export async function kickHlsPinAsyncForJob(data: { cid: string; jobId: string }) {
     const token = process.env.IPFS_LAMBDA_TOKEN;
     const fnName = process.env.IPFS_LAMBDA_NAME;
     const callbackSecret = process.env.MEDIACONVERT_WEBHOOK_SECRET;
@@ -291,4 +295,4 @@ export const kickHlsPinAsync = createServerFn({ method: "POST" })
     });
 
     return { ok: true, files: keys.length, callbackUrl };
-  });
+}

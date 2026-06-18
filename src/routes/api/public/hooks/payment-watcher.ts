@@ -254,7 +254,7 @@ async function processStuckPinning() {
   const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   const { data: stuck, error } = await supabaseAdmin
     .from("videos")
-    .select("cid, transcode_started_at")
+    .select("cid, transcode_job_id, transcode_started_at")
     .eq("transcode_status", "pinning")
     .is("hls_cid", null)
     .lt("transcode_started_at", cutoff)
@@ -262,16 +262,20 @@ async function processStuckPinning() {
   if (error) return { ok: false, error: error.message };
   if (!stuck || stuck.length === 0) return { retried: 0 };
 
-  const { retryFinalizePinFromS3 } = await import("@/lib/finalize-hls-pin.server");
+  const { kickHlsPinAsyncForJob } = await import("@/lib/ipfs-lambda.functions");
   const results: Array<Record<string, unknown>> = [];
   for (const row of stuck) {
     try {
-      const r = await retryFinalizePinFromS3(row.cid);
-      results.push({ cid: row.cid, action: "auto_finalized", ...r });
+      if (!row.transcode_job_id) {
+        results.push({ cid: row.cid, action: "auto_requeue_failed", error: "missing job id" });
+        continue;
+      }
+      const r = await kickHlsPinAsyncForJob({ cid: row.cid, jobId: row.transcode_job_id });
+      results.push({ cid: row.cid, action: "auto_pin_requeued", ...r });
     } catch (err) {
       results.push({
         cid: row.cid,
-        action: "auto_finalize_failed",
+        action: "auto_requeue_failed",
         error: err instanceof Error ? err.message : String(err),
       });
     }

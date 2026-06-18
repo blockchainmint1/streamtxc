@@ -1240,12 +1240,13 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
   const [quote, setQuote] = useState<Awaited<
     ReturnType<typeof buildBulkExtendQuote>
   > | null>(null);
-  const months = 1;
+  const [months, setMonths] = useState(1);
+  const [windowDays, setWindowDays] = useState(30);
 
   async function load() {
     setLoading(true);
     try {
-      const res = await buildQuote({ data: { wallet, months } });
+      const res = await buildQuote({ data: { wallet, months, windowDays } });
       setQuote(res);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to build quote");
@@ -1305,18 +1306,59 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
     >
       <DialogTrigger asChild>
         <Button className="font-mono shrink-0" variant="outline">
-          <CalendarPlus className="mr-2 h-4 w-4" /> extend all +30d
+          <CalendarPlus className="mr-2 h-4 w-4" /> bulk renew
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Bulk extend +30 days</DialogTitle>
+          <DialogTitle>Bulk renew expiring videos</DialogTitle>
           <DialogDescription>
-            Paste this <span className="font-mono">sendmany</span> into your TXC
-            web wallet, broadcast it, then paste the txid below to verify and
-            credit each video by the exact amount paid.
+            Pick a window and how many months to add. We'll build one
+            <span className="font-mono"> sendmany </span> transaction covering
+            every expiring video. Broadcast it from your TXC wallet, then paste
+            the txid below to credit each video by the exact amount paid.
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex flex-wrap items-end gap-4 border border-border rounded-sm p-3 bg-card/50">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="bulk-window" className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              expiring within (days)
+            </Label>
+            <Input
+              id="bulk-window"
+              type="number"
+              min={1}
+              max={3650}
+              value={windowDays}
+              onChange={(e) => setWindowDays(Math.max(1, Number(e.target.value) || 1))}
+              className="font-mono w-28"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="bulk-months" className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              renew for (months)
+            </Label>
+            <Input
+              id="bulk-months"
+              type="number"
+              min={1}
+              max={24}
+              value={months}
+              onChange={(e) => setMonths(Math.min(24, Math.max(1, Number(e.target.value) || 1)))}
+              className="font-mono w-28"
+            />
+          </div>
+          <Button
+            variant="outline"
+            className="font-mono"
+            onClick={load}
+            disabled={loading}
+          >
+            {loading ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <RefreshCw className="h-3 w-3 mr-2" />}
+            rebuild quote
+          </Button>
+        </div>
 
         {loading ? (
           <div className="py-8 text-center font-mono text-muted-foreground">
@@ -1325,7 +1367,7 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
           </div>
         ) : !quote ? null : quote.items.length === 0 ? (
           <p className="font-mono text-muted-foreground py-6">
-            No videos with deposit addresses to extend.
+            No videos expiring in the next {windowDays} day{windowDays === 1 ? "" : "s"}.
           </p>
         ) : (
           <div className="space-y-4">
