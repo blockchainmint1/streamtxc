@@ -23,6 +23,10 @@ const SORTS: { key: SortKey; label: string }[] = [
 
 export const Route = createFileRoute("/")({
   component: IndexPage,
+  head: () => ({
+    meta: [{ property: "og:url", content: "https://streamtxc.com/" }],
+    links: [{ rel: "canonical", href: "https://streamtxc.com/" }],
+  }),
 });
 
 function IndexPage() {
@@ -55,7 +59,7 @@ function IndexPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-
+      <main>
       {/* Hero */}
       <section className="mx-auto w-full max-w-7xl px-6 pt-24 pb-16">
         <div className="font-mono text-xs text-primary mb-6">
@@ -119,7 +123,7 @@ function IndexPage() {
           ].map((p) => (
             <div key={p.title} className="bg-card p-6">
               <p.icon className="h-5 w-5 text-primary mb-3" />
-              <h3 className="font-mono text-sm font-bold mb-2">{p.title}</h3>
+              <h2 className="font-mono text-sm font-bold mb-2">{p.title}</h2>
               <p className="text-sm text-muted-foreground">{p.body}</p>
             </div>
           ))}
@@ -232,7 +236,7 @@ function IndexPage() {
           </>
         )}
       </section>
-
+      </main>
       <Footer />
     </div>
   );
