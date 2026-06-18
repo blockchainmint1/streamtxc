@@ -182,13 +182,66 @@ async function handler({ request }: { request: Request }) {
   const commentResults = await processPendingComments();
   const boostResults = await processPendingBoosts();
   const pinningResults = await processStuckPinning();
+  const backfillResults = await processBackfillHls();
   return Response.json({
     ok: true,
     videos: videoResults,
     comments: commentResults,
     boosts: boostResults,
     stuckPinning: pinningResults,
+    backfillHls: backfillResults,
   });
+}
+
+/**
+ * Backfill old videos that pre-date the HLS pipeline. Picks up to 10 per
+ * tick (most-viewed first), copies the origin from IPFS into our S3 input
+ * bucket, and kicks off a MediaConvert job. The existing MediaConvert
+ * webhook + finalize-hls flow takes over from there.
+ *
+ * Cheap when nothing is eligible (one indexed SELECT). Self-throttling: a
+ * row drops out of the candidate set as soon as it flips to
+ * transcode_status='processing', so the next tick picks the next 10.
+ */
+async function processBackfillHls() {
+  const e = {
+    input: process.env.AWS_S3_INPUT_BUCKET,
+    output: process.env.AWS_S3_OUTPUT_BUCKET,
+    role: process.env.AWS_MEDIACONVERT_ROLE_ARN,
+  };
+  if (!e.input || !e.output || !e.role) {
+    return { skipped: "transcode_not_configured" };
+  }
+  const { pickBackfillCandidates, backfillOneHls } = await import(
+    "@/lib/backfill-hls.server"
+  );
+  let candidates: Awaited<ReturnType<typeof pickBackfillCandidates>>;
+  try {
+    candidates = await pickBackfillCandidates(10);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+  if (candidates.length === 0) return { queued: 0 };
+
+  const results: Array<Record<string, unknown>> = [];
+  for (const row of candidates) {
+    try {
+      const r = await backfillOneHls(row.cid);
+      results.push({ cid: row.cid, action: "backfill_queued", ...r });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Mark failed so the same row doesn't get retried every tick.
+      await supabaseAdmin
+        .from("videos")
+        .update({
+          transcode_status: "failed",
+          transcode_error: msg.slice(0, 500),
+        })
+        .eq("cid", row.cid);
+      results.push({ cid: row.cid, action: "backfill_failed", error: msg });
+    }
+  }
+  return { queued: candidates.length, results };
 }
 
 /**
