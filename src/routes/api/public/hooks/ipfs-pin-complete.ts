@@ -71,6 +71,13 @@ export const Route = createFileRoute("/api/public/hooks/ipfs-pin-complete")({
         const result = await finalizeHlsPin({
           cid: videoCid, jobId, hlsCid: event.cid, renditions,
         });
+        // Self-node primary already succeeded (that's why we're here).
+        // Fire-and-forget Pinata backup on the HLS wrap-directory CID so
+        // the bundle lives in two places. Never throws.
+        const { pinByCid } = await import("@/lib/pinata.server");
+        pinByCid(event.cid, `hls-${videoCid}`).catch((e) =>
+          console.warn(`[ipfs-pin-complete ${videoCid}] pinata backup failed:`, e),
+        );
         console.log(`[ipfs-pin-complete ${videoCid}] hls cid ${event.cid} · rows ${result.rowsUpdated}`);
         return Response.json({ ok: true, ...result });
       },
