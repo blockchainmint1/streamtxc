@@ -244,6 +244,45 @@ export function gatewayUrl(cid: string): string {
 }
 
 /**
+ * Pinata-only gateway URL — used as the fallback target by `/api/stream/*`
+ * when the self-hosted node can't serve a CID. Skips `IPFS_GATEWAY_DOMAIN`
+ * even when it's set; that's the whole point of the fallback.
+ */
+export function pinataGatewayUrl(cid: string): string {
+  const pinata = process.env.PINATA_GATEWAY_DOMAIN;
+  if (pinata) return `https://${pinata}/ipfs/${cid}`;
+  return `https://gateway.pinata.cloud/ipfs/${cid}`;
+}
+
+/**
+ * Resolve the best gateway for a CID right now. Tries the self-hosted node
+ * first with a short HEAD probe; falls back to Pinata on miss/timeout so a
+ * not-yet-mirrored CID never leaves the UI broken. Returned URL is what
+ * `/api/stream/*` should 302 to.
+ *
+ * Keep the timeout tight — this runs on every stream redirect.
+ */
+export async function resolveGatewayUrl(
+  cid: string,
+  timeoutMs = 1500,
+): Promise<string> {
+  const ownNode = process.env.IPFS_GATEWAY_DOMAIN;
+  if (!ownNode) return pinataGatewayUrl(cid);
+  const selfUrl = `https://${ownNode}/ipfs/${cid}`;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(selfUrl, { method: "HEAD", signal: ctrl.signal });
+    if (res.ok) return selfUrl;
+  } catch {
+    // network error / abort — fall through
+  } finally {
+    clearTimeout(t);
+  }
+  return pinataGatewayUrl(cid);
+}
+
+/**
  * HEAD-probe the gateway for a CID. Returns true if the bytes are
  * fetchable right now (200 OK). Short timeout so we never block the UI
  * on a slow gateway. Best-effort — a `false` doesn't strictly prove the
