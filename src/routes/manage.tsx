@@ -734,8 +734,88 @@ function ManagePageInner() {
   );
 }
 
+const ADMIN_WALLET = "TeiqbqMxQG4JrDfrzdvTZcqhhai8KT5JTc";
+
+function BugReportsAdminSection({ wallet }: { wallet: string }) {
+  const fetchReports = useServerFn(listBugReports);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["bug-reports", wallet],
+    queryFn: () => fetchReports({ data: { wallet } }),
+    enabled: wallet === ADMIN_WALLET,
+  });
+  if (wallet !== ADMIN_WALLET) return null;
+  return (
+    <section className="mt-16 border-t border-border pt-8">
+      <div className="font-mono text-xs text-primary mb-3">[ BUG REPORTS · ADMIN ]</div>
+      <h2 className="text-2xl font-bold mb-4">Bug reports</h2>
+      {isLoading && (
+        <div className="font-mono text-xs text-muted-foreground">loading…</div>
+      )}
+      {error && (
+        <div className="font-mono text-xs text-destructive">
+          {error instanceof Error ? error.message : "failed to load"}
+        </div>
+      )}
+      {data && data.length === 0 && (
+        <div className="font-mono text-xs text-muted-foreground">No bug reports yet.</div>
+      )}
+      {data && data.length > 0 && (
+        <div className="space-y-3">
+          {data.map((r) => (
+            <div key={r.id} className="border border-border rounded-sm p-4 bg-card">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="font-mono text-[10px] text-muted-foreground">
+                  {new Date(r.created_at).toLocaleString()}
+                </div>
+                <div className="font-mono text-[10px] text-muted-foreground truncate max-w-[50%]">
+                  {r.page_url ?? "—"}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-xs font-mono mb-2">
+                <div><span className="text-muted-foreground">name:</span> {r.name || "—"}</div>
+                <div><span className="text-muted-foreground">email:</span> {r.email || "—"}</div>
+                <div><span className="text-muted-foreground">tg:</span> {r.telegram || "—"}</div>
+              </div>
+              <pre className="text-sm whitespace-pre-wrap break-words bg-muted/30 p-3 rounded-sm border border-border">
+{r.details}
+              </pre>
+              {r.attachment_data_url && (
+                <div className="mt-2">
+                  <a
+                    href={r.attachment_data_url}
+                    download={r.attachment_name ?? "attachment"}
+                    className="font-mono text-xs text-primary hover:underline"
+                  >
+                    📎 {r.attachment_name ?? "attachment"} ({r.attachment_type ?? "file"})
+                  </a>
+                  {r.attachment_type?.startsWith("image/") && (
+                    <img
+                      src={r.attachment_data_url}
+                      alt={r.attachment_name ?? "attachment"}
+                      className="mt-2 max-h-64 rounded-sm border border-border"
+                    />
+                  )}
+                </div>
+              )}
+              {r.reporter_wallet && (
+                <div className="mt-2 font-mono text-[10px] text-muted-foreground truncate">
+                  wallet: {r.reporter_wallet}
+                </div>
+              )}
+              {r.user_agent && (
+                <div className="font-mono text-[10px] text-muted-foreground truncate">
+                  ua: {r.user_agent}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function EditVideoDialog({
-// placeholder removed
   cid,
   initialTitle,
   initialDescription,
