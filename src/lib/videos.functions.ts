@@ -1729,6 +1729,15 @@ export const finalizeOwnTranscode = createServerFn({ method: "POST" })
       pinned = await pinDirectoryToIPFS(files, `hls-${data.cid}`);
     }
 
+    // Pinata backup (best-effort, never throws). pinDirectoryToIPFS already
+    // does this in the fallback branch above; this covers the Lambda /pin path.
+    if (lambdaToken && (lambdaName || lambdaUrl)) {
+      const { pinByCid } = await import("./pinata.server");
+      pinByCid(pinned.cid, `hls-${data.cid}`).catch((e) =>
+        console.warn(`[rebuild-hls ${data.cid}] pinata backup failed:`, e),
+      );
+    }
+
     const renditions = keys
       .filter((k) => k.endsWith(".m3u8") && !k.endsWith("/master.m3u8"))
       .map((k) => {
