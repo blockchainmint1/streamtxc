@@ -726,6 +726,7 @@ function ManagePageInner() {
           )}
           </>
         )}
+        {address && <BugReportsAdminSection wallet={address} />}
       </main>
       <Footer />
     </div>
