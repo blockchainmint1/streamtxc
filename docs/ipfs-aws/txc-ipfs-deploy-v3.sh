@@ -481,6 +481,7 @@ exports.handler = async (event) => {
     }
     const auth = event.headers?.authorization || event.headers?.Authorization || "";
     if (auth !== `Bearer ${BEARER}`) return resp(401, { error: "unauthorized" });
+    if (route === "POST /add") return await addToNode(event);
     const body = JSON.parse(event.body || "{}");
     if (route === "POST /pin-by-hash") return await pinByHash(body);
     if (route === "POST /pin-cid") return await pinCidOnNode(body);
