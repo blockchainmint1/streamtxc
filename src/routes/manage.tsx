@@ -735,6 +735,7 @@ function ManagePageInner() {
 }
 
 function EditVideoDialog({
+// placeholder removed
   cid,
   initialTitle,
   initialDescription,
