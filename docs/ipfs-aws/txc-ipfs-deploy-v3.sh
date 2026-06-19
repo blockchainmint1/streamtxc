@@ -764,6 +764,14 @@ else
   aws apigatewayv2 create-route --region "$AWS_REGION" --api-id "$API_ID" --route-key "POST /pin-cid" --target "integrations/$INTEGRATION_ID" >/dev/null
 fi
 
+echo "=== Ensuring /add route exists..."
+ADD_ROUTE_ID="$(aws apigatewayv2 get-routes --region "$AWS_REGION" --api-id "$API_ID" --query "Items[?RouteKey=='POST /add'].RouteId | [0]" --output text)"
+if [ -n "$ADD_ROUTE_ID" ] && [ "$ADD_ROUTE_ID" != "None" ]; then
+  aws apigatewayv2 update-route --region "$AWS_REGION" --api-id "$API_ID" --route-id "$ADD_ROUTE_ID" --target "integrations/$INTEGRATION_ID" >/dev/null
+else
+  aws apigatewayv2 create-route --region "$AWS_REGION" --api-id "$API_ID" --route-key "POST /add" --target "integrations/$INTEGRATION_ID" >/dev/null
+fi
+
 echo "=== Publishing Lambda code..."
 (cd lambda && zip -q -r ../function.zip index.js)
 aws lambda update-function-code --region "$AWS_REGION" \
