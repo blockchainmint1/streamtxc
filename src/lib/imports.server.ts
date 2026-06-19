@@ -95,29 +95,32 @@ export async function markImportFailed(id: string, msg: string) {
   await updateImportRow(id, { status: "failed", error_message: msg.slice(0, 500) });
 }
 
-// --- Streaming pin to Pinata --------------------------------------------
+// --- Streaming pin via S3 → self-hosted IPFS Lambda ---------------------
 //
-// Pinata officially recommends the TUS resumable protocol for files >100MB.
-// Single-shot multipart was hitting their edge with 503s on multi-GB uploads
-// (the worker would push for many minutes and Pinata's frontend would 503
-// the whole request). TUS chunks the upload into ~50MB PATCHes — each small
-// enough to be retried individually on 5xx — while still streaming bytes
-// straight from the source URL through the worker, never buffering the
-// full file.
+// Strategy (matches the rest of the app: self-node primary, Pinata backup):
+//   1. Open an S3 multipart upload into AWS_S3_INPUT_BUCKET/imports/{uuid}.
+//   2. Stream the source body through the Worker, PUT-ing one part at a
+//      time. Each part is ~50 MB so memory stays bounded and retries are
+//      cheap. Workers handle the part-by-part HTTP nicely (subrequest budget
+//      is per-request, not per-byte).
+//   3. Complete the multipart upload.
+//   4. Call the IPFS Lambda's POST /pin with that S3 key. Lambda streams
+//      the object into kubo and returns the CID.
+//   5. Fire-and-forget Pinata backup pin (pinByHash on the same CID).
+//   6. Delete the temp S3 object — the bytes now live in kubo, S3 was just
+//      the conduit.
+//
+// Part size + retry tuned to S3, not Pinata. Same chunked-reader contract
+// as the previous TUS implementation, so the import-stream route is a
+// drop-in caller.
 
-const PINATA_UPLOADS = "https://uploads.pinata.cloud/v3";
-const PINATA_API = "https://api.pinata.cloud/v3";
-const TUS_CHUNK_SIZE = 50 * 1024 * 1024; // 50 MB per Pinata's recommendation
-const TUS_MAX_RETRIES = 6;
-const TUS_RETRY_DELAYS_MS = [1_000, 3_000, 5_000, 10_000, 20_000, 30_000];
+const PART_SIZE = 50 * 1024 * 1024; // 50 MB — well above S3's 5 MB minimum
+const PART_MAX_RETRIES = 6;
+const PART_RETRY_DELAYS_MS = [1_000, 3_000, 5_000, 10_000, 20_000, 30_000];
 
 export interface StreamPinResult {
   cid: string;
   size: number;
-}
-
-function b64(s: string): string {
-  return Buffer.from(s, "utf8").toString("base64");
 }
 
 function sleep(ms: number) {
@@ -181,187 +184,121 @@ async function readChunk(
 }
 
 /**
- * Resolve the freshly-uploaded file's CID by querying Pinata's files API
- * for the unique keyvalue we tagged it with.
- */
-async function lookupFileByKeyvalue(
-  jwt: string,
-  uploadKey: string,
-): Promise<{ cid: string; size: number } | null> {
-  // Pinata indexes new files within a few seconds of TUS completion.
-  // Poll briefly.
-  const url = `${PINATA_API}/files/public?metadata[upload_key]=${encodeURIComponent(uploadKey)}&limit=1`;
-  for (let attempt = 0; attempt < 15; attempt++) {
-    try {
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
-      if (res.ok) {
-        const json = (await res.json()) as {
-          data?: { files?: { cid: string; size: number }[] };
-        };
-        const f = json.data?.files?.[0];
-        if (f?.cid) return { cid: f.cid, size: f.size };
-      }
-    } catch {
-      /* keep polling */
-    }
-    await sleep(2_000);
-  }
-  return null;
-}
-
-/**
- * Upload via TUS (resumable). Streams from `body`, buffers up to
- * TUS_CHUNK_SIZE in memory at a time, PATCHes each chunk with retry,
- * then resolves the resulting CID via the files API.
+ * Stream a remote file body into our self-hosted IPFS node, with Pinata
+ * as a backup. Pipeline: source → Worker → S3 (multipart) → Lambda /pin →
+ * kubo. Returns the file CID. Used by the URL and Zoom importers.
  */
 export async function pinStreamToIPFS(args: {
   body: ReadableStream<Uint8Array>;
   filename: string;
-  /** Pre-known content length of the file. Required by TUS Upload-Length. */
+  /** Pre-known content length of the file. Required to drive multipart sizing. */
   sizeBytes: number;
   mime?: string;
-  /** Called as bytes are flushed to Pinata, for the progress bar. */
+  /** Called as bytes are PUT to S3, for the progress bar. */
   onProgress?: (bytes: number) => void;
 }): Promise<StreamPinResult> {
-  const jwt = process.env.PINATA_JWT;
-  if (!jwt) throw new Error("PINATA_JWT is not configured");
+  const bucket = process.env.AWS_S3_INPUT_BUCKET;
+  if (!bucket) throw new Error("AWS_S3_INPUT_BUCKET missing");
+  const lambdaToken = process.env.IPFS_LAMBDA_TOKEN;
+  if (!lambdaToken) throw new Error("IPFS_LAMBDA_TOKEN missing");
 
-  const filetype = args.mime || "application/octet-stream";
-  const uploadKey = randomUUID();
+  const {
+    createMultipartUpload,
+    completeMultipartUpload,
+    abortMultipartUpload,
+    s3UploadPart,
+    deleteObject,
+  } = await import("./aws-s3.server");
 
-  // 1) Create the upload.
-  const createMetadata = [
-    `filename ${b64(args.filename)}`,
-    `filetype ${b64(filetype)}`,
-    `network ${b64("public")}`,
-    // Tag with a unique key so we can find the resulting file's CID afterwards.
-    `keyvalues ${b64(JSON.stringify({ upload_key: uploadKey }))}`,
-  ].join(",");
+  const key = `imports/${randomUUID()}`;
+  const ct = args.mime || "application/octet-stream";
 
-  const createRes = await fetch(`${PINATA_UPLOADS}/files`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      "Tus-Resumable": "1.0.0",
-      "Upload-Length": String(args.sizeBytes),
-      "Upload-Metadata": createMetadata,
-    },
+  const { uploadId } = await createMultipartUpload({
+    bucket,
+    key,
+    contentType: ct,
   });
-  if (!createRes.ok) {
-    const text = await createRes.text().catch(() => "");
-    throw new Error(
-      `Pinata TUS create failed [${createRes.status}]: ${text.slice(0, 300)}`,
-    );
-  }
-  const location = createRes.headers.get("location");
-  if (!location) {
-    throw new Error("Pinata TUS create returned no Location header");
-  }
-  const uploadUrl = location.startsWith("http")
-    ? location
-    : new URL(location, PINATA_UPLOADS).toString();
 
-  // 2) PATCH chunks.
   const reader = args.body.getReader();
   const leftover = { buf: null as Uint8Array | null };
+  const parts: { partNumber: number; etag: string }[] = [];
   let offset = 0;
+  let partNumber = 1;
 
-  while (offset < args.sizeBytes) {
-    const want = Math.min(TUS_CHUNK_SIZE, args.sizeBytes - offset);
-    const { chunk } = await readChunk(reader, want, leftover);
-    if (chunk.byteLength === 0) {
-      throw new Error(
-        `Upstream ended early at byte ${offset}/${args.sizeBytes}`,
-      );
-    }
-
-    let success = false;
-    let lastErr: unknown = null;
-    for (let attempt = 0; attempt < TUS_MAX_RETRIES; attempt++) {
-      try {
-        const patchRes = await fetch(uploadUrl, {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${jwt}`,
-            "Tus-Resumable": "1.0.0",
-            "Upload-Offset": String(offset),
-            "Content-Type": "application/offset+octet-stream",
-            "Content-Length": String(chunk.byteLength),
-          },
-          body: chunk.buffer.slice(
-            chunk.byteOffset,
-            chunk.byteOffset + chunk.byteLength,
-          ) as ArrayBuffer,
-        });
-        if (patchRes.status === 204 || patchRes.status === 200) {
-          const newOffset = Number(
-            patchRes.headers.get("upload-offset") ?? offset + chunk.byteLength,
-          );
-          offset = newOffset;
-          args.onProgress?.(offset);
-          success = true;
-          break;
-        }
-        // Retry on 5xx and 409 (offset mismatch — re-sync via HEAD).
-        if (patchRes.status >= 500 || patchRes.status === 409) {
-          const text = await patchRes.text().catch(() => "");
-          lastErr = new Error(
-            `PATCH ${patchRes.status} at offset ${offset}: ${text.slice(0, 200)}`,
-          );
-          // Re-sync offset from the server before retrying.
-          try {
-            const head = await fetch(uploadUrl, {
-              method: "HEAD",
-              headers: {
-                Authorization: `Bearer ${jwt}`,
-                "Tus-Resumable": "1.0.0",
-              },
-            });
-            const serverOffset = Number(head.headers.get("upload-offset") ?? offset);
-            if (Number.isFinite(serverOffset) && serverOffset > offset) {
-              // Server somehow advanced — accept and skip ahead.
-              offset = serverOffset;
-              args.onProgress?.(offset);
-              success = true;
-              break;
-            }
-          } catch {
-            /* ignore HEAD failure, just back off */
-          }
-          await sleep(TUS_RETRY_DELAYS_MS[attempt] ?? 30_000);
-          continue;
-        }
-        // Permanent error.
-        const text = await patchRes.text().catch(() => "");
+  try {
+    while (offset < args.sizeBytes) {
+      const want = Math.min(PART_SIZE, args.sizeBytes - offset);
+      const { chunk } = await readChunk(reader, want, leftover);
+      if (chunk.byteLength === 0) {
         throw new Error(
-          `Pinata TUS PATCH failed [${patchRes.status}] at offset ${offset}: ${text.slice(0, 300)}`,
+          `Upstream ended early at byte ${offset}/${args.sizeBytes}`,
         );
-      } catch (err) {
-        lastErr = err;
-        // Network error — retry with backoff.
-        if (attempt < TUS_MAX_RETRIES - 1) {
-          await sleep(TUS_RETRY_DELAYS_MS[attempt] ?? 30_000);
-          continue;
+      }
+
+      let etag: string | null = null;
+      let lastErr: unknown = null;
+      for (let attempt = 0; attempt < PART_MAX_RETRIES; attempt++) {
+        try {
+          etag = await s3UploadPart({
+            bucket,
+            key,
+            uploadId,
+            partNumber,
+            body: chunk,
+          });
+          break;
+        } catch (err) {
+          lastErr = err;
+          if (attempt < PART_MAX_RETRIES - 1) {
+            await sleep(PART_RETRY_DELAYS_MS[attempt] ?? 30_000);
+            continue;
+          }
         }
       }
+      if (!etag) {
+        throw lastErr instanceof Error
+          ? lastErr
+          : new Error(`S3 part ${partNumber} failed after retries`);
+      }
+
+      parts.push({ partNumber, etag });
+      offset += chunk.byteLength;
+      partNumber++;
+      args.onProgress?.(offset);
     }
-    if (!success) {
-      throw lastErr instanceof Error
-        ? lastErr
-        : new Error("Pinata TUS PATCH failed after retries");
-    }
+
+    await completeMultipartUpload({ bucket, key, uploadId, parts });
+  } catch (err) {
+    await abortMultipartUpload({ bucket, key, uploadId });
+    throw err;
   }
 
-  // 3) Resolve the CID.
-  const found = await lookupFileByKeyvalue(jwt, uploadKey);
-  if (!found) {
-    throw new Error(
-      "Upload completed but Pinata didn't surface a CID — check the Files dashboard.",
-    );
+  // S3 object is now sitting at s3://bucket/key. Push it into kubo via
+  // the IPFS Lambda. /pin always wraps the upload in a directory, so the
+  // raw file CID is the first manifest entry, not the wrap CID.
+  const { callPinLambda } = await import("./ipfs-lambda.functions");
+  const pinned = await callPinLambda(
+    { bucket, keys: [key] },
+    lambdaToken,
+  );
+  const fileCid = pinned.manifest?.[0]?.cid ?? pinned.cid ?? "";
+  if (!fileCid) {
+    throw new Error("IPFS Lambda /pin returned no CID");
   }
-  return { cid: found.cid, size: found.size };
+
+  // Backup: fire-and-forget Pinata pin. Never throws.
+  const { pinByCid } = await import("./pinata.server");
+  pinByCid(fileCid, args.filename).catch((e) =>
+    console.warn(`import backup pin failed for ${fileCid}:`, e),
+  );
+
+  // Best-effort delete the temp S3 object. The bytes now live in kubo;
+  // S3 was a conduit.
+  deleteObject(bucket, key).catch((e) =>
+    console.warn(`import temp delete failed for ${key}:`, e),
+  );
+
+  return { cid: fileCid, size: pinned.totalBytes ?? args.sizeBytes };
 }
 
 /**
