@@ -7,6 +7,7 @@
 #   - A Lambda in the same VPC that streams S3 → IPFS and returns a CID
 #   - An HTTP API Gateway in front of the Lambda with:
 #       POST /pin           (bearer auth, the main entrypoint)
+#       POST /add           (bearer auth, multipart upload → kubo /api/v0/add)
 #       POST /pin-by-hash   (bearer auth, proxies to Pinata if PINATA_JWT set)
 #       POST /pin-cid       (bearer auth, pins an existing CID on our IPFS node)
 #       GET  /health        (no auth, returns {ok:true})
@@ -434,6 +435,9 @@ Resources:
   RoutePin:
     Type: AWS::ApiGatewayV2::Route
     Properties: { ApiId: !Ref Api, RouteKey: "POST /pin",         Target: !Sub "integrations/${Integration}" }
+  RouteAdd:
+    Type: AWS::ApiGatewayV2::Route
+    Properties: { ApiId: !Ref Api, RouteKey: "POST /add",         Target: !Sub "integrations/${Integration}" }
   RoutePinByHash:
     Type: AWS::ApiGatewayV2::Route
     Properties: { ApiId: !Ref Api, RouteKey: "POST /pin-by-hash", Target: !Sub "integrations/${Integration}" }
