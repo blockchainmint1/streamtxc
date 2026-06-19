@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { gatewayUrl } from "@/lib/pinata.server";
+import { resolveGatewayUrl } from "@/lib/pinata.server";
 import { recordView } from "@/lib/videos.functions";
 
 async function hashIp(ip: string): Promise<string> {
@@ -47,10 +47,15 @@ export const Route = createFileRoute("/api/stream/$cid")({
         // gets stuck at 1. The actual video bytes are still cached by Pinata
         // and the browser via Range requests, so this only costs us a tiny
         // 302 per playback.
+        // Self-node first, Pinata fallback. HEAD-probes the self-hosted
+        // gateway with a short timeout; if it can't serve this CID (e.g.
+        // pin hasn't been mirrored yet) we 302 to Pinata so the player
+        // never sees a hang. See mem://constraints/ipfs-gateway-fallback.
+        const location = await resolveGatewayUrl(cid);
         return new Response(null, {
           status: 302,
           headers: {
-            location: gatewayUrl(cid),
+            location,
             "cache-control": "no-store",
             "access-control-allow-origin": "*",
           },

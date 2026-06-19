@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { gatewayUrl } from "@/lib/pinata.server";
+import { resolveGatewayUrl } from "@/lib/pinata.server";
 
 /**
  * Splat-path version of /api/stream/:cid for IPFS *directories* (e.g. HLS
@@ -20,10 +20,15 @@ export const Route = createFileRoute("/api/stream/$cid/$")({
         if (!cid || cid.length > 200 || splat.length > 500) {
           return new Response("Bad path", { status: 400 });
         }
+        // Same self-first / Pinata-fallback policy as /api/stream/$cid.
+        // We probe the directory CID (cheap, single request) and append
+        // the splat path to whichever gateway answers. For HLS bundles
+        // this means a missing self-node pin still streams via Pinata.
+        const base = await resolveGatewayUrl(cid);
         return new Response(null, {
           status: 302,
           headers: {
-            location: `${gatewayUrl(cid)}/${splat}`,
+            location: `${base}/${splat}`,
             "cache-control": "no-store",
             "access-control-allow-origin": "*",
           },

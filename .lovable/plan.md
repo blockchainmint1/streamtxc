@@ -1,102 +1,91 @@
-## Phase 2 — self-node primary, Pinata backup, for every flow
+# Why the new thumb won't show
 
-Goal: **every pin** writes to the self-hosted IPFS node first (must succeed). **Then** a best-effort `pinByHash` to Pinata as the backup. No flow stays Pinata-first.
+I traced the layers and found the actual culprit. It's not the DB and not React Query caching — it's the **self-hosted IPFS gateway**.
 
-This needs (a) one new Lambda route, (b) app-side rewrites of every pin helper, (c) you re-running the deploy script in CloudShell.
+## Evidence
 
----
+| Layer | Result | What it means |
+|---|---|---|
+| `videos.thumbnail_cid` in DB | `bafkreiexqk4jznorga33odddvpalap67tvxlkok7ndlswfqvnhre2claxi` | Edit saved correctly ✅ |
+| Pinata gateway for that CID | `200 OK`, 148 KB image/jpeg | Bytes exist on Pinata ✅ |
+| `ipfs.io` gateway for that CID | `200 OK`, 148 KB image/jpeg | Bytes exist on the public network ✅ |
+| `ipfs.honest.money` (self-node) for that CID | **Hangs 15s → timeout (HTTP 000)** | Self-node does NOT have it ❌ |
+| `ipfs.honest.money` for the original video CID `QmZj…` | `200 OK` in 288 ms | Self-node is healthy, just missing this blob |
 
-### Part A — Lambda change: add `POST /add`
+Since the Phase 2 change made `gatewayUrl()` prefer the self-node, the watch-page poster URL (`/api/stream/<thumb>`) 302-redirects to `https://ipfs.honest.money/ipfs/bafkreiexqk…`, which hangs. The `<img>` request silently fails after a long timeout, so the player slot stays black (or shows whatever the browser cached from before).
 
-Today the Lambda has `/pin` (streams S3 → kubo), `/pin-cid` (pins an existing CID), `/pin-by-hash` (proxy to Pinata), `/health`. There's no way to push raw bytes into kubo — which is why thumbnails / JSON / comments all reached for Pinata. We add one route:
+## Root cause options (need to confirm which)
 
-`POST /add` — accepts `multipart/form-data` with one or more `file` parts, forwards to kubo `/api/v0/add?cid-version=1&raw-leaves=true&pin=true` (with `wrap-with-directory=true` when >1 part). Returns `{ cid, files, totalBytes, manifest }` — same shape as `/pin`.
+The new thumb was pinned through `pinFileToIPFS → addToSelfNode → POST /add` on the Lambda. It returned a CID (the one now in the DB), so the call appeared to succeed. But the gateway can't serve it. That points to one of:
 
-I'll patch three files in lockstep so they stay identical:
-- `docs/ipfs-aws/txc-ipfs-deploy-v3.sh` (canonical)
-- `public/txc-ipfs-deploy-v3.sh` (served at https://streamtxc.com/txc-ipfs-deploy-v3.sh)
-- `txc-ipfs-deploy-v3.sh` at repo root (currently stale — I'll resync it)
+1. **The Phase 2 Lambda redeploy never landed.** The new `/add` route doesn't exist on the live Lambda yet, and a different path (maybe an SDK fallback) handed back a computed CID without actually adding bytes to kubo.
+2. **`/add` is deployed but isn't pinning.** Less likely — the code passes `pin=true` and `raw-leaves=true`, which should add + pin in one shot. But worth verifying with `/api/v0/pin/ls` on the node.
+3. **Pin succeeded, kubo is still resolving across the network.** Unlikely for a 148 KB blob that's been on Pinata for hours — kubo should have it locally if `/add` actually ran.
 
-Inside the script: add the `/add` handler to the inline Lambda code, add `RouteAdd` to the CFN template, and add a small idempotent "ensure /add route exists" block next to the existing `/pin-cid` one (lines 705-713) so re-running the script on an already-deployed stack just adds the new route without recreating anything.
+Most likely: **(1)**. The CloudShell redeploy instructions from earlier need to be run.
 
-### Part B — App-side: flip every pin helper to "self-node first, Pinata backup"
+## Plan
 
-**`src/lib/pinata.server.ts`** — rewrite each helper:
+### 1. Verify Lambda state — copy/paste diagnostic (no code changes)
 
-- `pinFileToIPFS(blob, filename)` → POST `/add` with single file (primary, throws on fail). Then fire-and-forget `pinByHash` to Pinata with the returned CID (logs on fail).
-- `pinJsonToIPFS(obj, filename)` → wrap in Blob, call `pinFileToIPFS`.
-- `pinDirectoryToIPFS(files, dirName)` → POST `/add` with N parts + `wrap-with-directory=true` (primary). Then `pinByHash` backup on the dir CID.
-- `pinByCid(cid)` → call Lambda `/pin-cid` (primary), then Pinata `pinByHash` (backup). Same flip; today it does both but treats Pinata as primary.
-- `unpinByCid(cid)` → unchanged (Pinata-only; we're only removing Pinata from the *write* path, not the cleanup path).
-- Delete `alsoPinToSelfNode` — no longer needed since `/add` IS the self-node.
-- `createPresignedUploadUrl()` — unused after Part C; remove.
-
-**`src/lib/imports.server.ts`** (URL / Zoom imports) — currently Pinata-only. Rewrite to:
-1. Stream source URL → S3 at `s3://{AWS_S3_INPUT_BUCKET}/imports/{uuid}` (uses existing `aws-s3.server.ts`).
-2. Call existing Lambda `/pin` with that S3 key (primary).
-3. `pinByHash` backup on resulting CID.
-4. Best-effort delete the temp S3 object.
-
-**HLS bundle finalize** (`src/routes/api/public/hooks/ipfs-pin-complete.ts`) — already self-node primary; add a `pinByHash` backup call after the videos row is finalized so the HLS dir CID also lives on Pinata.
-
-**`src/routes/api/public/hooks/mediaconvert.ts` + `kickHlsPinAsync`** — same: after successful Lambda `/pin`, kick a `pinByHash` backup on the wrap CID.
-
-### Part C — Verify
-
-After Part A redeploy and Part B ship:
-- Upload a new video → check the videos row for `transcode_status='ready'` and CID present.
-- Hit `${IPFS_GATEWAY_DOMAIN}/ipfs/{cid}` directly → 200.
-- Wait ~30s, then check Pinata dashboard → CID shows up in the pin queue.
-- Post a comment → comment CID exists at both `${IPFS_GATEWAY_DOMAIN}/ipfs/{cid}` and `gateway.pinata.cloud/ipfs/{cid}`.
-- Run `src/routes/api/public/admin/backfill-self-pins.ts` once to mirror any old Pinata-only CIDs into the self-node (so nothing in the catalog is single-homed).
-
-### What I'm NOT touching this phase
-
-- The `gatewayUrl()` read fallback chain — stays `IPFS_GATEWAY_DOMAIN` → `PINATA_GATEWAY_DOMAIN` → public. (Already correct.)
-- `PINATA_JWT` secret — still required; it's now the backup writer + the unpin path.
-- Footer copy — I'll change "pinned via pinata" to "pinned to self-hosted IPFS, backed up to Pinata" so it matches reality.
-
----
-
-## Copy-paste CloudShell instructions (after I push the code)
-
-Once the code lands and you've verified the preview deploys, open AWS CloudShell in the **us-east-1** region and run:
+You'll run this in CloudShell. If `/add` returns a CID for a tiny test file but the gateway still can't serve it, we know the bug is in `/add`. If `/add` returns a 4xx/5xx, we know the Lambda wasn't redeployed.
 
 ```bash
-cd ~
-curl -fsS https://streamtxc.com/txc-ipfs-deploy-v3.sh -o txc-ipfs-deploy-v3.sh
-chmod +x txc-ipfs-deploy-v3.sh
-
-# Required: same S3 bucket MediaConvert writes to
-export S3_BUCKET=<your-mediaconvert-output-bucket>
-
-# Reuse your existing VPC / subnets so the script doesn't try to make new ones
-# (grab these from the previous deploy-output.env in ~/txc-ipfs)
-export VPC_ID=<vpc-xxx>
-export PUBLIC_SUBNET=<subnet-xxx>
-export PRIVATE_SUBNET=<subnet-yyy>
-
-# Keep Pinata backup wired in the Lambda env (same JWT as before)
-export PINATA_JWT='<paste your existing PINATA_JWT>'
-
-./txc-ipfs-deploy-v3.sh
+. ~/txc-ipfs/deploy-output.env
+echo "hello-$(date +%s)" > /tmp/probe.txt
+echo "=== POST /add ==="
+curl -sS -X POST "$IPFS_LAMBDA_URL/add" \
+  -H "Authorization: Bearer $IPFS_LAMBDA_TOKEN" \
+  -F "file=@/tmp/probe.txt"
+echo
+echo "=== Is the broken thumb pinned on the node? ==="
+curl -sS "$IPFS_LAMBDA_URL/pin-cid" \
+  -H "Authorization: Bearer $IPFS_LAMBDA_TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"cid":"bafkreiexqk4jznorga33odddvpalap67tvxlkok7ndlswfqvnhre2claxi"}'
 ```
 
-The script is idempotent — it'll detect the existing stacks, only patch the Lambda code and add the new `/add` API route, then print confirmation. **No new secrets to copy back to Lovable** for this phase — the existing `IPFS_LAMBDA_URL` / `IPFS_LAMBDA_TOKEN` / `IPFS_LAMBDA_NAME` keep working with the new route.
+- `/add` returns a `bafy…` CID → route is live; the missing-pin issue is real and `/pin-cid` will pull it from the network and pin it (fixes the immediate bad row).
+- `/add` returns 404 / "route not found" → redeploy the Lambda using the Phase 2 script, then re-run.
 
-Final smoke test in CloudShell after the script finishes:
-```bash
-API_URL=$(grep IPFS_LAMBDA_URL ~/txc-ipfs/deploy-output.env | cut -d= -f2)
-TOKEN=$(grep IPFS_LAMBDA_TOKEN ~/txc-ipfs/deploy-output.env | cut -d= -f2)
-echo "hello from streamtxc" > /tmp/hello.txt
-curl -sS -X POST "$API_URL/add" \
-  -H "Authorization: Bearer $TOKEN" \
-  -F "file=@/tmp/hello.txt"
-```
-Expected: JSON with `cid` field. Copy that CID, then:
-```bash
-curl -sI "https://<your IPFS_GATEWAY_DOMAIN>/ipfs/<cid>" | head -3
-```
-Expected: `200 OK`.
+### 2. App-side defensive fix — fall through to Pinata when self-node misses
 
-If both pass, the redeploy worked. App-side pins will then start writing self-node first / Pinata backup automatically.
+Right now `/api/stream/$cid` blindly 302s to `gatewayUrl(cid)`, which is the self-node. If the self-node doesn't have the CID, the user sees a hang or a black box. Change it to:
+
+- Issue a short HEAD probe to the self-node (~2 s timeout).
+- On 200 → 302 to self-node (current behavior).
+- On miss / timeout → 302 to Pinata gateway instead.
+- No caching of the decision (we still want `no-store` on the 302).
+
+This keeps the self-node primary for cost/independence but means a missing pin never breaks the UI — Pinata always serves while we backfill the self-node.
+
+Files touched:
+- `src/routes/api/stream.$cid.tsx` — add the HEAD-probe fallthrough.
+- `src/routes/api/stream.$cid.$.tsx` — same logic for HLS subpaths (use `headCidOnGateway` against the directory CID).
+- `src/lib/pinata.server.ts` — small helper `pinataGatewayUrl(cid)` that ignores `IPFS_GATEWAY_DOMAIN` and returns the Pinata URL specifically, so the fallback target is explicit.
+
+### 3. Backfill helper — re-pin everything the self-node is missing
+
+We already have `pinCidOnNode` in the Lambda and a `backfill-self-pins` admin route. Extend that route (or add a new one) to:
+
+- Walk recent `videos` rows.
+- For each `thumbnail_cid`, `metadata_cid`, `hls_cid`, and `cid` — HEAD-probe `ipfs.honest.money`.
+- Anything that misses → call Lambda `/pin-cid` to pull from the network.
+
+That brings any rows in the same state (saved-in-DB-but-not-on-self-node) back in sync without a manual sweep.
+
+### 4. Document the convention in `mem://`
+
+Save a `constraint` memory: "Self-node IPFS gateway is primary; `/api/stream/*` must HEAD-probe and fall through to Pinata. Don't remove the fallback — a missing self-node pin will silently break thumbnails/players." So this doesn't get refactored away later.
+
+## What you'll see when it's done
+
+- New thumb on `/v/QmZj…` shows immediately (Pinata serves it while the self-node is still missing).
+- Network tab: `/api/stream/<bafkrei…>` → 302 → `gateway.pinata.cloud/ipfs/<bafkrei…>` → 200 jpeg.
+- After running step 1's `/pin-cid` command, the 302 starts going to `ipfs.honest.money` instead (cheaper path).
+- Step 3 backfill makes sure no other rows are stuck in this half-state.
+
+## Out of scope for this turn
+
+- Changing how `editVideoMetadata` pins (it already calls `pinFileToIPFS`; the call returns a CID so the client-side path is fine).
+- Reworking the Phase 2 deploy script (we'll only re-run it if step 1 shows `/add` isn't live).
