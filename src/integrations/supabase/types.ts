@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      bug_reports: {
+        Row: {
+          attachment_data_url: string | null
+          attachment_name: string | null
+          attachment_type: string | null
+          created_at: string
+          details: string
+          email: string | null
+          id: string
+          name: string | null
+          page_url: string | null
+          reporter_wallet: string | null
+          telegram: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          attachment_data_url?: string | null
+          attachment_name?: string | null
+          attachment_type?: string | null
+          created_at?: string
+          details: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          page_url?: string | null
+          reporter_wallet?: string | null
+          telegram?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          attachment_data_url?: string | null
+          attachment_name?: string | null
+          attachment_type?: string | null
+          created_at?: string
+          details?: string
+          email?: string | null
+          id?: string
+          name?: string | null
+          page_url?: string | null
+          reporter_wallet?: string | null
+          telegram?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       chain_events: {
         Row: {
           block_hash: string | null

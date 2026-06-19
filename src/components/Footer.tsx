@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { BugReportDialog } from "@/components/BugReportDialog";
 
 export function Footer() {
   return (
@@ -47,6 +48,7 @@ export function Footer() {
           <Link to="/privacy" className="hover:text-foreground transition-colors">privacy</Link>
           <Link to="/terms" className="hover:text-foreground transition-colors">terms</Link>
           <Link to="/api" className="hover:text-foreground transition-colors">api</Link>
+          <BugReportDialog />
         </div>
       </div>
     </footer>
