@@ -491,6 +491,53 @@ exports.handler = async (event) => {
   }
 };
 
+// POST /add — multipart upload of raw bytes straight into kubo. Used by
+// the app for everything that isn't a MediaConvert HLS bundle: thumbnails,
+// JSON metadata, comment bodies, chain-stamp JSON, etc. The request body
+// is multipart/form-data with one or more "file" parts; we forward it
+// verbatim to /api/v0/add and return the resulting CID(s). When >1 part,
+// the caller can ask us to wrap them in a directory via ?wrap=1.
+async function addToNode(event) {
+  if (!IPFS_API) return resp(503, { error: "IPFS_API not configured" });
+  const ct = event.headers?.["content-type"] || event.headers?.["Content-Type"] || "";
+  if (!ct.toLowerCase().startsWith("multipart/form-data")) {
+    return resp(400, { error: "Content-Type must be multipart/form-data" });
+  }
+  const qs = event.queryStringParameters || {};
+  const wrap = qs.wrap === "1" || qs.wrap === "true";
+  const raw = event.body
+    ? (event.isBase64Encoded
+        ? Buffer.from(event.body, "base64")
+        : Buffer.from(event.body, "utf8"))
+    : Buffer.alloc(0);
+  const url = `${IPFS_API}/api/v0/add?cid-version=1&raw-leaves=true&pin=true&progress=false${wrap ? "&wrap-with-directory=true" : ""}`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": ct },
+    body: raw,
+  });
+  if (!r.ok) {
+    const t = await r.text();
+    return resp(502, { ok: false, error: "ipfs add failed", status: r.status, body: t.slice(0, 1000) });
+  }
+  const text = await r.text();
+  const entries = text.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
+  // When wrap=true kubo emits a final entry with Name=="" (the wrap dir);
+  // otherwise the root is just the last entry.
+  const root = wrap
+    ? (entries.find((e) => e.Name === "" || e.Name === "wrap") || entries[entries.length - 1])
+    : entries[entries.length - 1];
+  const totalBytes = entries.reduce((s, e) => s + Number(e.Size || 0), 0);
+  return resp(200, {
+    cid: root?.Hash,
+    files: entries.length,
+    totalBytes,
+    manifest: entries
+      .filter((e) => e.Hash && e.Hash !== root?.Hash)
+      .map((e) => ({ path: e.Name || "", cid: e.Hash, size: Number(e.Size || 0) })),
+  });
+}
+
 async function pinFromS3(body) {
   const bucket = body.bucket;
   const prefix = body.prefix || "";
