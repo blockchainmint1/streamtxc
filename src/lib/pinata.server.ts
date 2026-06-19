@@ -1,98 +1,140 @@
-// Pinata IPFS pinning client (server-only). Uses JWT auth.
-// https://docs.pinata.cloud/api-reference/endpoint/upload-a-file
+// IPFS pin client (server-only).
+//
+// Strategy: self-hosted IPFS node (the kubo behind IPFS_GATEWAY_DOMAIN) is
+// the PRIMARY home for every CID we create. Pinata is a best-effort BACKUP
+// — we ping its pinByHash API after the primary succeeds, but failures are
+// swallowed and logged. If the self-node is unreachable the caller sees a
+// hard error.
+//
+// Two transports into the self-node, both via the IPFS Lambda:
+//   - POST /add      multipart/form-data → kubo /api/v0/add  (for arbitrary bytes:
+//                    thumbnails, JSON, comments, chain stamps, small directories)
+//   - POST /pin      streams S3 objects → kubo /api/v0/add   (for big bundles
+//                    like HLS ladders — see ipfs-lambda.functions.ts)
 
-const PINATA_UPLOADS = "https://uploads.pinata.cloud/v3";
 const PINATA_API = "https://api.pinata.cloud/v3";
 const PINATA_LEGACY = "https://api.pinata.cloud";
+const PINATA_UPLOADS = "https://uploads.pinata.cloud/v3";
 
 export interface PinResult {
   cid: string;
   size: number;
+  /** Legacy Pinata file id. Empty string in the self-node-primary path. */
   pinataId: string;
 }
 
+function lambdaConfig(): { url: string; token: string } {
+  const url = process.env.IPFS_LAMBDA_URL;
+  const token = process.env.IPFS_LAMBDA_TOKEN;
+  if (!url || !token) {
+    throw new Error(
+      "IPFS_LAMBDA_URL / IPFS_LAMBDA_TOKEN missing — self-hosted IPFS node is unreachable",
+    );
+  }
+  return { url: url.replace(/\/$/, ""), token };
+}
+
 /**
- * Best-effort: also pin a CID to our self-hosted IPFS node (honest.money)
- * so every Pinata-pinned CID lives in two places. Never throws — failures
- * are logged and swallowed; Pinata remains the source of truth.
+ * Fire-and-forget Pinata backup pin. NEVER throws — failures are logged.
+ * Runs `pinByHash` against the CID we just wrote to the self-node so the
+ * same bytes also live in our Pinata account.
  */
-async function alsoPinToSelfNode(cid: string, name?: string): Promise<void> {
-  const lambdaUrl = process.env.IPFS_LAMBDA_URL;
-  const lambdaToken = process.env.IPFS_LAMBDA_TOKEN;
-  if (!lambdaUrl || !lambdaToken) return;
+async function backupPinToPinata(cid: string, name?: string): Promise<void> {
+  const jwt = process.env.PINATA_JWT;
+  if (!jwt) {
+    console.log(`pinata-backup: skipping ${cid} (PINATA_JWT not configured)`);
+    return;
+  }
   try {
-    const res = await fetch(`${lambdaUrl.replace(/\/$/, "")}/pin-cid`, {
+    const res = await fetch(`${PINATA_LEGACY}/pinning/pinByHash`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${lambdaToken}`,
+        Authorization: `Bearer ${jwt}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ cid, name: name ?? cid }),
+      body: JSON.stringify({
+        hashToPin: cid,
+        pinataMetadata: { name: name ?? cid },
+      }),
     });
-    if (!res.ok) {
+    if (!res.ok && res.status !== 409) {
       const text = await res.text().catch(() => "");
-      console.warn(`self-node mirror pin failed [${res.status}]: ${text}`);
+      console.warn(
+        `pinata-backup: pinByHash ${cid} soft-fail [${res.status}] ${text.slice(0, 200)}`,
+      );
     }
   } catch (err) {
-    console.warn("self-node mirror pin threw", err);
+    console.warn(`pinata-backup: pinByHash ${cid} threw`, err);
   }
 }
 
+interface AddResponse {
+  cid?: string;
+  files?: number;
+  totalBytes?: number;
+  manifest?: Array<{ path: string; cid: string; size: number }>;
+}
+
+/**
+ * Stream a multipart FormData into kubo via the Lambda's POST /add route.
+ * Returns the root CID. When `wrap` is true, kubo wraps the parts in a
+ * directory and the root CID is the directory CID.
+ */
+async function addToSelfNode(
+  form: FormData,
+  opts: { wrap: boolean; name: string },
+): Promise<{ cid: string; size: number }> {
+  const { url, token } = lambdaConfig();
+  const q = opts.wrap ? "?wrap=1" : "";
+  const res = await fetch(`${url}/add${q}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `Self-node /add failed [${res.status}] for ${opts.name}: ${text.slice(0, 400)}`,
+    );
+  }
+  const json = (await res.json()) as AddResponse;
+  if (!json.cid) {
+    throw new Error(`Self-node /add returned no cid for ${opts.name}`);
+  }
+  return { cid: json.cid, size: json.totalBytes ?? 0 };
+}
+
+/**
+ * Pin a single file to IPFS. Self-node primary; Pinata backup best-effort.
+ */
 export async function pinFileToIPFS(
   file: Blob | File,
   filename: string,
 ): Promise<PinResult> {
-  const jwt = process.env.PINATA_JWT;
-  if (!jwt) throw new Error("PINATA_JWT is not configured");
-
   const form = new FormData();
+  // Single-file add — no wrap. The returned root CID is the file CID.
   form.append("file", file, filename);
-  form.append("network", "public");
-  // Request CIDv1 (bafy…) instead of legacy CIDv0 (Qm…)
-  form.append("pinataOptions", JSON.stringify({ cidVersion: 1 }));
-
-  const res = await fetch(`${PINATA_UPLOADS}/files`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${jwt}` },
-    body: form,
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Pinata upload failed [${res.status}]: ${text}`);
-  }
-
-  const json = (await res.json()) as {
-    data: { id: string; cid: string; size: number };
-  };
-  const result = {
-    cid: json.data.cid,
-    size: json.data.size,
-    pinataId: json.data.id,
-  };
-  await alsoPinToSelfNode(result.cid, filename);
-  return result;
+  const primary = await addToSelfNode(form, { wrap: false, name: filename });
+  // Background backup — don't await; we don't want a slow Pinata to block
+  // upload latency, and we never want a Pinata failure to break the call.
+  void backupPinToPinata(primary.cid, filename);
+  return { cid: primary.cid, size: primary.size || file.size, pinataId: "" };
 }
 
 /**
- * Pin a directory of files to IPFS as a single directory CID. Used for HLS
- * bundles where the master playlist references rendition playlists, which in
- * turn reference .ts segments by relative path. The directory CID becomes the
- * stable handle: `https://{gateway}/ipfs/{dirCid}/master.m3u8`.
+ * Pin a directory of files as a single wrap-directory CID. Self-node
+ * primary; Pinata backup best-effort. Each entry's `path` becomes the
+ * relative path inside the wrap dir, e.g. `720p/index.m3u8`.
  *
- * Uses the legacy v1 `pinFileToIPFS` endpoint because it natively supports
- * directory uploads: each FormData `file` entry's filename can contain a path
- * (e.g. `bundle/720p/index.m3u8`) and Pinata wraps them into a single
- * directory whose CID is returned.
+ * NOTE: API Gateway has a 10 MB request-body cap. For large directories
+ * (HLS bundles), prefer the S3 → Lambda /pin path
+ * (see `kickHlsPinAsync` in ipfs-lambda.functions.ts) instead of this.
  */
 export async function pinDirectoryToIPFS(
   files: Array<{ path: string; body: Blob | Uint8Array; contentType?: string }>,
   dirName: string,
 ): Promise<PinResult> {
-  const jwt = process.env.PINATA_JWT;
-  if (!jwt) throw new Error("PINATA_JWT is not configured");
   if (files.length === 0) throw new Error("pinDirectoryToIPFS: no files");
-
   const form = new FormData();
   let totalSize = 0;
   for (const f of files) {
@@ -103,49 +145,18 @@ export async function pinDirectoryToIPFS(
             type: f.contentType ?? "application/octet-stream",
           });
     totalSize += blob.size;
-    // Filename MUST start with a directory name; Pinata uses the path to build
-    // the directory tree. Strip any leading slashes from the caller's path.
     const cleanPath = f.path.replace(/^\/+/, "");
-    form.append("file", blob, `${dirName}/${cleanPath}`);
+    // Kubo /add with wrap-with-directory uses the part filenames as
+    // relative paths inside the resulting directory.
+    form.append("file", blob, cleanPath);
   }
-  form.append(
-    "pinataOptions",
-    JSON.stringify({ cidVersion: 1, wrapWithDirectory: false }),
-  );
-  form.append(
-    "pinataMetadata",
-    JSON.stringify({ name: dirName }),
-  );
-
-  const res = await fetch(`${PINATA_LEGACY}/pinning/pinFileToIPFS`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${jwt}` },
-    body: form,
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Pinata directory pin failed [${res.status}]: ${text}`);
-  }
-
-  const json = (await res.json()) as {
-    IpfsHash: string;
-    PinSize: number;
-    Timestamp: string;
-    ID?: string;
-  };
-  const result = {
-    cid: json.IpfsHash,
-    size: json.PinSize ?? totalSize,
-    pinataId: json.ID ?? json.IpfsHash,
-  };
-  await alsoPinToSelfNode(result.cid, dirName);
-  return result;
+  const primary = await addToSelfNode(form, { wrap: true, name: dirName });
+  void backupPinToPinata(primary.cid, dirName);
+  return { cid: primary.cid, size: primary.size || totalSize, pinataId: "" };
 }
 
 /**
- * Pin a small JSON object to IPFS. Returns the CID. Used to anchor
- * comment bodies so the chain only needs to carry the CID pointer.
+ * Pin a small JSON object. Self-node primary; Pinata backup best-effort.
  */
 export async function pinJsonToIPFS(
   obj: unknown,
@@ -156,8 +167,10 @@ export async function pinJsonToIPFS(
 }
 
 /**
- * Request a presigned URL the browser can POST a file to directly.
- * Avoids streaming large files through our Worker.
+ * Legacy: presigned Pinata upload URL for the browser-direct upload path.
+ * Only used by the old `getUploadUrl` server function in videos.functions.ts
+ * (kept as a fallback for the original Upload flow before the S3 +
+ * MediaConvert pipeline took over). New code should not call this.
  */
 export async function createPresignedUploadUrl(opts: {
   filename: string;
@@ -191,39 +204,34 @@ export async function createPresignedUploadUrl(opts: {
 }
 
 /**
- * Pin an already-existing CID into our Pinata account so playback is reliable.
- * Returns the queue entry id; pinning happens asynchronously on Pinata's side.
+ * Pin an already-existing CID. Self-node first (mirrors via kubo /pin/add
+ * over the IPFS swarm); Pinata backup best-effort. Used to mirror old
+ * Pinata-only CIDs into our self-node and vice-versa.
  */
 export async function pinByCid(cid: string, name?: string): Promise<void> {
-  // Pin to BOTH our self-hosted IPFS node (honest.money) and Pinata so
-  // every CID is mirrored in two places. Self-node failures are
-  // best-effort and don't block the Pinata pin.
-  await alsoPinToSelfNode(cid, name);
-
-  const jwt = process.env.PINATA_JWT;
-  if (!jwt) throw new Error("PINATA_JWT is not configured");
-
-  // Use the legacy v1 pinByHash endpoint — the v3 `files/public/pin_by_cid`
-  // endpoint returns 400 for our account/payload shape, while pinByHash works
-  // reliably and queues the CID for asynchronous pinning.
-  const res = await fetch("https://api.pinata.cloud/pinning/pinByHash", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${jwt}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      hashToPin: cid,
-      pinataMetadata: { name: name ?? cid },
-    }),
-  });
-
-  // 200/202 both acceptable; ignore "already pinned" style errors.
-  if (!res.ok && res.status !== 409) {
-    const text = await res.text().catch(() => "");
-    // Don't throw — pin_by_cid is best-effort. Just log.
-    console.warn(`pin_by_cid soft-fail [${res.status}]: ${text}`);
+  // Primary: tell our kubo to fetch the CID from the IPFS swarm.
+  try {
+    const { url, token } = lambdaConfig();
+    const res = await fetch(`${url}/pin-cid`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ cid, name: name ?? cid }),
+    });
+    if (!res.ok && res.status !== 202) {
+      const text = await res.text().catch(() => "");
+      console.warn(
+        `pinByCid: self-node /pin-cid soft-fail [${res.status}] for ${cid}: ${text.slice(0, 200)}`,
+      );
+    }
+  } catch (err) {
+    console.warn(`pinByCid: self-node /pin-cid threw for ${cid}`, err);
   }
+
+  // Backup: also pin in Pinata (best-effort, never throws).
+  await backupPinToPinata(cid, name);
 }
 
 export function gatewayUrl(cid: string): string {

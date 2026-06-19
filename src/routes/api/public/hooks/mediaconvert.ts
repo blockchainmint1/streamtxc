@@ -182,6 +182,12 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
           cid, jobId, hlsCid: pinned.cid, renditions,
         });
 
+        // Pinata backup: best-effort mirror of the HLS wrap CID. Never throws.
+        const { pinByCid } = await import("@/lib/pinata.server");
+        pinByCid(pinned.cid, `hls-${cid}`).catch((e) =>
+          console.warn(`[mediaconvert ${cid}] pinata backup failed:`, e),
+        );
+
         // For Zoom imports: transcribe the audio-only MediaConvert output
         // and stamp the transcript CID onto the row. Best-effort —
         // failures don't block the HLS flow.

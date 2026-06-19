@@ -7,6 +7,7 @@
 #   - A Lambda in the same VPC that streams S3 → IPFS and returns a CID
 #   - An HTTP API Gateway in front of the Lambda with:
 #       POST /pin           (bearer auth, the main entrypoint)
+#       POST /add           (bearer auth, multipart upload → kubo /api/v0/add)
 #       POST /pin-by-hash   (bearer auth, proxies to Pinata if PINATA_JWT set)
 #       POST /pin-cid       (bearer auth, pins an existing CID on our IPFS node)
 #       GET  /health        (no auth, returns {ok:true})
@@ -434,6 +435,9 @@ Resources:
   RoutePin:
     Type: AWS::ApiGatewayV2::Route
     Properties: { ApiId: !Ref Api, RouteKey: "POST /pin",         Target: !Sub "integrations/${Integration}" }
+  RouteAdd:
+    Type: AWS::ApiGatewayV2::Route
+    Properties: { ApiId: !Ref Api, RouteKey: "POST /add",         Target: !Sub "integrations/${Integration}" }
   RoutePinByHash:
     Type: AWS::ApiGatewayV2::Route
     Properties: { ApiId: !Ref Api, RouteKey: "POST /pin-by-hash", Target: !Sub "integrations/${Integration}" }
@@ -477,6 +481,7 @@ exports.handler = async (event) => {
     }
     const auth = event.headers?.authorization || event.headers?.Authorization || "";
     if (auth !== `Bearer ${BEARER}`) return resp(401, { error: "unauthorized" });
+    if (route === "POST /add") return await addToNode(event);
     const body = JSON.parse(event.body || "{}");
     if (route === "POST /pin-by-hash") return await pinByHash(body);
     if (route === "POST /pin-cid") return await pinCidOnNode(body);
@@ -486,6 +491,53 @@ exports.handler = async (event) => {
     return resp(500, { error: String(err?.message || err) });
   }
 };
+
+// POST /add — multipart upload of raw bytes straight into kubo. Used by
+// the app for everything that isn't a MediaConvert HLS bundle: thumbnails,
+// JSON metadata, comment bodies, chain-stamp JSON, etc. The request body
+// is multipart/form-data with one or more "file" parts; we forward it
+// verbatim to /api/v0/add and return the resulting CID(s). When >1 part,
+// the caller can ask us to wrap them in a directory via ?wrap=1.
+async function addToNode(event) {
+  if (!IPFS_API) return resp(503, { error: "IPFS_API not configured" });
+  const ct = event.headers?.["content-type"] || event.headers?.["Content-Type"] || "";
+  if (!ct.toLowerCase().startsWith("multipart/form-data")) {
+    return resp(400, { error: "Content-Type must be multipart/form-data" });
+  }
+  const qs = event.queryStringParameters || {};
+  const wrap = qs.wrap === "1" || qs.wrap === "true";
+  const raw = event.body
+    ? (event.isBase64Encoded
+        ? Buffer.from(event.body, "base64")
+        : Buffer.from(event.body, "utf8"))
+    : Buffer.alloc(0);
+  const url = `${IPFS_API}/api/v0/add?cid-version=1&raw-leaves=true&pin=true&progress=false${wrap ? "&wrap-with-directory=true" : ""}`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": ct },
+    body: raw,
+  });
+  if (!r.ok) {
+    const t = await r.text();
+    return resp(502, { ok: false, error: "ipfs add failed", status: r.status, body: t.slice(0, 1000) });
+  }
+  const text = await r.text();
+  const entries = text.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
+  // When wrap=true kubo emits a final entry with Name=="" (the wrap dir);
+  // otherwise the root is just the last entry.
+  const root = wrap
+    ? (entries.find((e) => e.Name === "" || e.Name === "wrap") || entries[entries.length - 1])
+    : entries[entries.length - 1];
+  const totalBytes = entries.reduce((s, e) => s + Number(e.Size || 0), 0);
+  return resp(200, {
+    cid: root?.Hash,
+    files: entries.length,
+    totalBytes,
+    manifest: entries
+      .filter((e) => e.Hash && e.Hash !== root?.Hash)
+      .map((e) => ({ path: e.Name || "", cid: e.Hash, size: Number(e.Size || 0) })),
+  });
+}
 
 async function pinFromS3(body) {
   const bucket = body.bucket;
@@ -594,11 +646,6 @@ async function pinCidOnNode(body) {
   if (!IPFS_API) return resp(503, { error: "IPFS_API not configured" });
   if (!body.cid) return resp(400, { error: "cid required" });
   const url = `${IPFS_API}/api/v0/pin/add?arg=${encodeURIComponent(body.cid)}&recursive=true&progress=false`;
-  // Kubo's /pin/add blocks until the whole DAG is fetched, which can take
-  // minutes for large CIDs and easily exceeds API Gateway's 30s timeout.
-  // Race the request against a short timeout: if it finishes fast, return
-  // the result; otherwise return 202 and let the node keep fetching in the
-  // background (Kubo continues the pin even after the HTTP client drops).
   const controller = new AbortController();
   const SOFT_TIMEOUT_MS = 20000;
   const timer = setTimeout(() => controller.abort(), SOFT_TIMEOUT_MS);
@@ -715,6 +762,14 @@ if [ -n "$PIN_CID_ROUTE_ID" ] && [ "$PIN_CID_ROUTE_ID" != "None" ]; then
   aws apigatewayv2 update-route --region "$AWS_REGION" --api-id "$API_ID" --route-id "$PIN_CID_ROUTE_ID" --target "integrations/$INTEGRATION_ID" >/dev/null
 else
   aws apigatewayv2 create-route --region "$AWS_REGION" --api-id "$API_ID" --route-key "POST /pin-cid" --target "integrations/$INTEGRATION_ID" >/dev/null
+fi
+
+echo "=== Ensuring /add route exists..."
+ADD_ROUTE_ID="$(aws apigatewayv2 get-routes --region "$AWS_REGION" --api-id "$API_ID" --query "Items[?RouteKey=='POST /add'].RouteId | [0]" --output text)"
+if [ -n "$ADD_ROUTE_ID" ] && [ "$ADD_ROUTE_ID" != "None" ]; then
+  aws apigatewayv2 update-route --region "$AWS_REGION" --api-id "$API_ID" --route-id "$ADD_ROUTE_ID" --target "integrations/$INTEGRATION_ID" >/dev/null
+else
+  aws apigatewayv2 create-route --region "$AWS_REGION" --api-id "$API_ID" --route-key "POST /add" --target "integrations/$INTEGRATION_ID" >/dev/null
 fi
 
 echo "=== Publishing Lambda code..."

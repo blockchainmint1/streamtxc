@@ -17,14 +17,17 @@ export function Footer() {
           ecosystem
         </div>
         <div className="flex gap-4">
-          <a
-            href="https://pinata.cloud"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-foreground transition-colors"
-          >
-            pinned via pinata
-          </a>
+          <span className="text-muted-foreground">
+            pinned to self-hosted IPFS · backed up to{" "}
+            <a
+              href="https://pinata.cloud"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors underline"
+            >
+              pinata
+            </a>
+          </span>
           <a
             href="https://ipfs.io"
             target="_blank"

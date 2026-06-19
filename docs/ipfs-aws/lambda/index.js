@@ -15,6 +15,7 @@ exports.handler = async (event) => {
     }
     const auth = event.headers?.authorization || event.headers?.Authorization || "";
     if (auth !== `Bearer ${BEARER}`) return resp(401, { error: "unauthorized" });
+    if (route === "POST /add") return await addToNode(event);
     const body = JSON.parse(event.body || "{}");
     if (route === "POST /pin-by-hash") return await pinByHash(body);
     if (route === "POST /pin-cid") return await pinCidOnNode(body);
@@ -24,6 +25,46 @@ exports.handler = async (event) => {
     return resp(500, { error: String(err?.message || err) });
   }
 };
+
+// POST /add — multipart upload of raw bytes straight into kubo.
+async function addToNode(event) {
+  if (!IPFS_API) return resp(503, { error: "IPFS_API not configured" });
+  const ct = event.headers?.["content-type"] || event.headers?.["Content-Type"] || "";
+  if (!ct.toLowerCase().startsWith("multipart/form-data")) {
+    return resp(400, { error: "Content-Type must be multipart/form-data" });
+  }
+  const qs = event.queryStringParameters || {};
+  const wrap = qs.wrap === "1" || qs.wrap === "true";
+  const raw = event.body
+    ? (event.isBase64Encoded
+        ? Buffer.from(event.body, "base64")
+        : Buffer.from(event.body, "utf8"))
+    : Buffer.alloc(0);
+  const url = `${IPFS_API}/api/v0/add?cid-version=1&raw-leaves=true&pin=true&progress=false${wrap ? "&wrap-with-directory=true" : ""}`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": ct },
+    body: raw,
+  });
+  if (!r.ok) {
+    const t = await r.text();
+    return resp(502, { ok: false, error: "ipfs add failed", status: r.status, body: t.slice(0, 1000) });
+  }
+  const text = await r.text();
+  const entries = text.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
+  const root = wrap
+    ? (entries.find((e) => e.Name === "" || e.Name === "wrap") || entries[entries.length - 1])
+    : entries[entries.length - 1];
+  const totalBytes = entries.reduce((s, e) => s + Number(e.Size || 0), 0);
+  return resp(200, {
+    cid: root?.Hash,
+    files: entries.length,
+    totalBytes,
+    manifest: entries
+      .filter((e) => e.Hash && e.Hash !== root?.Hash)
+      .map((e) => ({ path: e.Name || "", cid: e.Hash, size: Number(e.Size || 0) })),
+  });
+}
 
 async function pinFromS3(body) {
   const bucket = body.bucket;

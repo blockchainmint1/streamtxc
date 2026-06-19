@@ -186,6 +186,45 @@ export async function signMultipartPartUrl(opts: {
   return signed.url;
 }
 
+/**
+ * Server-side upload of a single multipart part. Returns the ETag the
+ * caller must collect for completeMultipartUpload(). Used by the URL/Zoom
+ * importer which streams source bytes through the Worker into S3 a chunk
+ * at a time, then has the IPFS Lambda pin the resulting object.
+ */
+export async function s3UploadPart(opts: {
+  bucket: string;
+  key: string;
+  uploadId: string;
+  partNumber: number;
+  body: Uint8Array;
+}): Promise<string> {
+  const client = s3Client();
+  const url = new URL(`${s3Host(opts.bucket)}/${encodeKey(opts.key)}`);
+  url.searchParams.set("partNumber", String(opts.partNumber));
+  url.searchParams.set("uploadId", opts.uploadId);
+  const body = opts.body.buffer.slice(
+    opts.body.byteOffset,
+    opts.body.byteOffset + opts.body.byteLength,
+  ) as ArrayBuffer;
+  const res = await client.fetch(url.toString(), { method: "PUT", body });
+  if (!res.ok) {
+    throw new Error(
+      `S3 uploadPart failed [${res.status}]: ${await res.text().catch(() => "")}`,
+    );
+  }
+  const etag = res.headers.get("etag");
+  if (!etag) throw new Error("S3 uploadPart: no ETag in response");
+  return etag;
+}
+
+/** Delete a single S3 object. Best-effort; doesn't throw on 404. */
+export async function deleteObject(bucket: string, key: string): Promise<void> {
+  const client = s3Client();
+  const url = `${s3Host(bucket)}/${encodeKey(key)}`;
+  await client.fetch(url, { method: "DELETE" }).catch(() => {});
+}
+
 export async function completeMultipartUpload(opts: {
   bucket: string;
   key: string;
