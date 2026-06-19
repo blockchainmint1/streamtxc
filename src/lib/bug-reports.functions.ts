@@ -1,0 +1,53 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+
+const ADMIN_WALLET = "TeiqbqMxQG4JrDfrzdvTZcqhhai8KT5JTc";
+
+const SubmitSchema = z.object({
+  name: z.string().trim().max(120).optional().nullable(),
+  email: z.string().trim().max(255).optional().nullable(),
+  telegram: z.string().trim().max(120).optional().nullable(),
+  details: z.string().trim().min(1, "details required").max(5000),
+  attachment_name: z.string().max(255).optional().nullable(),
+  attachment_type: z.string().max(120).optional().nullable(),
+  attachment_data_url: z.string().max(3_500_000).optional().nullable(), // ~2.5MB base64
+  page_url: z.string().max(500).optional().nullable(),
+  user_agent: z.string().max(500).optional().nullable(),
+  reporter_wallet: z.string().max(120).optional().nullable(),
+});
+
+export const submitBugReport = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => SubmitSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("bug_reports").insert({
+      name: data.name || null,
+      email: data.email || null,
+      telegram: data.telegram || null,
+      details: data.details,
+      attachment_name: data.attachment_name || null,
+      attachment_type: data.attachment_type || null,
+      attachment_data_url: data.attachment_data_url || null,
+      page_url: data.page_url || null,
+      user_agent: data.user_agent || null,
+      reporter_wallet: data.reporter_wallet || null,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const listBugReports = createServerFn({ method: "POST" })
+  .inputValidator((input: { wallet: string }) => ({ wallet: String(input.wallet || "") }))
+  .handler(async ({ data }) => {
+    if (data.wallet !== ADMIN_WALLET) {
+      throw new Error("Forbidden");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("bug_reports")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
