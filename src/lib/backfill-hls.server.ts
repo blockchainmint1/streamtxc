@@ -181,6 +181,8 @@ export async function pickBackfillCandidates(limit: number) {
     .select("cid, view_count, size_bytes")
     .not("cid", "is", null)
     .is("hls_cid", null)
+    .like("mime_type", "video/%")
+    .gte("size_bytes", 100000)
     .or("transcode_status.is.null,transcode_status.eq.failed")
     .order("view_count", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
