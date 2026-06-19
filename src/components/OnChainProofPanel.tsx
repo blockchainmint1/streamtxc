@@ -27,8 +27,6 @@ export function OnChainProofPanel({
   stampFailed,
   onCopy,
 }: Props) {
-  const pinataGateway =
-    import.meta.env.VITE_PINATA_GATEWAY_DOMAIN || "gateway.pinata.cloud";
   return (
     <CollapsibleSection title="[ ON-CHAIN PROOF ]" defaultOpen={true}>
       <Field label="IPFS CID" value={cid} onCopy={onCopy} mono />
@@ -80,7 +78,7 @@ export function OnChainProofPanel({
         <Field
           label="Metadata CID (title + description, on IPFS)"
           value={metadataCid}
-          href={`https://${pinataGateway}/ipfs/${metadataCid}`}
+          href={`/api/stream/${metadataCid}`}
           onCopy={onCopy}
           mono
         />

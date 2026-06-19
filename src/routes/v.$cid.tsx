@@ -61,7 +61,7 @@ export const Route = createFileRoute("/v/$cid")({
       ? v.description.slice(0, 160)
       : "Watch this content-addressed video on streamTXC — pinned to IPFS, receipted on the TEXITcoin chain.";
     const thumb = v?.thumbnail_cid
-      ? `https://ipfs.honest.money/ipfs/${v.thumbnail_cid}`
+      ? `https://streamtxc.com/api/stream/${v.thumbnail_cid}`
       : undefined;
     const meta: Array<Record<string, string>> = [
       { title },
@@ -250,7 +250,7 @@ function WatchPage() {
                         Source-of-truth WebVTT on IPFS
                       </span>
                       <a
-                        href={`https://ipfs.honest.money/ipfs/${video.transcript_cid}`}
+                        href={`/api/stream/${video.transcript_cid}`}
                         target="_blank"
                         rel="noreferrer"
                         className="font-mono text-[11px] text-primary hover:underline"
