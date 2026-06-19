@@ -1,0 +1,1 @@
+UPDATE public.videos SET transcode_status='failed', transcode_error='non-video mime_type; skipped by picker', transcode_completed_at=now() WHERE cid='bafkreiaf345hglszac4dr355ogfwtgw26uupgmzk5imrxrzqniekgnhxpi';
