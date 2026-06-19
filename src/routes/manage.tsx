@@ -55,6 +55,7 @@ import {
 import { CheckCircle2, Film, Clock, ArrowUp, ArrowDown, ChevronsUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationPrefs } from "@/components/NotificationPrefs";
+import { listBugReports } from "@/lib/bug-reports.functions";
 
 export const Route = createFileRoute("/manage")({
   head: () => ({
