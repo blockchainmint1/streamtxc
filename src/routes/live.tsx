@@ -188,3 +188,25 @@ function SimulcastLinks({ stream }: { stream: Stream }) {
     </div>
   );
 }
+
+function LiveHeader({ stream }: { stream: Stream }) {
+  const viewers = useLiveViewerCount(stream.id);
+  return (
+    <div className="mt-4 flex items-center gap-2 flex-wrap">
+      <span className="relative flex h-2.5 w-2.5">
+        <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+      </span>
+      <span className="font-mono text-xs text-red-500 font-bold">LIVE</span>
+      <span
+        className="inline-flex items-center gap-1 rounded-sm border border-border bg-card px-2 py-0.5 font-mono text-xs text-muted-foreground"
+        title="Viewers watching right now"
+      >
+        <Eye className="h-3 w-3" />
+        {viewers.toLocaleString()}
+        <span className="sr-only"> viewers</span>
+      </span>
+      <h1 className="text-2xl font-bold ml-2">{stream.title}</h1>
+    </div>
+  );
+}
