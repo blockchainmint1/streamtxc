@@ -331,6 +331,75 @@ export type Database = {
         }
         Relationships: []
       }
+      live_streams: {
+        Row: {
+          archive_transcode_job_id: string | null
+          archive_video_cid: string | null
+          created_at: string
+          description: string | null
+          ended_at: string | null
+          hls_url: string | null
+          id: string
+          medialive_channel_id: string | null
+          owner_wallet: string
+          peak_viewers: number
+          scheduled_for: string | null
+          simulcast_facebook_url: string | null
+          simulcast_twitter_url: string | null
+          simulcast_youtube_url: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["live_stream_status"]
+          thumbnail_cid: string | null
+          title: string
+          total_views: number
+          updated_at: string
+        }
+        Insert: {
+          archive_transcode_job_id?: string | null
+          archive_video_cid?: string | null
+          created_at?: string
+          description?: string | null
+          ended_at?: string | null
+          hls_url?: string | null
+          id?: string
+          medialive_channel_id?: string | null
+          owner_wallet: string
+          peak_viewers?: number
+          scheduled_for?: string | null
+          simulcast_facebook_url?: string | null
+          simulcast_twitter_url?: string | null
+          simulcast_youtube_url?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["live_stream_status"]
+          thumbnail_cid?: string | null
+          title: string
+          total_views?: number
+          updated_at?: string
+        }
+        Update: {
+          archive_transcode_job_id?: string | null
+          archive_video_cid?: string | null
+          created_at?: string
+          description?: string | null
+          ended_at?: string | null
+          hls_url?: string | null
+          id?: string
+          medialive_channel_id?: string | null
+          owner_wallet?: string
+          peak_viewers?: number
+          scheduled_for?: string | null
+          simulcast_facebook_url?: string | null
+          simulcast_twitter_url?: string | null
+          simulcast_youtube_url?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["live_stream_status"]
+          thumbnail_cid?: string | null
+          title?: string
+          total_views?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           created_at: string
@@ -460,6 +529,7 @@ export type Database = {
           hls_cid: string | null
           hosting_credit_txc: number
           is_nsfw: boolean
+          live_stream_id: string | null
           metadata_cid: string | null
           mime_type: string | null
           months_prepaid: number
@@ -481,6 +551,7 @@ export type Database = {
           report_count: number
           size_bytes: number
           source: string
+          source_kind: string | null
           status: string
           thumbnail_cid: string | null
           title: string
@@ -515,6 +586,7 @@ export type Database = {
           hls_cid?: string | null
           hosting_credit_txc?: number
           is_nsfw?: boolean
+          live_stream_id?: string | null
           metadata_cid?: string | null
           mime_type?: string | null
           months_prepaid?: number
@@ -536,6 +608,7 @@ export type Database = {
           report_count?: number
           size_bytes: number
           source?: string
+          source_kind?: string | null
           status?: string
           thumbnail_cid?: string | null
           title: string
@@ -570,6 +643,7 @@ export type Database = {
           hls_cid?: string | null
           hosting_credit_txc?: number
           is_nsfw?: boolean
+          live_stream_id?: string | null
           metadata_cid?: string | null
           mime_type?: string | null
           months_prepaid?: number
@@ -591,6 +665,7 @@ export type Database = {
           report_count?: number
           size_bytes?: number
           source?: string
+          source_kind?: string | null
           status?: string
           thumbnail_cid?: string | null
           title?: string
@@ -607,7 +682,15 @@ export type Database = {
           video_wallet?: string | null
           view_count?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "videos_live_stream_id_fkey"
+            columns: ["live_stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       view_events: {
         Row: {
@@ -691,7 +774,13 @@ export type Database = {
       next_video_wallet_index: { Args: never; Returns: number }
     }
     Enums: {
-      [_ in never]: never
+      live_stream_status:
+        | "scheduled"
+        | "starting"
+        | "live"
+        | "ending"
+        | "ended"
+        | "archived"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -818,6 +907,15 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      live_stream_status: [
+        "scheduled",
+        "starting",
+        "live",
+        "ending",
+        "ended",
+        "archived",
+      ],
+    },
   },
 } as const
