@@ -2436,6 +2436,10 @@ function MyGoLiveSection({ wallet }: { wallet: string }) {
         </Button>
       </div>
 
+      {/* Permanent embed link — same URL every stream */}
+      <PermanentEmbedRow wallet={wallet} />
+
+
       <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
         <DialogContent>
           <DialogHeader>
