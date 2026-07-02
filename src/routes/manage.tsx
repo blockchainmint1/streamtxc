@@ -756,6 +756,150 @@ function ManagePageInner() {
 
 const ADMIN_WALLET = "TeiqbqMxQG4JrDfrzdvTZcqhhai8KT5JTc";
 
+function LiveEligibilityAdminSection({ wallet }: { wallet: string }) {
+  const listFn = useServerFn(listLiveEligibleWallets);
+  const setFn = useServerFn(setLiveEligibility);
+  const qc = useQueryClient();
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["live-eligible-wallets", wallet],
+    queryFn: () => listFn(),
+    enabled: wallet === ADMIN_WALLET,
+  });
+  const [target, setTarget] = useState("");
+  const [rate, setRate] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  if (wallet !== ADMIN_WALLET) return null;
+
+  const submit = async (opts: {
+    targetWallet: string;
+    live_eligible: boolean;
+    live_rate_txc_per_minute?: number | null;
+  }) => {
+    setBusy(true);
+    try {
+      await setFn({ data: opts });
+      toast.success("Updated");
+      setTarget("");
+      setRate("");
+      await qc.invalidateQueries({ queryKey: ["live-eligible-wallets"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="mt-16 border-t border-border pt-8">
+      <div className="font-mono text-xs text-primary mb-3">[ LIVE ELIGIBILITY · ADMIN ]</div>
+      <h2 className="text-2xl font-bold mb-2">Livestream eligibility</h2>
+      <p className="text-sm text-muted-foreground mb-4">
+        Flip <code>live_eligible</code> on for a wallet and (optionally) set a
+        per-wallet TXC/minute override. Only listed wallets get the Go Live UI
+        on their /manage page.
+      </p>
+
+      <div className="rounded-sm border border-border bg-card p-4 mb-4 space-y-3">
+        <div className="font-mono text-xs text-muted-foreground">Grant / update a wallet</div>
+        <div className="flex flex-wrap gap-2 items-end">
+          <div className="flex-1 min-w-[280px]">
+            <Label className="text-xs font-mono">Wallet (T…)</Label>
+            <Input
+              value={target}
+              onChange={(e) => setTarget(e.target.value.trim())}
+              placeholder="T…"
+              className="font-mono text-xs"
+            />
+          </div>
+          <div className="w-40">
+            <Label className="text-xs font-mono">Rate TXC/min (opt)</Label>
+            <Input
+              value={rate}
+              onChange={(e) => setRate(e.target.value)}
+              placeholder="default"
+              inputMode="decimal"
+              className="font-mono text-xs"
+            />
+          </div>
+          <Button
+            size="sm"
+            disabled={busy || !target}
+            onClick={() => {
+              const parsedRate = rate ? Number(rate) : null;
+              if (rate && (!Number.isFinite(parsedRate) || (parsedRate ?? 0) <= 0)) {
+                toast.error("Rate must be a positive number");
+                return;
+              }
+              submit({
+                targetWallet: target,
+                live_eligible: true,
+                live_rate_txc_per_minute: parsedRate,
+              });
+            }}
+          >
+            {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : "Enable"}
+          </Button>
+        </div>
+      </div>
+
+      {isLoading && (
+        <div className="font-mono text-xs text-muted-foreground">loading…</div>
+      )}
+      {error && (
+        <div className="font-mono text-xs text-destructive">
+          {error instanceof Error ? error.message : "failed to load"}
+        </div>
+      )}
+      {data && data.length === 0 && (
+        <div className="font-mono text-xs text-muted-foreground">
+          No eligible wallets yet.
+        </div>
+      )}
+      {data && data.length > 0 && (
+        <div className="border border-border rounded-sm overflow-hidden">
+          <table className="w-full text-xs font-mono">
+            <thead className="bg-muted/30">
+              <tr>
+                <th className="text-left p-2">Wallet</th>
+                <th className="text-left p-2">Enabled</th>
+                <th className="text-left p-2">Rate TXC/min</th>
+                <th className="text-left p-2">Max min</th>
+                <th className="text-right p-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((r) => (
+                <tr key={r.wallet} className="border-t border-border">
+                  <td className="p-2 truncate max-w-[280px]">{r.wallet}</td>
+                  <td className="p-2">{r.live_eligible ? "yes" : "no"}</td>
+                  <td className="p-2">{r.live_rate_txc_per_minute ?? "—"}</td>
+                  <td className="p-2">{r.live_max_concurrent_minutes}</td>
+                  <td className="p-2 text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() =>
+                        submit({
+                          targetWallet: r.wallet,
+                          live_eligible: !r.live_eligible,
+                        })
+                      }
+                    >
+                      {r.live_eligible ? "Disable" : "Enable"}
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function BugReportsAdminSection({ wallet }: { wallet: string }) {
   const fetchReports = useServerFn(listBugReports);
   const { data, isLoading, error } = useQuery({
