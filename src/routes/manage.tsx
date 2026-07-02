@@ -57,6 +57,10 @@ import { toast } from "sonner";
 import { NotificationPrefs } from "@/components/NotificationPrefs";
 import { listBugReports } from "@/lib/bug-reports.functions";
 import {
+  listLiveEligibleWallets,
+  setLiveEligibility,
+} from "@/lib/live-eligibility.functions";
+import {
   listRecentLiveStreams,
   createLiveStream,
   startLiveStream,
