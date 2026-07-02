@@ -30,27 +30,37 @@ function shortCode(bytes = 6): string {
  * Returns null if no row exists.
  */
 export const getWalletPrefs = createServerFn({ method: "POST" })
-  .inputValidator((input) =>
-    z.object({ wallet: z.string().trim().min(8).max(120) }).parse(input),
-  )
-  .handler(async ({ data }) => {
+  .middleware([requireWalletSession])
+  .handler(async ({ context }) => {
+    // Wallet is the session-verified value on context — never trusted input.
+    // We also project only the fields the UI needs: sensitive columns
+    // (email_verify_token, telegram_chat_id numeric value, telegram_pairing_code,
+    // telegram_pairing_expires_at) never leave the server.
     const { data: row, error } = await (supabaseAdmin as any)
       .from(TABLE)
       .select(
-        "wallet, email, email_verified_at, telegram_chat_id, telegram_username, telegram_pairing_code, telegram_pairing_expires_at, notify_expiry",
+        "wallet, email, email_verified_at, telegram_chat_id, telegram_username, notify_expiry",
       )
-      .eq("wallet", data.wallet)
+      .eq("wallet", context.wallet)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return row as null | {
+    if (!row) return null;
+    const r = row as {
       wallet: string;
       email: string | null;
       email_verified_at: string | null;
       telegram_chat_id: number | null;
       telegram_username: string | null;
-      telegram_pairing_code: string | null;
-      telegram_pairing_expires_at: string | null;
       notify_expiry: boolean;
+    };
+    return {
+      wallet: r.wallet,
+      email: r.email,
+      email_verified_at: r.email_verified_at,
+      // Expose only a boolean "connected" indicator; never the chat id itself.
+      telegram_chat_id: r.telegram_chat_id != null ? 1 : null,
+      telegram_username: r.telegram_username,
+      notify_expiry: r.notify_expiry,
     };
   });
 
