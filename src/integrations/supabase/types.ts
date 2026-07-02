@@ -483,6 +483,7 @@ export type Database = {
           simulcast_youtube_url: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["live_stream_status"]
+          stopped_reason: string | null
           thumbnail_cid: string | null
           title: string
           total_views: number
@@ -509,6 +510,7 @@ export type Database = {
           simulcast_youtube_url?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["live_stream_status"]
+          stopped_reason?: string | null
           thumbnail_cid?: string | null
           title: string
           total_views?: number
@@ -535,6 +537,7 @@ export type Database = {
           simulcast_youtube_url?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["live_stream_status"]
+          stopped_reason?: string | null
           thumbnail_cid?: string | null
           title?: string
           total_views?: number
