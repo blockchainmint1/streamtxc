@@ -52,3 +52,13 @@ export async function stopChannel(): Promise<MediaLiveChannelState> {
   const raw = await call("POST", `/prod/channels/${channelId()}/stop`);
   return { state: String(raw.state ?? "STOPPING"), raw };
 }
+
+export async function describeInput(inputId?: string): Promise<{ destinations: string[]; raw: any }> {
+  const id = inputId ?? process.env.MEDIALIVE_INPUT_ID;
+  if (!id) throw new Error("MEDIALIVE_INPUT_ID not configured");
+  const raw = await call("GET", `/prod/inputs/${id}`);
+  const destinations = Array.isArray(raw?.destinations)
+    ? raw.destinations.map((d: any) => String(d?.url ?? "")).filter(Boolean)
+    : [];
+  return { destinations, raw };
+}
