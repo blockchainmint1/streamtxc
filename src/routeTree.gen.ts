@@ -38,6 +38,7 @@ import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/p
 import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
 import { Route as ApiPublicHooksIpfsPinCompleteRouteImport } from './routes/api/public/hooks/ipfs-pin-complete'
 import { Route as ApiPublicHooksFinalizeStuckHlsRouteImport } from './routes/api/public/hooks/finalize-stuck-hls'
+import { Route as ApiPublicHooksFinalizeLiveArchiveRouteImport } from './routes/api/public/hooks/finalize-live-archive'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
 import { Route as ApiPublicAdminFinalizeHlsRouteImport } from './routes/api/public/admin/finalize-hls'
 import { Route as ApiPublicAdminBackfillSelfPinsRouteImport } from './routes/api/public/admin/backfill-self-pins'
@@ -194,6 +195,12 @@ const ApiPublicHooksFinalizeStuckHlsRoute =
     path: '/public/hooks/finalize-stuck-hls',
     getParentRoute: () => ApiRoute,
   } as any)
+const ApiPublicHooksFinalizeLiveArchiveRoute =
+  ApiPublicHooksFinalizeLiveArchiveRouteImport.update({
+    id: '/public/hooks/finalize-live-archive',
+    path: '/public/hooks/finalize-live-archive',
+    getParentRoute: () => ApiRoute,
+  } as any)
 const ApiPublicAdminRetryStampsRoute =
   ApiPublicAdminRetryStampsRouteImport.update({
     id: '/public/admin/retry-stamps',
@@ -246,6 +253,7 @@ export interface FileRoutesByFullPath {
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/hooks/finalize-live-archive': typeof ApiPublicHooksFinalizeLiveArchiveRoute
   '/api/public/hooks/finalize-stuck-hls': typeof ApiPublicHooksFinalizeStuckHlsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
@@ -281,6 +289,7 @@ export interface FileRoutesByTo {
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/hooks/finalize-live-archive': typeof ApiPublicHooksFinalizeLiveArchiveRoute
   '/api/public/hooks/finalize-stuck-hls': typeof ApiPublicHooksFinalizeStuckHlsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
@@ -317,6 +326,7 @@ export interface FileRoutesById {
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/hooks/finalize-live-archive': typeof ApiPublicHooksFinalizeLiveArchiveRoute
   '/api/public/hooks/finalize-stuck-hls': typeof ApiPublicHooksFinalizeStuckHlsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
@@ -354,6 +364,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/backfill-self-pins'
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/hooks/finalize-live-archive'
     | '/api/public/hooks/finalize-stuck-hls'
     | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/mediaconvert'
@@ -389,6 +400,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/backfill-self-pins'
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/hooks/finalize-live-archive'
     | '/api/public/hooks/finalize-stuck-hls'
     | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/mediaconvert'
@@ -424,6 +436,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/backfill-self-pins'
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/hooks/finalize-live-archive'
     | '/api/public/hooks/finalize-stuck-hls'
     | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/mediaconvert'
@@ -657,6 +670,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksFinalizeStuckHlsRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/public/hooks/finalize-live-archive': {
+      id: '/api/public/hooks/finalize-live-archive'
+      path: '/public/hooks/finalize-live-archive'
+      fullPath: '/api/public/hooks/finalize-live-archive'
+      preLoaderRoute: typeof ApiPublicHooksFinalizeLiveArchiveRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/public/admin/retry-stamps': {
       id: '/api/public/admin/retry-stamps'
       path: '/public/admin/retry-stamps'
@@ -710,6 +730,7 @@ interface ApiRouteChildren {
   ApiPublicAdminBackfillSelfPinsRoute: typeof ApiPublicAdminBackfillSelfPinsRoute
   ApiPublicAdminFinalizeHlsRoute: typeof ApiPublicAdminFinalizeHlsRoute
   ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
+  ApiPublicHooksFinalizeLiveArchiveRoute: typeof ApiPublicHooksFinalizeLiveArchiveRoute
   ApiPublicHooksFinalizeStuckHlsRoute: typeof ApiPublicHooksFinalizeStuckHlsRoute
   ApiPublicHooksIpfsPinCompleteRoute: typeof ApiPublicHooksIpfsPinCompleteRoute
   ApiPublicHooksMediaconvertRoute: typeof ApiPublicHooksMediaconvertRoute
@@ -728,6 +749,8 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiPublicAdminBackfillSelfPinsRoute: ApiPublicAdminBackfillSelfPinsRoute,
   ApiPublicAdminFinalizeHlsRoute: ApiPublicAdminFinalizeHlsRoute,
   ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
+  ApiPublicHooksFinalizeLiveArchiveRoute:
+    ApiPublicHooksFinalizeLiveArchiveRoute,
   ApiPublicHooksFinalizeStuckHlsRoute: ApiPublicHooksFinalizeStuckHlsRoute,
   ApiPublicHooksIpfsPinCompleteRoute: ApiPublicHooksIpfsPinCompleteRoute,
   ApiPublicHooksMediaconvertRoute: ApiPublicHooksMediaconvertRoute,
