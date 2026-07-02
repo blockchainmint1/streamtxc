@@ -3,16 +3,33 @@
 
 import { AwsClient } from "aws4fetch";
 
+function region() {
+  return process.env.MEDIALIVE_REGION ?? process.env.AWS_REGION ?? "us-east-1";
+}
+
 function aws() {
   const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
   const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
-  const region = process.env.MEDIALIVE_REGION ?? process.env.AWS_REGION ?? "us-east-1";
   if (!accessKeyId || !secretAccessKey) {
     throw new Error("AWS not configured: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY missing");
   }
+  const r = region();
   return {
-    client: new AwsClient({ accessKeyId, secretAccessKey, region, service: "medialive" }),
-    region,
+    client: new AwsClient({ accessKeyId, secretAccessKey, region: r, service: "medialive" }),
+    region: r,
+  };
+}
+
+function mpClient() {
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+  if (!accessKeyId || !secretAccessKey) {
+    throw new Error("AWS not configured");
+  }
+  const r = region();
+  return {
+    client: new AwsClient({ accessKeyId, secretAccessKey, region: r, service: "mediapackage" }),
+    region: r,
   };
 }
 
@@ -22,13 +39,34 @@ function channelId() {
   return id;
 }
 
-async function call(method: "GET" | "POST", path: string) {
+async function call(method: "GET" | "POST" | "PUT" | "DELETE", path: string, body?: unknown) {
   const { client, region } = aws();
   const url = `https://medialive.${region}.amazonaws.com${path}`;
-  const res = await client.fetch(url, { method });
+  const init: RequestInit = { method };
+  if (body !== undefined) {
+    init.body = JSON.stringify(body);
+    (init as any).headers = { "content-type": "application/json" };
+  }
+  const res = await client.fetch(url, init);
   const text = await res.text();
   if (!res.ok) {
     throw new Error(`MediaLive ${method} ${path} failed [${res.status}]: ${text.slice(0, 500)}`);
+  }
+  return text ? JSON.parse(text) : {};
+}
+
+async function mpCall(method: "GET" | "POST" | "PUT" | "DELETE", path: string, body?: unknown) {
+  const { client, region } = mpClient();
+  const url = `https://mediapackage.${region}.amazonaws.com${path}`;
+  const init: RequestInit = { method };
+  if (body !== undefined) {
+    init.body = JSON.stringify(body);
+    (init as any).headers = { "content-type": "application/json" };
+  }
+  const res = await client.fetch(url, init);
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`MediaPackage ${method} ${path} failed [${res.status}]: ${text.slice(0, 500)}`);
   }
   return text ? JSON.parse(text) : {};
 }
@@ -38,18 +76,18 @@ export interface MediaLiveChannelState {
   raw: any;
 }
 
-export async function describeChannel(): Promise<MediaLiveChannelState> {
-  const raw = await call("GET", `/prod/channels/${channelId()}`);
+export async function describeChannel(id?: string): Promise<MediaLiveChannelState> {
+  const raw = await call("GET", `/prod/channels/${id ?? channelId()}`);
   return { state: String(raw.state ?? "UNKNOWN"), raw };
 }
 
-export async function startChannel(): Promise<MediaLiveChannelState> {
-  const raw = await call("POST", `/prod/channels/${channelId()}/start`);
+export async function startChannel(id?: string): Promise<MediaLiveChannelState> {
+  const raw = await call("POST", `/prod/channels/${id ?? channelId()}/start`);
   return { state: String(raw.state ?? "STARTING"), raw };
 }
 
-export async function stopChannel(): Promise<MediaLiveChannelState> {
-  const raw = await call("POST", `/prod/channels/${channelId()}/stop`);
+export async function stopChannel(id?: string): Promise<MediaLiveChannelState> {
+  const raw = await call("POST", `/prod/channels/${id ?? channelId()}/stop`);
   return { state: String(raw.state ?? "STOPPING"), raw };
 }
 
@@ -61,4 +99,102 @@ export async function describeInput(inputId?: string): Promise<{ destinations: s
     ? raw.destinations.map((d: any) => String(d?.url ?? "")).filter(Boolean)
     : [];
   return { destinations, raw };
+}
+
+// ---------- Provisioning (Phase B) ----------
+
+export async function createRtmpInput(args: {
+  name: string;
+  streamName: string; // e.g. `wallet-abc123/primary`
+  securityGroupId: string;
+}): Promise<{ inputId: string; destinations: string[] }> {
+  const raw = await call("POST", `/prod/inputs`, {
+    name: args.name,
+    type: "RTMP_PUSH",
+    inputSecurityGroups: [args.securityGroupId],
+    destinations: [{ streamName: args.streamName }],
+  });
+  const input = raw?.input ?? raw;
+  const destinations = Array.isArray(input?.destinations)
+    ? input.destinations.map((d: any) => String(d?.url ?? "")).filter(Boolean)
+    : [];
+  return { inputId: String(input?.id), destinations };
+}
+
+export async function deleteInput(inputId: string) {
+  await call("DELETE", `/prod/inputs/${inputId}`).catch(() => null);
+}
+
+export async function createMediaLiveChannel(args: {
+  name: string;
+  roleArn: string;
+  inputId: string;
+  encoderSettings: unknown;
+  destinations: unknown;
+  inputSpecification: unknown;
+}): Promise<{ channelId: string; raw: any }> {
+  const raw = await call("POST", `/prod/channels`, {
+    name: args.name,
+    channelClass: "SINGLE_PIPELINE",
+    roleArn: args.roleArn,
+    inputAttachments: [
+      {
+        inputId: args.inputId,
+        inputAttachmentName: "primary",
+        inputSettings: { sourceEndBehavior: "CONTINUE" },
+      },
+    ],
+    inputSpecification: args.inputSpecification,
+    destinations: args.destinations,
+    encoderSettings: args.encoderSettings,
+  });
+  const ch = raw?.channel ?? raw;
+  return { channelId: String(ch?.id), raw: ch };
+}
+
+export async function deleteMediaLiveChannel(id: string) {
+  await call("DELETE", `/prod/channels/${id}`).catch(() => null);
+}
+
+export async function listRunningChannelIds(): Promise<string[]> {
+  const raw = await call("GET", `/prod/channels?maxResults=100`);
+  const list = Array.isArray(raw?.channels) ? raw.channels : [];
+  return list
+    .filter((c: any) => c?.state === "RUNNING" || c?.state === "STARTING")
+    .map((c: any) => String(c.id));
+}
+
+// ---------- MediaPackage ----------
+
+export async function createMediaPackageChannel(id: string): Promise<{ channelId: string }> {
+  const raw = await mpCall("POST", `/channels`, { id, description: `streamTXC live channel ${id}` });
+  return { channelId: String(raw?.id ?? id) };
+}
+
+export async function deleteMediaPackageChannel(id: string) {
+  await mpCall("DELETE", `/channels/${id}`).catch(() => null);
+}
+
+export async function createHlsOriginEndpoint(args: {
+  id: string;
+  channelId: string;
+}): Promise<{ endpointId: string; url: string }> {
+  const raw = await mpCall("POST", `/origin_endpoints`, {
+    id: args.id,
+    channelId: args.channelId,
+    manifestName: "index",
+    startoverWindowSeconds: 3600,
+    hlsPackage: {
+      segmentDurationSeconds: 4,
+      playlistWindowSeconds: 60,
+      playlistType: "EVENT",
+      adMarkers: "NONE",
+      includeIframeOnlyStream: false,
+    },
+  });
+  return { endpointId: String(raw?.id ?? args.id), url: String(raw?.url ?? "") };
+}
+
+export async function deleteHlsOriginEndpoint(id: string) {
+  await mpCall("DELETE", `/origin_endpoints/${id}`).catch(() => null);
 }
