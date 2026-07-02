@@ -5,8 +5,10 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { VideoPlayerV2 } from "@/components/VideoPlayerV2";
 import { LiveChat } from "@/components/LiveChat";
-import { Youtube, Twitter, Facebook, Eye, ChevronLeft } from "lucide-react";
+import { Youtube, Twitter, Facebook, Eye, ChevronLeft, Code2 } from "lucide-react";
 import { useLiveViewerCount } from "@/hooks/useLiveViewerCount";
+import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { copyToClipboard } from "@/lib/copy-to-clipboard";
 
 export const Route = createFileRoute("/live/$streamId")({
   head: () => ({
@@ -127,6 +129,7 @@ function LiveStreamPage() {
               {stream.description && (
                 <p className="mt-2 text-muted-foreground whitespace-pre-wrap">{stream.description}</p>
               )}
+              <EmbedRow streamId={stream.id} />
               <SimulcastLinks stream={stream} />
             </div>
 
@@ -165,6 +168,27 @@ function LiveHeader({ stream }: { stream: Stream }) {
         <span className="font-mono text-xs text-muted-foreground uppercase">{stream.status}</span>
       )}
       <h1 className="text-2xl font-bold ml-2">{stream.title}</h1>
+    </div>
+  );
+}
+
+function EmbedRow({ streamId }: { streamId: string }) {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const shareUrl = `${origin}/live/${streamId}`;
+  const embedSrc = `${origin}/embed/live/${streamId}?autoplay=1&mute=1`;
+  const embedCode = `<iframe src="${embedSrc}" width="640" height="360" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen frameborder="0"></iframe>`;
+  return (
+    <div className="mt-4 flex flex-wrap gap-2 items-center">
+      <span className="font-mono text-xs text-muted-foreground self-center">Share:</span>
+      <CopyLinkButton value={shareUrl} label="copy link" ariaLabel="Copy stream link" />
+      <button
+        type="button"
+        onClick={() => copyToClipboard(embedCode, { successMessage: "✅ Embed code copied" })}
+        className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-input px-2.5 py-1.5 font-mono text-xs text-muted-foreground transition-all duration-200 hover:border-primary hover:text-primary active:scale-95"
+        aria-label="Copy embed code"
+      >
+        <Code2 className="h-3.5 w-3.5" /> copy embed
+      </button>
     </div>
   );
 }
