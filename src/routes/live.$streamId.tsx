@@ -5,8 +5,10 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { VideoPlayerV2 } from "@/components/VideoPlayerV2";
 import { LiveChat } from "@/components/LiveChat";
-import { Youtube, Twitter, Facebook, Eye, ChevronLeft } from "lucide-react";
+import { Youtube, Twitter, Facebook, Eye, ChevronLeft, Code2 } from "lucide-react";
 import { useLiveViewerCount } from "@/hooks/useLiveViewerCount";
+import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { copyToClipboard } from "@/lib/copy-to-clipboard";
 
 export const Route = createFileRoute("/live/$streamId")({
   head: () => ({
@@ -127,6 +129,7 @@ function LiveStreamPage() {
               {stream.description && (
                 <p className="mt-2 text-muted-foreground whitespace-pre-wrap">{stream.description}</p>
               )}
+              <EmbedRow streamId={stream.id} />
               <SimulcastLinks stream={stream} />
             </div>
 
