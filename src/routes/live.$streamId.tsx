@@ -172,10 +172,6 @@ function LiveHeader({ stream }: { stream: Stream }) {
   );
 }
 
-function SimulcastLinks({ stream }: { stream: Stream }) {
-  return _SimulcastLinks({ stream });
-}
-
 function EmbedRow({ streamId }: { streamId: string }) {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const shareUrl = `${origin}/live/${streamId}`;
@@ -197,7 +193,7 @@ function EmbedRow({ streamId }: { streamId: string }) {
   );
 }
 
-function _SimulcastLinks({ stream }: { stream: Stream }) {
+function SimulcastLinks({ stream }: { stream: Stream }) {
   const links = [
     { url: stream.simulcast_youtube_url, label: "YouTube", Icon: Youtube },
     { url: stream.simulcast_twitter_url, label: "X", Icon: Twitter },
