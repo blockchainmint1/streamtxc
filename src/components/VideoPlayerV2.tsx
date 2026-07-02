@@ -8,7 +8,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Settings, Gauge, Layers } from "lucide-react";
+import { Settings, Gauge, Layers, VolumeX } from "lucide-react";
 
 interface VideoPlayerV2Props {
   src: string;
@@ -19,6 +19,12 @@ interface VideoPlayerV2Props {
   className?: string;
   /** Show small "HLS" / "MP4" badge in the corner. */
   showSourceBadge?: boolean;
+  /**
+   * When true, render a big centered "Tap to unmute" overlay while the
+   * video is muted. Needed for autoplay-muted live streams on mobile,
+   * where the native volume control is easy to miss.
+   */
+  showTapToUnmute?: boolean;
 }
 
 const QUALITY_KEY = "txc-player-quality";
@@ -42,6 +48,7 @@ export function VideoPlayerV2({
   startAt = 0,
   className,
   showSourceBadge = true,
+  showTapToUnmute = false,
 }: VideoPlayerV2Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -50,6 +57,28 @@ export function VideoPlayerV2({
   const [currentLevel, setCurrentLevel] = useState<number>(-1); // -1 = auto
   const [speed, setSpeed] = useState<number>(1);
   const [mode, setMode] = useState<"hls" | "native" | "mp4">("mp4");
+  const [isMuted, setIsMuted] = useState<boolean>(muted);
+
+  // Sync `isMuted` with the actual <video> element — the browser can flip
+  // it via native controls, keyboard shortcut, or autoplay policy.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const onVol = () => setIsMuted(video.muted || video.volume === 0);
+    onVol();
+    video.addEventListener("volumechange", onVol);
+    return () => video.removeEventListener("volumechange", onVol);
+  }, []);
+
+  function unmuteAndPlay() {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = false;
+    if (video.volume === 0) video.volume = 1;
+    setIsMuted(false);
+    // Kick playback in case the user tapped before it started.
+    void video.play().catch(() => {});
+  }
 
   const isHls = src.endsWith(".m3u8");
 
@@ -213,6 +242,22 @@ export function VideoPlayerV2({
         tabIndex={0}
         className={className ?? "w-full h-full bg-black"}
       />
+
+      {showTapToUnmute && isMuted && (
+        <button
+          type="button"
+          onClick={unmuteAndPlay}
+          aria-label="Tap to unmute"
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/40 text-white font-mono text-sm hover:bg-black/50 transition-colors"
+        >
+          <span className="flex items-center gap-2 rounded-full border border-white/60 bg-black/70 px-4 py-2">
+            <VolumeX className="h-5 w-5" />
+            <span className="uppercase tracking-wider text-xs font-bold">
+              Tap to unmute
+            </span>
+          </span>
+        </button>
+      )}
 
       {/* Top-right overlay: source badge + settings */}
       <div className="absolute top-2 right-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
