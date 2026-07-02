@@ -199,6 +199,12 @@ Resources:
                 Level: H264_LEVEL_AUTO
                 AdaptiveQuantization: HIGH
                 LookAheadRateControl: HIGH
+                FramerateControl: SPECIFIED
+                FramerateNumerator: 30
+                FramerateDenominator: 1
+                ParControl: SPECIFIED
+                ParNumerator: 1
+                ParDenominator: 1
           - Name: video_480p
             Width: 854
             Height: 480
@@ -210,6 +216,12 @@ Resources:
                 GopSize: 2
                 GopSizeUnits: SECONDS
                 Profile: MAIN
+                FramerateControl: SPECIFIED
+                FramerateNumerator: 30
+                FramerateDenominator: 1
+                ParControl: SPECIFIED
+                ParNumerator: 1
+                ParDenominator: 1
           - Name: video_360p
             Width: 640
             Height: 360
@@ -221,6 +233,12 @@ Resources:
                 GopSize: 2
                 GopSizeUnits: SECONDS
                 Profile: MAIN
+                FramerateControl: SPECIFIED
+                FramerateNumerator: 30
+                FramerateDenominator: 1
+                ParControl: SPECIFIED
+                ParNumerator: 1
+                ParDenominator: 1
         OutputGroups:
           - Name: hls-to-mediapackage
             OutputGroupSettings:
