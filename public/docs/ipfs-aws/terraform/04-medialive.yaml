@@ -1,0 +1,294 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  MediaLive (RTMP push from StreamYard) → MediaPackage HLS + S3 archive.
+  Channel starts IDLE. Start/stop via the app or `aws medialive start-channel`.
+  Deploy once per region; keep the outputs in Lovable secrets.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: txc-live
+    Description: Prefix used to name channel, input, bucket, roles.
+
+  AdminCidr:
+    Type: String
+    Description: >
+      CIDR allowed to push RTMP into the MediaLive input. This should be
+      StreamYard's egress range OR your admin IP as a /32 (e.g.
+      203.0.113.5/32). StreamYard pushes from AWS us-east-1 IP space; if
+      you want to be strict, contact StreamYard support for their current
+      egress list. 0.0.0.0/0 works but leaks your stream key security
+      onto the whole internet — don't ship that.
+    Default: 0.0.0.0/0
+
+  StreamName:
+    Type: String
+    Default: live
+    Description: >
+      Stream key path. StreamYard will use `rtmp://<url>/<StreamName>` as
+      the server URL and the app-name-derived key. Keep short & lowercase.
+
+  ChannelClass:
+    Type: String
+    Default: SINGLE_PIPELINE
+    AllowedValues: [SINGLE_PIPELINE, STANDARD]
+    Description: >
+      SINGLE_PIPELINE is ~half the cost (~$0.60/hr HD) and fine for one
+      StreamYard source. STANDARD gives redundant pipelines (two RTMP
+      URLs) — pick that if you upgrade StreamYard to send both.
+
+Conditions:
+  IsStandard: !Equals [!Ref ChannelClass, STANDARD]
+
+Resources:
+
+  # -----------------------------------------------------------------------
+  # S3 bucket for MediaLive archive output (raw stream recording)
+  # -----------------------------------------------------------------------
+  ArchiveBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-archive-${AWS::AccountId}"
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-raw-archive-14d
+            Status: Enabled
+            ExpirationInDays: 14
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # -----------------------------------------------------------------------
+  # MediaLive input security group (who can push RTMP)
+  # -----------------------------------------------------------------------
+  InputSg:
+    Type: AWS::MediaLive::InputSecurityGroup
+    Properties:
+      WhitelistRules:
+        - Cidr: !Ref AdminCidr
+
+  # -----------------------------------------------------------------------
+  # MediaLive input (RTMP_PUSH). Two destinations when STANDARD.
+  # -----------------------------------------------------------------------
+  RtmpInput:
+    Type: AWS::MediaLive::Input
+    Properties:
+      Name: !Sub "${ProjectName}-rtmp"
+      Type: RTMP_PUSH
+      InputSecurityGroups: [!Ref InputSg]
+      Destinations:
+        - StreamName: !Sub "${StreamName}/primary"
+        - !If
+          - IsStandard
+          - StreamName: !Sub "${StreamName}/backup"
+          - !Ref AWS::NoValue
+
+  # -----------------------------------------------------------------------
+  # MediaPackage channel + HLS endpoint (playback URL)
+  # -----------------------------------------------------------------------
+  MpChannel:
+    Type: AWS::MediaPackage::Channel
+    Properties:
+      Id: !Sub "${ProjectName}-mp"
+
+  MpHlsEndpoint:
+    Type: AWS::MediaPackage::OriginEndpoint
+    Properties:
+      Id: !Sub "${ProjectName}-hls"
+      ChannelId: !Ref MpChannel
+      ManifestName: index
+      StartoverWindowSeconds: 3600
+      HlsPackage:
+        SegmentDurationSeconds: 4
+        PlaylistWindowSeconds: 60
+        PlaylistType: EVENT
+        AdMarkers: NONE
+        IncludeIframeOnlyStream: false
+
+  # -----------------------------------------------------------------------
+  # IAM role MediaLive assumes to write to MediaPackage + S3 archive
+  # -----------------------------------------------------------------------
+  ChannelRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-medialive-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: medialive.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: mediapackage-and-s3
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - mediapackage:*
+                  - mediapackagev2:*
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt ArchiveBucket.Arn
+                  - !Sub "${ArchiveBucket.Arn}/*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
+  # -----------------------------------------------------------------------
+  # MediaLive channel — ABR 720p/480p/360p HLS + S3 archive
+  # Starts IDLE; app calls StartChannel to go live.
+  # -----------------------------------------------------------------------
+  Channel:
+    Type: AWS::MediaLive::Channel
+    Properties:
+      Name: !Sub "${ProjectName}-channel"
+      ChannelClass: !Ref ChannelClass
+      RoleArn: !GetAtt ChannelRole.Arn
+      InputAttachments:
+        - InputId: !Ref RtmpInput
+          InputAttachmentName: streamyard
+          InputSettings:
+            SourceEndBehavior: CONTINUE
+      InputSpecification:
+        Codec: AVC
+        Resolution: HD
+        MaximumBitrate: MAX_10_MBPS
+      Destinations:
+        - Id: mediapackage-dest
+          MediaPackageSettings:
+            - ChannelId: !Ref MpChannel
+        - Id: s3-archive-dest
+          Settings:
+            - Url: !Sub "s3://${ArchiveBucket}/${!AWS::StackName}"
+      EncoderSettings:
+        TimecodeConfig: { Source: EMBEDDED }
+        AudioDescriptions:
+          - Name: audio_aac
+            AudioSelectorName: default
+            CodecSettings:
+              AacSettings:
+                Bitrate: 128000
+                CodingMode: CODING_MODE_2_0
+                SampleRate: 48000
+        VideoDescriptions:
+          - Name: video_720p
+            Width: 1280
+            Height: 720
+            RespondToAfd: NONE
+            Sharpness: 50
+            ScalingBehavior: DEFAULT
+            CodecSettings:
+              H264Settings:
+                RateControlMode: QVBR
+                QvbrQualityLevel: 7
+                MaxBitrate: 2500000
+                GopSize: 2
+                GopSizeUnits: SECONDS
+                Profile: MAIN
+                Level: H264_LEVEL_AUTO
+                AdaptiveQuantization: HIGH
+                LookAheadRateControl: HIGH
+          - Name: video_480p
+            Width: 854
+            Height: 480
+            CodecSettings:
+              H264Settings:
+                RateControlMode: QVBR
+                QvbrQualityLevel: 6
+                MaxBitrate: 1200000
+                GopSize: 2
+                GopSizeUnits: SECONDS
+                Profile: MAIN
+          - Name: video_360p
+            Width: 640
+            Height: 360
+            CodecSettings:
+              H264Settings:
+                RateControlMode: QVBR
+                QvbrQualityLevel: 5
+                MaxBitrate: 600000
+                GopSize: 2
+                GopSizeUnits: SECONDS
+                Profile: MAIN
+        OutputGroups:
+          - Name: hls-to-mediapackage
+            OutputGroupSettings:
+              MediaPackageGroupSettings:
+                Destination: { DestinationRefId: mediapackage-dest }
+            Outputs:
+              - OutputName: 720p
+                VideoDescriptionName: video_720p
+                AudioDescriptionNames: [audio_aac]
+                OutputSettings:
+                  MediaPackageOutputSettings: {}
+              - OutputName: 480p
+                VideoDescriptionName: video_480p
+                AudioDescriptionNames: [audio_aac]
+                OutputSettings:
+                  MediaPackageOutputSettings: {}
+              - OutputName: 360p
+                VideoDescriptionName: video_360p
+                AudioDescriptionNames: [audio_aac]
+                OutputSettings:
+                  MediaPackageOutputSettings: {}
+          - Name: archive-to-s3
+            OutputGroupSettings:
+              ArchiveGroupSettings:
+                Destination: { DestinationRefId: s3-archive-dest }
+                RolloverInterval: 3600
+            Outputs:
+              - OutputName: archive
+                VideoDescriptionName: video_720p
+                AudioDescriptionNames: [audio_aac]
+                OutputSettings:
+                  ArchiveOutputSettings:
+                    NameModifier: _archive
+                    ContainerSettings:
+                      M2tsSettings:
+                        AudioBufferModel: ATSC
+                        BufferModel: MULTIPLEX
+                        RateMode: CBR
+
+Outputs:
+  ChannelId:
+    Description: MediaLive channel id (used by app StartChannel/StopChannel)
+    Value: !Ref Channel
+
+  InputId:
+    Description: MediaLive input id
+    Value: !Ref RtmpInput
+
+  RtmpPrimaryUrl:
+    Description: Primary RTMP push URL (paste into StreamYard "Server URL")
+    Value: !Select [0, !GetAtt RtmpInput.Destinations]
+
+  RtmpBackupUrl:
+    Condition: IsStandard
+    Description: Backup RTMP push URL (only when ChannelClass=STANDARD)
+    Value: !Select [1, !GetAtt RtmpInput.Destinations]
+
+  StreamKeyHint:
+    Description: >
+      MediaLive derives the stream key from the URL path segment. StreamYard's
+      "Stream key" field can be any non-empty string (e.g. "live"); AWS
+      accepts anything on RTMP_PUSH inputs from whitelisted CIDRs.
+    Value: !Ref StreamName
+
+  HlsPlaybackUrl:
+    Description: MediaPackage HLS URL for the app player (into LIVE_HLS_URL secret)
+    Value: !GetAtt MpHlsEndpoint.Url
+
+  ArchiveBucketName:
+    Description: S3 bucket where MediaLive writes raw archive segments
+    Value: !Ref ArchiveBucket
