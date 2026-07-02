@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { LiveBadge } from "@/components/LiveBadge";
 
 export function Header() {
   const { address, completeLogin, disconnect } = useWallet();
@@ -123,6 +124,7 @@ export function Header() {
         </Link>
 
         <nav className="ml-auto flex items-center gap-2 text-sm font-mono">
+          <LiveBadge />
           <Link
             to="/about"
             className="px-3 py-1.5 hover:text-primary transition-colors"
