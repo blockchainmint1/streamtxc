@@ -917,6 +917,45 @@ function LiveEligibilityAdminSection({ wallet }: { wallet: string }) {
   );
 }
 
+function PermanentEmbedRow({ wallet }: { wallet: string }) {
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "https://stream.texitcoin.org";
+  const link = `${origin}/embed/live/by-wallet/${wallet}?autoplay=1&mute=1`;
+  const iframe = `<iframe src="${link}" width="100%" height="480" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen frameborder="0"></iframe>`;
+  return (
+    <div className="mb-6 p-3 rounded border border-border bg-muted/40 space-y-2">
+      <div className="font-mono text-xs text-muted-foreground">
+        Permanent embed link (auto-plays your current stream, shows "Offline" otherwise)
+      </div>
+      <div className="flex items-center gap-2">
+        <Input readOnly value={link} className="font-mono text-xs" />
+        <Button
+          size="sm"
+          variant="outline"
+          className="font-mono"
+          onClick={() => {
+            navigator.clipboard.writeText(link);
+            toast.success("Link copied");
+          }}
+        >
+          Copy link
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="font-mono"
+          onClick={() => {
+            navigator.clipboard.writeText(iframe);
+            toast.success("Embed code copied");
+          }}
+        >
+          Copy embed
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function BugReportsAdminSection({ wallet }: { wallet: string }) {
   const fetchReports = useServerFn(listBugReports);
   const { data, isLoading, error } = useQuery({
