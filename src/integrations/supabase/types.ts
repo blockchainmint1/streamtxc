@@ -772,6 +772,9 @@ export type Database = {
           email_verified_at: string | null
           email_verify_expires_at: string | null
           email_verify_token: string | null
+          live_eligible: boolean
+          live_max_concurrent_minutes: number
+          live_rate_txc_per_minute: number | null
           notify_expiry: boolean
           telegram_chat_id: number | null
           telegram_pairing_code: string | null
@@ -786,6 +789,9 @@ export type Database = {
           email_verified_at?: string | null
           email_verify_expires_at?: string | null
           email_verify_token?: string | null
+          live_eligible?: boolean
+          live_max_concurrent_minutes?: number
+          live_rate_txc_per_minute?: number | null
           notify_expiry?: boolean
           telegram_chat_id?: number | null
           telegram_pairing_code?: string | null
@@ -800,6 +806,9 @@ export type Database = {
           email_verified_at?: string | null
           email_verify_expires_at?: string | null
           email_verify_token?: string | null
+          live_eligible?: boolean
+          live_max_concurrent_minutes?: number
+          live_rate_txc_per_minute?: number | null
           notify_expiry?: boolean
           telegram_chat_id?: number | null
           telegram_pairing_code?: string | null
