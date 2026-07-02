@@ -18,6 +18,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useWallet } from "@/lib/wallet";
+import { getWallet } from "@/lib/wallet";
 import { formatBytes, MAX_S3_UPLOAD_BYTES } from "@/lib/fees";
 import {
   registerUpload,
@@ -436,9 +437,14 @@ export function S3VideoUpload({
       setStage("pin-ipfs", "done", `cid: ${canonicalCid.slice(0, 14)}…`);
 
       setStage("register", "active");
+      // Read wallet synchronously at submit time — the `address` from
+      // useWallet() hydrates from localStorage inside a useEffect and can
+      // be stale/null on the first render, which was causing logged-in
+      // users to have their uploads silently registered as anonymous.
+      const submitWallet = address ?? getWallet();
       const result = await register({
         data: {
-          wallet: address ?? undefined,
+          wallet: submitWallet ?? undefined,
           cid: canonicalCid,
           title, description,
           sizeBytes: file.size,
@@ -455,7 +461,7 @@ export function S3VideoUpload({
         result.chainStatus === "stamp_failed"
           ? "Saved · chain stamp queued for retry"
           : "Row saved · TXC stamp broadcast");
-      if (!address) recordAnonUpload(result.cid, title);
+      if (!submitWallet) recordAnonUpload(result.cid, title);
       qc.invalidateQueries({ queryKey: ["recent-videos"] });
       setResultCid(result.cid);
 
