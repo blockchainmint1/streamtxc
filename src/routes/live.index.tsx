@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Hls from "hls.js";
 import { supabase } from "@/integrations/supabase/client";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -129,7 +130,9 @@ function LiveCard({ stream }: { stream: Stream }) {
       className="group border border-border rounded-sm bg-card overflow-hidden hover:border-primary transition-colors"
     >
       <div className="aspect-video bg-black relative">
-        {thumb ? (
+        {stream.hls_url ? (
+          <LivePreview src={stream.hls_url} poster={thumb ?? undefined} />
+        ) : thumb ? (
           <img src={thumb} alt="" className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -155,5 +158,55 @@ function LiveCard({ stream }: { stream: Stream }) {
         )}
       </div>
     </Link>
+  );
+}
+
+function LivePreview({ src, poster }: { src: string; poster?: string }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    let hls: Hls | null = null;
+
+    if (Hls.isSupported() && src.endsWith(".m3u8")) {
+      hls = new Hls({
+        enableWorker: true,
+        maxBufferLength: 6,
+        liveSyncDurationCount: 3,
+        capLevelToPlayerSize: true,
+      });
+      hls.loadSource(src);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        // Pin to the lowest rendition to minimize bandwidth on the grid.
+        if (hls && hls.levels.length > 0) hls.currentLevel = 0;
+      });
+    } else {
+      video.src = src;
+    }
+
+    const tryPlay = () => video.play().catch(() => {});
+    video.addEventListener("loadedmetadata", tryPlay);
+    tryPlay();
+
+    return () => {
+      video.removeEventListener("loadedmetadata", tryPlay);
+      if (hls) hls.destroy();
+      video.removeAttribute("src");
+      video.load();
+    };
+  }, [src]);
+
+  return (
+    <video
+      ref={videoRef}
+      className="w-full h-full object-cover"
+      muted
+      playsInline
+      autoPlay
+      disablePictureInPicture
+      poster={poster}
+    />
   );
 }
