@@ -1089,6 +1089,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const describe = useServerFn(describeMediaLiveChannel);
   const archive = useServerFn(archiveLiveStream);
   const skipArchive = useServerFn(skipLiveArchive);
+  const rtmpCfg = useServerFn(getRtmpConfig);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["live-streams-admin"],
@@ -1104,6 +1105,20 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const [fbUrl, setFbUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [channelState, setChannelState] = useState<string | null>(null);
+  const [rtmpEndpoints, setRtmpEndpoints] = useState<
+    { serverUrl: string; streamKey: string; fullUrl: string }[]
+  >([]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    rtmpCfg({ data: { wallet } })
+      .then((r) => !cancelled && setRtmpEndpoints(r.endpoints ?? []))
+      .catch(() => !cancelled && setRtmpEndpoints([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, wallet, rtmpCfg]);
 
   useEffect(() => {
     if (!isAdmin) return;
