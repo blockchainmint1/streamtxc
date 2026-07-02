@@ -980,7 +980,7 @@ export const listVideosByCids = createServerFn({ method: "POST" })
       .in("cid", data.cids)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return videos ?? [];
+    return (videos ?? []).map((v) => stripSensitiveVideoFields(v));
   });
 
 /**
