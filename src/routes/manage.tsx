@@ -746,6 +746,7 @@ function ManagePageInner() {
           </>
         )}
         {address && <BugReportsAdminSection wallet={address} />}
+        {address && <LiveEligibilityAdminSection wallet={address} />}
         {address && <GoLiveAdminSection wallet={address} />}
       </main>
       <Footer />
