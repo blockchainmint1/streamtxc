@@ -59,7 +59,18 @@ import { listBugReports } from "@/lib/bug-reports.functions";
 import {
   listLiveEligibleWallets,
   setLiveEligibility,
+  getMyLiveEligibility,
 } from "@/lib/live-eligibility.functions";
+import {
+  getMyLiveChannel,
+  provisionMyLiveChannel,
+  startMyStream,
+  stopMyStream,
+  markMyStreamLive,
+  describeMyChannelState,
+  getMySignalHealth,
+  listMyLiveStreams,
+} from "@/lib/live-channels.functions";
 import {
   listRecentLiveStreams,
   createLiveStream,
@@ -748,6 +759,7 @@ function ManagePageInner() {
         {address && <BugReportsAdminSection wallet={address} />}
         {address && <LiveEligibilityAdminSection wallet={address} />}
         {address && <GoLiveAdminSection wallet={address} />}
+        {address && <MyGoLiveSection wallet={address} />}
       </main>
       <Footer />
     </div>
@@ -2253,5 +2265,255 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// -----------------------------------------------------------------------
+// MyGoLiveSection — for wallets flagged live_eligible=true on
+// wallet_notification_prefs (see LiveEligibilityAdminSection above). Admin
+// gets its own GoLiveAdminSection so we hide this one for the admin wallet
+// to avoid two Go Live UIs on the same page.
+// -----------------------------------------------------------------------
+function MyGoLiveSection({ wallet }: { wallet: string }) {
+  const eligFn = useServerFn(getMyLiveEligibility);
+  const channelFn = useServerFn(getMyLiveChannel);
+  const provisionFn = useServerFn(provisionMyLiveChannel);
+  const startFn = useServerFn(startMyStream);
+  const stopFn = useServerFn(stopMyStream);
+  const markLiveFn = useServerFn(markMyStreamLive);
+  const describeFn = useServerFn(describeMyChannelState);
+  const signalFn = useServerFn(getMySignalHealth);
+  const listFn = useServerFn(listMyLiveStreams);
+  const qc = useQueryClient();
+
+  const elig = useQuery({
+    queryKey: ["my-live-eligibility", wallet],
+    queryFn: () => eligFn(),
+    enabled: !!wallet && wallet !== ADMIN_WALLET,
+  });
+  const channel = useQuery({
+    queryKey: ["my-live-channel", wallet],
+    queryFn: () => channelFn(),
+    enabled: !!elig.data?.eligible,
+  });
+  const state = useQuery({
+    queryKey: ["my-live-state", wallet],
+    queryFn: () => describeFn(),
+    enabled: !!channel.data,
+    refetchInterval: 5000,
+  });
+  const signal = useQuery({
+    queryKey: ["my-live-signal", wallet],
+    queryFn: () => signalFn(),
+    enabled: state.data?.state === "RUNNING",
+    refetchInterval: 5000,
+  });
+  const streams = useQuery({
+    queryKey: ["my-live-streams", wallet],
+    queryFn: () => listFn(),
+    enabled: !!elig.data?.eligible,
+  });
+
+  const [title, setTitle] = useState("");
+  const [desc, setDesc] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  if (wallet === ADMIN_WALLET) return null;
+  if (!elig.data?.eligible) return null;
+
+  const activeStream = (streams.data ?? []).find(
+    (s: any) => s.status === "starting" || s.status === "live",
+  );
+  const ch = channel.data;
+
+  async function handleProvision() {
+    setBusy(true);
+    try {
+      await provisionFn();
+      toast.success("Channel provisioned. RTMP credentials are ready.");
+      qc.invalidateQueries({ queryKey: ["my-live-channel", wallet] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Provision failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleStart() {
+    if (!title.trim()) return toast.error("Give it a title");
+    setBusy(true);
+    try {
+      await startFn({ data: { title, description: desc || null } });
+      toast.success("Starting channel — give it up to 60s, then paste RTMP into StreamYard.");
+      setTitle("");
+      setDesc("");
+      qc.invalidateQueries({ queryKey: ["my-live-streams", wallet] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Start failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleStop(streamId: string) {
+    setBusy(true);
+    try {
+      await stopFn({ data: { streamId } });
+      toast.success("Stopped");
+      qc.invalidateQueries({ queryKey: ["my-live-streams", wallet] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Stop failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleMarkLive(streamId: string) {
+    try {
+      await markLiveFn({ data: { streamId } });
+      qc.invalidateQueries({ queryKey: ["my-live-streams", wallet] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
+    }
+  }
+
+  return (
+    <section className="mt-12 border border-primary/20 bg-card p-6 rounded">
+      <div className="font-mono text-xs text-primary mb-3">[ GO LIVE ]</div>
+      <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
+        <Radio className="h-6 w-6" /> Livestream
+      </h2>
+      <p className="text-sm text-muted-foreground mb-6">
+        Push a live broadcast to streamTXC from OBS, StreamYard, or any RTMP
+        source. Rate: {elig.data.rateTxcPerMinute || 0} TXC/minute (billing goes
+        live in a later phase — free during testing).
+      </p>
+
+      {!ch ? (
+        <Button onClick={handleProvision} disabled={busy} className="font-mono">
+          {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Enable live (provision channel)
+        </Button>
+      ) : (
+        <div className="space-y-6">
+          <div className="grid gap-3 text-sm">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono text-xs text-muted-foreground">state:</span>
+              <span className="font-mono text-xs px-2 py-0.5 rounded bg-muted">
+                {state.data?.state ?? "…"}
+              </span>
+              {state.data?.state === "RUNNING" && (
+                <span
+                  className={
+                    "font-mono text-xs px-2 py-0.5 rounded " +
+                    (signal.data && "receiving" in signal.data && signal.data.receiving
+                      ? "bg-green-500/20 text-green-500"
+                      : "bg-yellow-500/20 text-yellow-500")
+                  }
+                >
+                  {signal.data && "receiving" in signal.data && signal.data.receiving
+                    ? "RECEIVING"
+                    : "NO SEGMENTS YET"}
+                </span>
+              )}
+            </div>
+            <div>
+              <div className="font-mono text-xs text-muted-foreground mb-1">
+                Server URL (paste into StreamYard / OBS)
+              </div>
+              <div className="flex items-center gap-2">
+                <Input readOnly value={ch.rtmpUrl} className="font-mono text-xs" />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    navigator.clipboard.writeText(ch.rtmpUrl);
+                    toast.success("Copied");
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div>
+              <div className="font-mono text-xs text-muted-foreground mb-1">Stream key</div>
+              <div className="flex items-center gap-2">
+                <Input readOnly value={ch.streamKey} className="font-mono text-xs" />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    navigator.clipboard.writeText(ch.streamKey);
+                    toast.success("Copied");
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {!activeStream ? (
+            <div className="space-y-2 border-t border-border pt-4">
+              <Label className="font-mono text-xs">New broadcast</Label>
+              <Input
+                placeholder="Stream title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+              <Textarea
+                placeholder="Description (optional)"
+                value={desc}
+                onChange={(e) => setDesc(e.target.value)}
+                rows={2}
+              />
+              <Button onClick={handleStart} disabled={busy} className="font-mono">
+                {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Go Live
+              </Button>
+            </div>
+          ) : (
+            <div className="border-t border-border pt-4 space-y-2">
+              <div className="font-mono text-xs text-muted-foreground">
+                Active broadcast: {activeStream.title}
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {activeStream.status === "starting" && (
+                  <Button
+                    variant="outline"
+                    className="font-mono"
+                    onClick={() => handleMarkLive(activeStream.id)}
+                  >
+                    Mark LIVE
+                  </Button>
+                )}
+                <Button
+                  variant="destructive"
+                  className="font-mono"
+                  onClick={() => handleStop(activeStream.id)}
+                  disabled={busy}
+                >
+                  Stop
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {streams.data && streams.data.length > 0 && (
+            <div className="border-t border-border pt-4">
+              <div className="font-mono text-xs text-muted-foreground mb-2">Recent</div>
+              <ul className="space-y-1 text-sm">
+                {streams.data.slice(0, 5).map((s: any) => (
+                  <li key={s.id} className="flex items-center gap-2">
+                    <span className="font-mono text-xs w-16">{s.status}</span>
+                    <span className="truncate">{s.title}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }

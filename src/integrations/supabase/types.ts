@@ -331,6 +331,60 @@ export type Database = {
         }
         Relationships: []
       }
+      live_channels: {
+        Row: {
+          archive_prefix: string
+          created_at: string
+          hls_url: string
+          id: string
+          last_used_at: string | null
+          medialive_channel_id: string
+          medialive_input_id: string
+          mediapackage_channel_id: string
+          mediapackage_endpoint_id: string | null
+          owner_wallet: string
+          provisioned_at: string
+          rtmp_url: string
+          status: string
+          stream_key: string
+          updated_at: string
+        }
+        Insert: {
+          archive_prefix: string
+          created_at?: string
+          hls_url: string
+          id?: string
+          last_used_at?: string | null
+          medialive_channel_id: string
+          medialive_input_id: string
+          mediapackage_channel_id: string
+          mediapackage_endpoint_id?: string | null
+          owner_wallet: string
+          provisioned_at?: string
+          rtmp_url: string
+          status?: string
+          stream_key: string
+          updated_at?: string
+        }
+        Update: {
+          archive_prefix?: string
+          created_at?: string
+          hls_url?: string
+          id?: string
+          last_used_at?: string | null
+          medialive_channel_id?: string
+          medialive_input_id?: string
+          mediapackage_channel_id?: string
+          mediapackage_endpoint_id?: string | null
+          owner_wallet?: string
+          provisioned_at?: string
+          rtmp_url?: string
+          status?: string
+          stream_key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       live_chat_messages: {
         Row: {
           body: string
@@ -373,6 +427,7 @@ export type Database = {
           archive_status: string | null
           archive_transcode_job_id: string | null
           archive_video_cid: string | null
+          channel_row_id: string | null
           created_at: string
           description: string | null
           ended_at: string | null
@@ -398,6 +453,7 @@ export type Database = {
           archive_status?: string | null
           archive_transcode_job_id?: string | null
           archive_video_cid?: string | null
+          channel_row_id?: string | null
           created_at?: string
           description?: string | null
           ended_at?: string | null
@@ -423,6 +479,7 @@ export type Database = {
           archive_status?: string | null
           archive_transcode_job_id?: string | null
           archive_video_cid?: string | null
+          channel_row_id?: string | null
           created_at?: string
           description?: string | null
           ended_at?: string | null
@@ -442,7 +499,15 @@ export type Database = {
           total_views?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "live_streams_channel_row_id_fkey"
+            columns: ["channel_row_id"]
+            isOneToOne: false
+            referencedRelation: "live_channels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payments: {
         Row: {
