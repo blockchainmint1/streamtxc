@@ -24,6 +24,7 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VCidRouteImport } from './routes/v.$cid'
 import { Route as UWalletRouteImport } from './routes/u.$wallet'
+import { Route as LiveStreamIdRouteImport } from './routes/live.$streamId'
 import { Route as EmbedCidRouteImport } from './routes/embed.$cid'
 import { Route as VCidRestoreRouteImport } from './routes/v.$cid.restore'
 import { Route as ApiStreamCidRouteImport } from './routes/api/stream.$cid'
@@ -119,6 +120,11 @@ const UWalletRoute = UWalletRouteImport.update({
   id: '/u/$wallet',
   path: '/u/$wallet',
   getParentRoute: () => rootRouteImport,
+} as any)
+const LiveStreamIdRoute = LiveStreamIdRouteImport.update({
+  id: '/$streamId',
+  path: '/$streamId',
+  getParentRoute: () => LiveRoute,
 } as any)
 const EmbedCidRoute = EmbedCidRouteImport.update({
   id: '/embed/$cid',
@@ -238,7 +244,7 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/api': typeof ApiRouteWithChildren
   '/brand': typeof BrandRoute
-  '/live': typeof LiveRoute
+  '/live': typeof LiveRouteWithChildren
   '/manage': typeof ManageRoute
   '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
@@ -248,6 +254,7 @@ export interface FileRoutesByFullPath {
   '/upload': typeof UploadRoute
   '/upload-aws': typeof UploadAwsRoute
   '/embed/$cid': typeof EmbedCidRoute
+  '/live/$streamId': typeof LiveStreamIdRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
@@ -275,7 +282,7 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/api': typeof ApiRouteWithChildren
   '/brand': typeof BrandRoute
-  '/live': typeof LiveRoute
+  '/live': typeof LiveRouteWithChildren
   '/manage': typeof ManageRoute
   '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
@@ -285,6 +292,7 @@ export interface FileRoutesByTo {
   '/upload': typeof UploadRoute
   '/upload-aws': typeof UploadAwsRoute
   '/embed/$cid': typeof EmbedCidRoute
+  '/live/$streamId': typeof LiveStreamIdRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
@@ -313,7 +321,7 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/api': typeof ApiRouteWithChildren
   '/brand': typeof BrandRoute
-  '/live': typeof LiveRoute
+  '/live': typeof LiveRouteWithChildren
   '/manage': typeof ManageRoute
   '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
@@ -323,6 +331,7 @@ export interface FileRoutesById {
   '/upload': typeof UploadRoute
   '/upload-aws': typeof UploadAwsRoute
   '/embed/$cid': typeof EmbedCidRoute
+  '/live/$streamId': typeof LiveStreamIdRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
@@ -362,6 +371,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/upload-aws'
     | '/embed/$cid'
+    | '/live/$streamId'
     | '/u/$wallet'
     | '/v/$cid'
     | '/api/public/import-stream'
@@ -399,6 +409,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/upload-aws'
     | '/embed/$cid'
+    | '/live/$streamId'
     | '/u/$wallet'
     | '/v/$cid'
     | '/api/public/import-stream'
@@ -436,6 +447,7 @@ export interface FileRouteTypes {
     | '/upload'
     | '/upload-aws'
     | '/embed/$cid'
+    | '/live/$streamId'
     | '/u/$wallet'
     | '/v/$cid'
     | '/api/public/import-stream'
@@ -464,7 +476,7 @@ export interface RootRouteChildren {
   AboutRoute: typeof AboutRoute
   ApiRoute: typeof ApiRouteWithChildren
   BrandRoute: typeof BrandRoute
-  LiveRoute: typeof LiveRoute
+  LiveRoute: typeof LiveRouteWithChildren
   ManageRoute: typeof ManageRoute
   ManifestoRoute: typeof ManifestoRoute
   PrivacyRoute: typeof PrivacyRoute
@@ -584,6 +596,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/u/$wallet'
       preLoaderRoute: typeof UWalletRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/live/$streamId': {
+      id: '/live/$streamId'
+      path: '/$streamId'
+      fullPath: '/live/$streamId'
+      preLoaderRoute: typeof LiveStreamIdRouteImport
+      parentRoute: typeof LiveRoute
     }
     '/embed/$cid': {
       id: '/embed/$cid'
@@ -783,6 +802,16 @@ const ApiRouteChildren: ApiRouteChildren = {
 
 const ApiRouteWithChildren = ApiRoute._addFileChildren(ApiRouteChildren)
 
+interface LiveRouteChildren {
+  LiveStreamIdRoute: typeof LiveStreamIdRoute
+}
+
+const LiveRouteChildren: LiveRouteChildren = {
+  LiveStreamIdRoute: LiveStreamIdRoute,
+}
+
+const LiveRouteWithChildren = LiveRoute._addFileChildren(LiveRouteChildren)
+
 interface VCidRouteChildren {
   VCidRestoreRoute: typeof VCidRestoreRoute
 }
@@ -798,7 +827,7 @@ const rootRouteChildren: RootRouteChildren = {
   AboutRoute: AboutRoute,
   ApiRoute: ApiRouteWithChildren,
   BrandRoute: BrandRoute,
-  LiveRoute: LiveRoute,
+  LiveRoute: LiveRouteWithChildren,
   ManageRoute: ManageRoute,
   ManifestoRoute: ManifestoRoute,
   PrivacyRoute: PrivacyRoute,
