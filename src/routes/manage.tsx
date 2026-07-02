@@ -59,7 +59,18 @@ import { listBugReports } from "@/lib/bug-reports.functions";
 import {
   listLiveEligibleWallets,
   setLiveEligibility,
+  getMyLiveEligibility,
 } from "@/lib/live-eligibility.functions";
+import {
+  getMyLiveChannel,
+  provisionMyLiveChannel,
+  startMyStream,
+  stopMyStream,
+  markMyStreamLive,
+  describeMyChannelState,
+  getMySignalHealth,
+  listMyLiveStreams,
+} from "@/lib/live-channels.functions";
 import {
   listRecentLiveStreams,
   createLiveStream,
@@ -748,6 +759,7 @@ function ManagePageInner() {
         {address && <BugReportsAdminSection wallet={address} />}
         {address && <LiveEligibilityAdminSection wallet={address} />}
         {address && <GoLiveAdminSection wallet={address} />}
+        {address && <MyGoLiveSection wallet={address} />}
       </main>
       <Footer />
     </div>
