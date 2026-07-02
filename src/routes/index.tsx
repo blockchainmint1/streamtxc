@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { LiveBanner } from "@/components/LiveBanner";
 import { Button } from "@/components/ui/button";
 import { listRecentVideos } from "@/lib/videos.functions";
 import { formatBytes } from "@/lib/fees";
@@ -59,6 +60,7 @@ function IndexPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
+      <LiveBanner />
       {/* Hero */}
       <section className="mx-auto w-full max-w-7xl px-6 pt-24 pb-16">
         <div className="font-mono text-xs text-primary mb-6">
