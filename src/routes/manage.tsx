@@ -753,7 +753,7 @@ function BugReportsAdminSection({ wallet }: { wallet: string }) {
   const fetchReports = useServerFn(listBugReports);
   const { data, isLoading, error } = useQuery({
     queryKey: ["bug-reports", wallet],
-    queryFn: () => fetchReports({ data: { wallet } }),
+    queryFn: () => fetchReports(),
     enabled: wallet === ADMIN_WALLET,
   });
   if (wallet !== ADMIN_WALLET) return null;
