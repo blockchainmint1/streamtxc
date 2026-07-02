@@ -17,11 +17,11 @@ import { Route as S3TestRouteImport } from './routes/s3-test'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ManifestoRouteImport } from './routes/manifesto'
 import { Route as ManageRouteImport } from './routes/manage'
-import { Route as LiveRouteImport } from './routes/live'
 import { Route as BrandRouteImport } from './routes/brand'
 import { Route as ApiRouteImport } from './routes/api'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LiveIndexRouteImport } from './routes/live.index'
 import { Route as VCidRouteImport } from './routes/v.$cid'
 import { Route as UWalletRouteImport } from './routes/u.$wallet'
 import { Route as LiveStreamIdRouteImport } from './routes/live.$streamId'
@@ -88,11 +88,6 @@ const ManageRoute = ManageRouteImport.update({
   path: '/manage',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LiveRoute = LiveRouteImport.update({
-  id: '/live',
-  path: '/live',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const BrandRoute = BrandRouteImport.update({
   id: '/brand',
   path: '/brand',
@@ -113,6 +108,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LiveIndexRoute = LiveIndexRouteImport.update({
+  id: '/live/',
+  path: '/live/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VCidRoute = VCidRouteImport.update({
   id: '/v/$cid',
   path: '/v/$cid',
@@ -124,9 +124,9 @@ const UWalletRoute = UWalletRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const LiveStreamIdRoute = LiveStreamIdRouteImport.update({
-  id: '/$streamId',
-  path: '/$streamId',
-  getParentRoute: () => LiveRoute,
+  id: '/live/$streamId',
+  path: '/live/$streamId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const EmbedCidRoute = EmbedCidRouteImport.update({
   id: '/embed/$cid',
@@ -256,7 +256,6 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/api': typeof ApiRouteWithChildren
   '/brand': typeof BrandRoute
-  '/live': typeof LiveRouteWithChildren
   '/manage': typeof ManageRoute
   '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
@@ -269,6 +268,7 @@ export interface FileRoutesByFullPath {
   '/live/$streamId': typeof LiveStreamIdRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
+  '/live/': typeof LiveIndexRoute
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
@@ -296,7 +296,6 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/api': typeof ApiRouteWithChildren
   '/brand': typeof BrandRoute
-  '/live': typeof LiveRouteWithChildren
   '/manage': typeof ManageRoute
   '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
@@ -309,6 +308,7 @@ export interface FileRoutesByTo {
   '/live/$streamId': typeof LiveStreamIdRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
+  '/live': typeof LiveIndexRoute
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
@@ -337,7 +337,6 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/api': typeof ApiRouteWithChildren
   '/brand': typeof BrandRoute
-  '/live': typeof LiveRouteWithChildren
   '/manage': typeof ManageRoute
   '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
@@ -350,6 +349,7 @@ export interface FileRoutesById {
   '/live/$streamId': typeof LiveStreamIdRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
+  '/live/': typeof LiveIndexRoute
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
@@ -379,7 +379,6 @@ export interface FileRouteTypes {
     | '/about'
     | '/api'
     | '/brand'
-    | '/live'
     | '/manage'
     | '/manifesto'
     | '/privacy'
@@ -392,6 +391,7 @@ export interface FileRouteTypes {
     | '/live/$streamId'
     | '/u/$wallet'
     | '/v/$cid'
+    | '/live/'
     | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
@@ -419,7 +419,6 @@ export interface FileRouteTypes {
     | '/about'
     | '/api'
     | '/brand'
-    | '/live'
     | '/manage'
     | '/manifesto'
     | '/privacy'
@@ -432,6 +431,7 @@ export interface FileRouteTypes {
     | '/live/$streamId'
     | '/u/$wallet'
     | '/v/$cid'
+    | '/live'
     | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
@@ -459,7 +459,6 @@ export interface FileRouteTypes {
     | '/about'
     | '/api'
     | '/brand'
-    | '/live'
     | '/manage'
     | '/manifesto'
     | '/privacy'
@@ -472,6 +471,7 @@ export interface FileRouteTypes {
     | '/live/$streamId'
     | '/u/$wallet'
     | '/v/$cid'
+    | '/live/'
     | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
@@ -500,7 +500,6 @@ export interface RootRouteChildren {
   AboutRoute: typeof AboutRoute
   ApiRoute: typeof ApiRouteWithChildren
   BrandRoute: typeof BrandRoute
-  LiveRoute: typeof LiveRouteWithChildren
   ManageRoute: typeof ManageRoute
   ManifestoRoute: typeof ManifestoRoute
   PrivacyRoute: typeof PrivacyRoute
@@ -510,8 +509,10 @@ export interface RootRouteChildren {
   UploadRoute: typeof UploadRoute
   UploadAwsRoute: typeof UploadAwsRoute
   EmbedCidRoute: typeof EmbedCidRoute
+  LiveStreamIdRoute: typeof LiveStreamIdRoute
   UWalletRoute: typeof UWalletRoute
   VCidRoute: typeof VCidRouteWithChildren
+  LiveIndexRoute: typeof LiveIndexRoute
   EmbedLiveStreamIdRoute: typeof EmbedLiveStreamIdRoute
   EmbedLiveByWalletWalletRoute: typeof EmbedLiveByWalletWalletRoute
 }
@@ -574,13 +575,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ManageRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/live': {
-      id: '/live'
-      path: '/live'
-      fullPath: '/live'
-      preLoaderRoute: typeof LiveRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/brand': {
       id: '/brand'
       path: '/brand'
@@ -609,6 +603,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/live/': {
+      id: '/live/'
+      path: '/live'
+      fullPath: '/live/'
+      preLoaderRoute: typeof LiveIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v/$cid': {
       id: '/v/$cid'
       path: '/v/$cid'
@@ -625,10 +626,10 @@ declare module '@tanstack/react-router' {
     }
     '/live/$streamId': {
       id: '/live/$streamId'
-      path: '/$streamId'
+      path: '/live/$streamId'
       fullPath: '/live/$streamId'
       preLoaderRoute: typeof LiveStreamIdRouteImport
-      parentRoute: typeof LiveRoute
+      parentRoute: typeof rootRouteImport
     }
     '/embed/$cid': {
       id: '/embed/$cid'
@@ -842,16 +843,6 @@ const ApiRouteChildren: ApiRouteChildren = {
 
 const ApiRouteWithChildren = ApiRoute._addFileChildren(ApiRouteChildren)
 
-interface LiveRouteChildren {
-  LiveStreamIdRoute: typeof LiveStreamIdRoute
-}
-
-const LiveRouteChildren: LiveRouteChildren = {
-  LiveStreamIdRoute: LiveStreamIdRoute,
-}
-
-const LiveRouteWithChildren = LiveRoute._addFileChildren(LiveRouteChildren)
-
 interface VCidRouteChildren {
   VCidRestoreRoute: typeof VCidRestoreRoute
 }
@@ -867,7 +858,6 @@ const rootRouteChildren: RootRouteChildren = {
   AboutRoute: AboutRoute,
   ApiRoute: ApiRouteWithChildren,
   BrandRoute: BrandRoute,
-  LiveRoute: LiveRouteWithChildren,
   ManageRoute: ManageRoute,
   ManifestoRoute: ManifestoRoute,
   PrivacyRoute: PrivacyRoute,
@@ -877,8 +867,10 @@ const rootRouteChildren: RootRouteChildren = {
   UploadRoute: UploadRoute,
   UploadAwsRoute: UploadAwsRoute,
   EmbedCidRoute: EmbedCidRoute,
+  LiveStreamIdRoute: LiveStreamIdRoute,
   UWalletRoute: UWalletRoute,
   VCidRoute: VCidRouteWithChildren,
+  LiveIndexRoute: LiveIndexRoute,
   EmbedLiveStreamIdRoute: EmbedLiveStreamIdRoute,
   EmbedLiveByWalletWalletRoute: EmbedLiveByWalletWalletRoute,
 }

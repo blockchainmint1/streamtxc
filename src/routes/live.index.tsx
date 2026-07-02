@@ -6,7 +6,7 @@ import { Footer } from "@/components/Footer";
 import { Radio, Eye } from "lucide-react";
 import { useLiveViewerCount } from "@/hooks/useLiveViewerCount";
 
-export const Route = createFileRoute("/live")({
+export const Route = createFileRoute("/live/")({
   head: () => ({
     meta: [
       { title: "Live — streamTXC" },
