@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireWalletSession } from "./wallet-auth.functions";
 
 const ADMIN_WALLET = "TeiqbqMxQG4JrDfrzdvTZcqhhai8KT5JTc";
 
@@ -37,9 +38,10 @@ export const submitBugReport = createServerFn({ method: "POST" })
   });
 
 export const listBugReports = createServerFn({ method: "POST" })
-  .inputValidator((input: { wallet: string }) => ({ wallet: String(input.wallet || "") }))
-  .handler(async ({ data }) => {
-    if (data.wallet !== ADMIN_WALLET) {
+  .middleware([requireWalletSession])
+  .handler(async ({ context }) => {
+    // Session-verified wallet from HMAC-signed token — cannot be spoofed.
+    if (context.wallet !== ADMIN_WALLET) {
       throw new Error("Forbidden");
     }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
