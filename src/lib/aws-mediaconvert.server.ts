@@ -25,6 +25,14 @@ export interface CreateJobOpts {
   videoId: string;
 }
 
+export interface MultiInputJobOpts {
+  /** Ordered list of S3 URIs (e.g. .ts segments) — MediaConvert stitches them in order. */
+  inputUris: string[];
+  outputPrefix: string;
+  /** Opaque tag round-tripped via userMetadata. For live archives we use `live-archive:<streamId>`. */
+  videoId: string;
+}
+
 /**
  * Kick off a MediaConvert HLS job with a 3-rendition ABR ladder:
  *   720p @ 2.5 Mbps, 480p @ 1.2 Mbps, 360p @ 0.6 Mbps
@@ -80,6 +88,77 @@ export async function startHlsTranscode(opts: CreateJobOpts): Promise<{ jobId: s
     body: JSON.stringify(body),
   });
 
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`MediaConvert createJob failed [${res.status}]: ${text}`);
+  }
+  const json = (await res.json()) as { job?: { id?: string } };
+  if (!json.job?.id) throw new Error("MediaConvert returned no job id");
+  return { jobId: json.job.id };
+}
+
+/**
+ * Kick off an HLS ABR MediaConvert job with N stitched inputs. Used to
+ * reassemble a live stream's archived .ts segments into a normal HLS asset.
+ */
+export async function startHlsTranscodeFromInputs(
+  opts: MultiInputJobOpts,
+): Promise<{ jobId: string }> {
+  const endpoint = process.env.AWS_MEDIACONVERT_ENDPOINT;
+  const roleArn = process.env.AWS_MEDIACONVERT_ROLE_ARN;
+  if (!endpoint || !roleArn) {
+    throw new Error("AWS_MEDIACONVERT_ENDPOINT and AWS_MEDIACONVERT_ROLE_ARN required");
+  }
+  if (opts.inputUris.length === 0) {
+    throw new Error("startHlsTranscodeFromInputs: no inputs");
+  }
+  // MediaConvert has a per-job input cap (~150). If we exceed it, fail loud
+  // rather than silently drop the tail of the stream.
+  if (opts.inputUris.length > 150) {
+    throw new Error(
+      `startHlsTranscodeFromInputs: ${opts.inputUris.length} inputs exceeds MediaConvert cap of 150`,
+    );
+  }
+
+  const body = {
+    Role: roleArn,
+    UserMetadata: { videoId: opts.videoId },
+    Settings: {
+      Inputs: opts.inputUris.map((uri) => ({
+        FileInput: uri,
+        AudioSelectors: { "Audio Selector 1": { DefaultSelection: "DEFAULT" } },
+        VideoSelector: {},
+        TimecodeSource: "ZEROBASED",
+      })),
+      OutputGroups: [
+        {
+          Name: "Apple HLS",
+          OutputGroupSettings: {
+            Type: "HLS_GROUP_SETTINGS",
+            HlsGroupSettings: {
+              Destination: opts.outputPrefix,
+              SegmentLength: 6,
+              MinSegmentLength: 0,
+              ManifestDurationFormat: "INTEGER",
+              OutputSelection: "MANIFESTS_AND_SEGMENTS",
+            },
+          },
+          Outputs: [
+            rendition("720p", 1280, 720, 2_500_000, 128_000),
+            rendition("480p", 854, 480, 1_200_000, 96_000),
+            rendition("360p", 640, 360, 600_000, 64_000),
+          ],
+        },
+      ],
+    },
+  };
+
+  const client = aws();
+  const res = await client.fetch(`${endpoint.replace(/\/$/, "")}/2017-08-29/jobs`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`MediaConvert createJob failed [${res.status}]: ${text}`);

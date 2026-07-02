@@ -64,6 +64,8 @@ import {
   markLiveStreamRunning,
   updateLiveStream,
   describeMediaLiveChannel,
+  archiveLiveStream,
+  skipLiveArchive,
 } from "@/lib/livestream.functions";
 import { Radio } from "lucide-react";
 
@@ -1084,6 +1086,8 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const markRunning = useServerFn(markLiveStreamRunning);
   const update = useServerFn(updateLiveStream);
   const describe = useServerFn(describeMediaLiveChannel);
+  const archive = useServerFn(archiveLiveStream);
+  const skipArchive = useServerFn(skipLiveArchive);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["live-streams-admin"],
@@ -1184,6 +1188,39 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
       refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Stop failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleArchive(id: string) {
+    if (!confirm(
+      "Archive this stream to your library?\n\n" +
+        "We'll stitch the recording into a normal HLS video and pin it to " +
+        "IPFS. This takes a few minutes; the video will appear in your " +
+        "list when it's ready.",
+    )) return;
+    setBusy(true);
+    try {
+      const r = await archive({ data: { wallet, id } });
+      toast.success(
+        r.alreadyStarted
+          ? `Archive already ${r.status}`
+          : `Archiving ${r.segments ?? "?"} segments — check back in a few minutes`,
+      );
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Archive failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSkipArchive(id: string) {
+    setBusy(true);
+    try {
+      await skipArchive({ data: { wallet, id } });
+      refetch();
     } finally {
       setBusy(false);
     }
@@ -1339,6 +1376,63 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
                       Stop
                     </Button>
                   )}
+                  {s.status === "ended" && !s.archive_status && (
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => handleArchive(s.id)}
+                        disabled={busy}
+                        className="font-mono"
+                      >
+                        Archive to library
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleSkipArchive(s.id)}
+                        disabled={busy}
+                        className="font-mono"
+                      >
+                        Skip
+                      </Button>
+                    </>
+                  )}
+                  {s.archive_status === "transcoding" && (
+                    <span className="font-mono text-[11px] text-yellow-500">
+                      archiving: transcoding…
+                    </span>
+                  )}
+                  {s.archive_status === "pinning" && (
+                    <span className="font-mono text-[11px] text-yellow-500">
+                      archiving: pinning to IPFS…
+                    </span>
+                  )}
+                  {s.archive_status === "ready" && s.archive_video_cid && (
+                    <Link
+                      to="/v/$cid"
+                      params={{ cid: s.archive_video_cid }}
+                      className="inline-flex items-center rounded-sm border border-primary bg-background px-3 py-1.5 font-mono text-xs text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                    >
+                      archived →
+                    </Link>
+                  )}
+                  {s.archive_status === "skipped" && (
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      archive skipped
+                    </span>
+                  )}
+                  {s.archive_status === "failed" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleArchive(s.id)}
+                      disabled={busy}
+                      className="font-mono text-red-500"
+                      title={s.archive_error ?? "archive failed"}
+                    >
+                      retry archive
+                    </Button>
+                  )}
                   <Link
                     to="/live"
                     className="inline-flex items-center rounded-sm border border-border bg-background px-3 py-1.5 font-mono text-xs hover:border-primary hover:text-primary transition-colors"
@@ -1355,8 +1449,9 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
       <p className="mt-4 font-mono text-[11px] text-muted-foreground">
         Flow: Create → Go Live (starts MediaLive channel) → wait ~1 min for
         channel RUNNING → start StreamYard broadcast → click "Mark LIVE" once
-        video plays on /live → Stop when done (channel shuts down, archive
-        auto-uploads).
+        video plays on /live → Stop when done. After stop, choose
+        "Archive to library" to save the recording as a normal HLS video, or
+        "Skip" to let it expire from S3.
       </p>
     </section>
   );

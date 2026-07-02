@@ -368,6 +368,9 @@ export type Database = {
       }
       live_streams: {
         Row: {
+          archive_error: string | null
+          archive_output_prefix: string | null
+          archive_status: string | null
           archive_transcode_job_id: string | null
           archive_video_cid: string | null
           created_at: string
@@ -390,6 +393,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archive_error?: string | null
+          archive_output_prefix?: string | null
+          archive_status?: string | null
           archive_transcode_job_id?: string | null
           archive_video_cid?: string | null
           created_at?: string
@@ -412,6 +418,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archive_error?: string | null
+          archive_output_prefix?: string | null
+          archive_status?: string | null
           archive_transcode_job_id?: string | null
           archive_video_cid?: string | null
           created_at?: string
