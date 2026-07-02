@@ -1376,6 +1376,63 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
                       Stop
                     </Button>
                   )}
+                  {s.status === "ended" && !s.archive_status && (
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => handleArchive(s.id)}
+                        disabled={busy}
+                        className="font-mono"
+                      >
+                        Archive to library
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleSkipArchive(s.id)}
+                        disabled={busy}
+                        className="font-mono"
+                      >
+                        Skip
+                      </Button>
+                    </>
+                  )}
+                  {s.archive_status === "transcoding" && (
+                    <span className="font-mono text-[11px] text-yellow-500">
+                      archiving: transcoding…
+                    </span>
+                  )}
+                  {s.archive_status === "pinning" && (
+                    <span className="font-mono text-[11px] text-yellow-500">
+                      archiving: pinning to IPFS…
+                    </span>
+                  )}
+                  {s.archive_status === "ready" && s.archive_video_cid && (
+                    <Link
+                      to="/v/$cid"
+                      params={{ cid: s.archive_video_cid }}
+                      className="inline-flex items-center rounded-sm border border-primary bg-background px-3 py-1.5 font-mono text-xs text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                    >
+                      archived →
+                    </Link>
+                  )}
+                  {s.archive_status === "skipped" && (
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      archive skipped
+                    </span>
+                  )}
+                  {s.archive_status === "failed" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleArchive(s.id)}
+                      disabled={busy}
+                      className="font-mono text-red-500"
+                      title={s.archive_error ?? "archive failed"}
+                    >
+                      retry archive
+                    </Button>
+                  )}
                   <Link
                     to="/live"
                     className="inline-flex items-center rounded-sm border border-border bg-background px-3 py-1.5 font-mono text-xs hover:border-primary hover:text-primary transition-colors"
