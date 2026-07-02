@@ -437,9 +437,14 @@ export function S3VideoUpload({
       setStage("pin-ipfs", "done", `cid: ${canonicalCid.slice(0, 14)}…`);
 
       setStage("register", "active");
+      // Read wallet synchronously at submit time — the `address` from
+      // useWallet() hydrates from localStorage inside a useEffect and can
+      // be stale/null on the first render, which was causing logged-in
+      // users to have their uploads silently registered as anonymous.
+      const submitWallet = address ?? getWallet();
       const result = await register({
         data: {
-          wallet: address ?? undefined,
+          wallet: submitWallet ?? undefined,
           cid: canonicalCid,
           title, description,
           sizeBytes: file.size,
