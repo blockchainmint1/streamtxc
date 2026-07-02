@@ -420,6 +420,47 @@ export type Database = {
           },
         ]
       }
+      live_credit_ledger: {
+        Row: {
+          created_at: string
+          delta_txc: number
+          id: string
+          kind: string
+          note: string | null
+          stream_id: string | null
+          txid: string | null
+          wallet: string
+        }
+        Insert: {
+          created_at?: string
+          delta_txc: number
+          id?: string
+          kind: string
+          note?: string | null
+          stream_id?: string | null
+          txid?: string | null
+          wallet: string
+        }
+        Update: {
+          created_at?: string
+          delta_txc?: number
+          id?: string
+          kind?: string
+          note?: string | null
+          stream_id?: string | null
+          txid?: string | null
+          wallet?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_credit_ledger_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       live_streams: {
         Row: {
           archive_error: string | null
@@ -442,6 +483,7 @@ export type Database = {
           simulcast_youtube_url: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["live_stream_status"]
+          stopped_reason: string | null
           thumbnail_cid: string | null
           title: string
           total_views: number
@@ -468,6 +510,7 @@ export type Database = {
           simulcast_youtube_url?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["live_stream_status"]
+          stopped_reason?: string | null
           thumbnail_cid?: string | null
           title: string
           total_views?: number
@@ -494,6 +537,7 @@ export type Database = {
           simulcast_youtube_url?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["live_stream_status"]
+          stopped_reason?: string | null
           thumbnail_cid?: string | null
           title?: string
           total_views?: number
@@ -837,6 +881,9 @@ export type Database = {
           email_verified_at: string | null
           email_verify_expires_at: string | null
           email_verify_token: string | null
+          live_deposit_address: string | null
+          live_deposit_derivation_index: number | null
+          live_deposit_received_txc: number
           live_eligible: boolean
           live_max_concurrent_minutes: number
           live_rate_txc_per_minute: number | null
@@ -854,6 +901,9 @@ export type Database = {
           email_verified_at?: string | null
           email_verify_expires_at?: string | null
           email_verify_token?: string | null
+          live_deposit_address?: string | null
+          live_deposit_derivation_index?: number | null
+          live_deposit_received_txc?: number
           live_eligible?: boolean
           live_max_concurrent_minutes?: number
           live_rate_txc_per_minute?: number | null
@@ -871,6 +921,9 @@ export type Database = {
           email_verified_at?: string | null
           email_verify_expires_at?: string | null
           email_verify_token?: string | null
+          live_deposit_address?: string | null
+          live_deposit_derivation_index?: number | null
+          live_deposit_received_txc?: number
           live_eligible?: boolean
           live_max_concurrent_minutes?: number
           live_rate_txc_per_minute?: number | null

@@ -72,6 +72,11 @@ import {
   listMyLiveStreams,
 } from "@/lib/live-channels.functions";
 import {
+  getMyLiveBalance,
+  getMyLiveDepositInfo,
+  listMyLiveLedger,
+} from "@/lib/live-credits.functions";
+import {
   listRecentLiveStreams,
   createLiveStream,
   startLiveStream,
@@ -2284,6 +2289,9 @@ function MyGoLiveSection({ wallet }: { wallet: string }) {
   const describeFn = useServerFn(describeMyChannelState);
   const signalFn = useServerFn(getMySignalHealth);
   const listFn = useServerFn(listMyLiveStreams);
+  const balanceFn = useServerFn(getMyLiveBalance);
+  const depositFn = useServerFn(getMyLiveDepositInfo);
+  const ledgerFn = useServerFn(listMyLiveLedger);
   const qc = useQueryClient();
 
   const elig = useQuery({
@@ -2313,6 +2321,23 @@ function MyGoLiveSection({ wallet }: { wallet: string }) {
     queryFn: () => listFn(),
     enabled: !!elig.data?.eligible,
   });
+  const balance = useQuery({
+    queryKey: ["my-live-balance", wallet],
+    queryFn: () => balanceFn(),
+    enabled: !!elig.data?.eligible,
+    refetchInterval: 15000,
+  });
+  const [depositOpen, setDepositOpen] = useState(false);
+  const deposit = useQuery({
+    queryKey: ["my-live-deposit", wallet],
+    queryFn: () => depositFn(),
+    enabled: !!elig.data?.eligible && depositOpen,
+  });
+  const ledger = useQuery({
+    queryKey: ["my-live-ledger", wallet],
+    queryFn: () => ledgerFn(),
+    enabled: !!elig.data?.eligible && depositOpen,
+  });
 
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
@@ -2325,6 +2350,8 @@ function MyGoLiveSection({ wallet }: { wallet: string }) {
     (s: any) => s.status === "starting" || s.status === "live",
   );
   const ch = channel.data;
+  const bal = balance.data;
+  const canStart = bal ? bal.balanceTxc >= bal.ratePerMin * 5 : false;
 
   async function handleProvision() {
     setBusy(true);
@@ -2385,9 +2412,90 @@ function MyGoLiveSection({ wallet }: { wallet: string }) {
       </h2>
       <p className="text-sm text-muted-foreground mb-6">
         Push a live broadcast to streamTXC from OBS, StreamYard, or any RTMP
-        source. Rate: {elig.data.rateTxcPerMinute || 0} TXC/minute (billing goes
-        live in a later phase — free during testing).
+        source. Streaming is billed by the minute in TXC.
       </p>
+
+      {/* Credit balance + deposit */}
+      <div className="flex items-center gap-3 flex-wrap mb-6 p-3 rounded border border-border bg-muted/40">
+        <div className="text-sm">
+          <span className="font-mono text-xs text-muted-foreground mr-1">balance:</span>
+          <span className="font-mono">{bal ? bal.balanceTxc.toFixed(4) : "…"} TXC</span>
+          {bal && (
+            <span className="text-muted-foreground text-xs ml-2">
+              (~{bal.estimatedMinutes} min @ {bal.ratePerMin} TXC/min)
+            </span>
+          )}
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="font-mono ml-auto"
+          onClick={() => setDepositOpen(true)}
+        >
+          Add credit
+        </Button>
+      </div>
+
+      <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-mono">Add live-stream credit</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">
+              Send TXC to the address below. It's credited to your live balance
+              automatically once the transaction confirms (usually within one
+              cron tick). Rate: {deposit.data?.ratePerMin ?? "…"} TXC/minute.
+            </p>
+            <div>
+              <Label className="font-mono text-xs">Deposit address</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <Input
+                  readOnly
+                  value={deposit.data?.address ?? ""}
+                  className="font-mono text-xs"
+                />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    if (!deposit.data?.address) return;
+                    navigator.clipboard.writeText(deposit.data.address);
+                    toast.success("Copied");
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            {ledger.data && ledger.data.length > 0 && (
+              <div>
+                <div className="font-mono text-xs text-muted-foreground mb-1">
+                  Recent activity
+                </div>
+                <ul className="text-xs space-y-1 max-h-48 overflow-auto">
+                  {ledger.data.slice(0, 15).map((r: any) => (
+                    <li key={r.id} className="flex justify-between gap-2">
+                      <span className="truncate">
+                        {r.kind} {r.note ? `— ${r.note}` : ""}
+                      </span>
+                      <span
+                        className={
+                          "font-mono " +
+                          (Number(r.delta_txc) >= 0 ? "text-green-500" : "text-red-500")
+                        }
+                      >
+                        {Number(r.delta_txc) >= 0 ? "+" : ""}
+                        {Number(r.delta_txc).toFixed(4)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {!ch ? (
         <Button onClick={handleProvision} disabled={busy} className="font-mono">
@@ -2471,6 +2579,12 @@ function MyGoLiveSection({ wallet }: { wallet: string }) {
                 {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Go Live
               </Button>
+              {!canStart && bal && (
+                <p className="text-xs text-yellow-500 font-mono">
+                  Need at least {(bal.ratePerMin * 5).toFixed(4)} TXC to start
+                  (5 min buffer). Click "Add credit".
+                </p>
+              )}
             </div>
           ) : (
             <div className="border-t border-border pt-4 space-y-2">

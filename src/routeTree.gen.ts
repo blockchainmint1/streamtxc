@@ -36,6 +36,7 @@ import { Route as ApiPublicNotifyVerifyEmailRouteImport } from './routes/api/pub
 import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/hooks/telegram'
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
 import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
+import { Route as ApiPublicHooksLiveBillingTickRouteImport } from './routes/api/public/hooks/live-billing-tick'
 import { Route as ApiPublicHooksIpfsPinCompleteRouteImport } from './routes/api/public/hooks/ipfs-pin-complete'
 import { Route as ApiPublicHooksFinalizeStuckHlsRouteImport } from './routes/api/public/hooks/finalize-stuck-hls'
 import { Route as ApiPublicHooksFinalizeLiveArchiveRouteImport } from './routes/api/public/hooks/finalize-live-archive'
@@ -183,6 +184,12 @@ const ApiPublicHooksMediaconvertRoute =
     path: '/public/hooks/mediaconvert',
     getParentRoute: () => ApiRoute,
   } as any)
+const ApiPublicHooksLiveBillingTickRoute =
+  ApiPublicHooksLiveBillingTickRouteImport.update({
+    id: '/public/hooks/live-billing-tick',
+    path: '/public/hooks/live-billing-tick',
+    getParentRoute: () => ApiRoute,
+  } as any)
 const ApiPublicHooksIpfsPinCompleteRoute =
   ApiPublicHooksIpfsPinCompleteRouteImport.update({
     id: '/public/hooks/ipfs-pin-complete',
@@ -256,6 +263,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/finalize-live-archive': typeof ApiPublicHooksFinalizeLiveArchiveRoute
   '/api/public/hooks/finalize-stuck-hls': typeof ApiPublicHooksFinalizeStuckHlsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
+  '/api/public/hooks/live-billing-tick': typeof ApiPublicHooksLiveBillingTickRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
@@ -292,6 +300,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/finalize-live-archive': typeof ApiPublicHooksFinalizeLiveArchiveRoute
   '/api/public/hooks/finalize-stuck-hls': typeof ApiPublicHooksFinalizeStuckHlsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
+  '/api/public/hooks/live-billing-tick': typeof ApiPublicHooksLiveBillingTickRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
@@ -329,6 +338,7 @@ export interface FileRoutesById {
   '/api/public/hooks/finalize-live-archive': typeof ApiPublicHooksFinalizeLiveArchiveRoute
   '/api/public/hooks/finalize-stuck-hls': typeof ApiPublicHooksFinalizeStuckHlsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
+  '/api/public/hooks/live-billing-tick': typeof ApiPublicHooksLiveBillingTickRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
@@ -367,6 +377,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/finalize-live-archive'
     | '/api/public/hooks/finalize-stuck-hls'
     | '/api/public/hooks/ipfs-pin-complete'
+    | '/api/public/hooks/live-billing-tick'
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
@@ -403,6 +414,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/finalize-live-archive'
     | '/api/public/hooks/finalize-stuck-hls'
     | '/api/public/hooks/ipfs-pin-complete'
+    | '/api/public/hooks/live-billing-tick'
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
@@ -439,6 +451,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/finalize-live-archive'
     | '/api/public/hooks/finalize-stuck-hls'
     | '/api/public/hooks/ipfs-pin-complete'
+    | '/api/public/hooks/live-billing-tick'
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
@@ -656,6 +669,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksMediaconvertRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/public/hooks/live-billing-tick': {
+      id: '/api/public/hooks/live-billing-tick'
+      path: '/public/hooks/live-billing-tick'
+      fullPath: '/api/public/hooks/live-billing-tick'
+      preLoaderRoute: typeof ApiPublicHooksLiveBillingTickRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/public/hooks/ipfs-pin-complete': {
       id: '/api/public/hooks/ipfs-pin-complete'
       path: '/public/hooks/ipfs-pin-complete'
@@ -733,6 +753,7 @@ interface ApiRouteChildren {
   ApiPublicHooksFinalizeLiveArchiveRoute: typeof ApiPublicHooksFinalizeLiveArchiveRoute
   ApiPublicHooksFinalizeStuckHlsRoute: typeof ApiPublicHooksFinalizeStuckHlsRoute
   ApiPublicHooksIpfsPinCompleteRoute: typeof ApiPublicHooksIpfsPinCompleteRoute
+  ApiPublicHooksLiveBillingTickRoute: typeof ApiPublicHooksLiveBillingTickRoute
   ApiPublicHooksMediaconvertRoute: typeof ApiPublicHooksMediaconvertRoute
   ApiPublicHooksPaymentWatcherRoute: typeof ApiPublicHooksPaymentWatcherRoute
   ApiPublicHooksTelegramRoute: typeof ApiPublicHooksTelegramRoute
@@ -753,6 +774,7 @@ const ApiRouteChildren: ApiRouteChildren = {
     ApiPublicHooksFinalizeLiveArchiveRoute,
   ApiPublicHooksFinalizeStuckHlsRoute: ApiPublicHooksFinalizeStuckHlsRoute,
   ApiPublicHooksIpfsPinCompleteRoute: ApiPublicHooksIpfsPinCompleteRoute,
+  ApiPublicHooksLiveBillingTickRoute: ApiPublicHooksLiveBillingTickRoute,
   ApiPublicHooksMediaconvertRoute: ApiPublicHooksMediaconvertRoute,
   ApiPublicHooksPaymentWatcherRoute: ApiPublicHooksPaymentWatcherRoute,
   ApiPublicHooksTelegramRoute: ApiPublicHooksTelegramRoute,
@@ -792,13 +814,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

@@ -219,6 +219,22 @@ export const startMyStream = createServerFn({ method: "POST" })
     const row = await getMyChannelRow(context.wallet);
     if (!row) throw new Error("No channel provisioned. Click Enable live first.");
 
+    // Preflight: require at least 5 minutes of TXC credit on the balance.
+    const { syncDepositsForWallet, computeBalance, getWalletRatePerMin } = await import(
+      "./live-credits.functions"
+    );
+    await syncDepositsForWallet(context.wallet).catch(() => null);
+    const [balance, rate] = await Promise.all([
+      computeBalance(context.wallet),
+      getWalletRatePerMin(context.wallet),
+    ]);
+    if (balance < rate * 5) {
+      const need = +(rate * 5 - balance).toFixed(4);
+      throw new Error(
+        `Not enough live credit. You need at least ${(rate * 5).toFixed(4)} TXC (${need} TXC more) to start a stream.`,
+      );
+    }
+
     // Concurrency cap: refuse if the account is already at LIVE_MAX_CHANNELS_RUNNING.
     const cap = Number(process.env.LIVE_MAX_CHANNELS_RUNNING ?? "3");
     const { listRunningChannelIds, describeChannel, startChannel } = await import(
