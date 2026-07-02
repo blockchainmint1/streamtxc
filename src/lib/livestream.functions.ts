@@ -214,6 +214,40 @@ export const describeMediaLiveChannel = createServerFn({ method: "POST" })
     return { state: info.state };
   });
 
+// Probe the MediaPackage HLS manifest so we can tell the operator, at a
+// glance, whether MediaLive is actually receiving RTMP from StreamYard.
+// MediaPackage returns 404 with `x-mediapackage-manifest-last-sequence: 0`
+// until MediaLive delivers at least one segment; once StreamYard is pushing
+// video that MediaLive can encode, the manifest returns 200 and the sequence
+// number increments every ~4s. This is the fastest way to diagnose "channel
+// says RUNNING but /live is a spinner".
+export const getLiveSignalHealth = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ wallet: z.string() }).parse(input))
+  .handler(async ({ data }) => {
+    if (!isAdmin(data.wallet)) throw new Error("Forbidden");
+    const hls = process.env.LIVE_HLS_URL;
+    if (!hls) return { ok: false, reason: "LIVE_HLS_URL not configured" as const };
+    try {
+      const res = await fetch(hls, { method: "GET", cache: "no-store" });
+      const seqRaw = res.headers.get("x-mediapackage-manifest-last-sequence");
+      const updatedRaw = res.headers.get("x-mediapackage-manifest-last-updated");
+      const lastSequence = seqRaw ? Number(seqRaw) : 0;
+      const lastUpdatedMs = updatedRaw ? Number(updatedRaw) * 1000 : 0;
+      const ageSec = lastUpdatedMs ? Math.round((Date.now() - lastUpdatedMs) / 1000) : null;
+      return {
+        ok: true as const,
+        status: res.status,
+        lastSequence,
+        lastUpdatedMs,
+        ageSec,
+        // "receiving" means MediaPackage got a segment in the last ~30s.
+        receiving: res.status === 200 && ageSec !== null && ageSec < 30,
+      };
+    } catch (err) {
+      return { ok: false as const, reason: err instanceof Error ? err.message : "probe failed" };
+    }
+  });
+
 // Return the RTMP push endpoints authoritative from MediaLive (Input.destinations),
 // already split into a StreamYard-friendly Server URL + Stream Key pair.
 // StreamYard's "Server URL" is `rtmp://<ip>:1935/<app>` and "Stream Key" is `<streamName>`.

@@ -67,6 +67,7 @@ import {
   archiveLiveStream,
   skipLiveArchive,
   getRtmpConfig,
+  getLiveSignalHealth,
 } from "@/lib/livestream.functions";
 import { Radio } from "lucide-react";
 
@@ -1090,6 +1091,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const archive = useServerFn(archiveLiveStream);
   const skipArchive = useServerFn(skipLiveArchive);
   const rtmpCfg = useServerFn(getRtmpConfig);
+  const signalHealth = useServerFn(getLiveSignalHealth);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["live-streams-admin"],
@@ -1105,6 +1107,12 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const [fbUrl, setFbUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [channelState, setChannelState] = useState<string | null>(null);
+  const [signal, setSignal] = useState<{
+    receiving: boolean;
+    lastSequence: number;
+    ageSec: number | null;
+    status: number;
+  } | null>(null);
   const [rtmpEndpoints, setRtmpEndpoints] = useState<
     { serverUrl: string; streamKey: string; fullUrl: string }[]
   >([]);
@@ -1137,6 +1145,35 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
       clearInterval(iv);
     };
   }, [isAdmin, wallet, describe]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    const probe = async () => {
+      try {
+        const r = await signalHealth({ data: { wallet } });
+        if (cancelled) return;
+        if ("ok" in r && r.ok) {
+          setSignal({
+            receiving: r.receiving,
+            lastSequence: r.lastSequence,
+            ageSec: r.ageSec,
+            status: r.status,
+          });
+        } else {
+          setSignal(null);
+        }
+      } catch {
+        if (!cancelled) setSignal(null);
+      }
+    };
+    probe();
+    const iv = setInterval(probe, 8_000);
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+    };
+  }, [isAdmin, wallet, signalHealth]);
 
   if (!isAdmin) return null;
 
@@ -1259,6 +1296,34 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
             {channelState ?? "…"}
           </span>
         </div>
+        <div>
+          <span className="text-muted-foreground">MediaPackage signal: </span>
+          {signal === null ? (
+            <span className="text-muted-foreground">…</span>
+          ) : signal.receiving ? (
+            <span className="text-red-500">
+              RECEIVING · seg #{signal.lastSequence} · {signal.ageSec}s ago
+            </span>
+          ) : signal.lastSequence > 0 ? (
+            <span className="text-yellow-500">
+              STALE · last seg #{signal.lastSequence}
+              {signal.ageSec !== null ? ` · ${signal.ageSec}s ago` : ""}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">
+              NO SEGMENTS YET — StreamYard is not delivering to MediaLive
+            </span>
+          )}
+        </div>
+        {signal && !signal.receiving && signal.lastSequence === 0 && channelState === "RUNNING" && (
+          <div className="text-muted-foreground pt-1 leading-relaxed">
+            The channel is up but nothing is flowing. In StreamYard, make sure
+            you clicked the big <b>Go live</b> button (not just added the
+            destination), and that the Custom RTMP tile shows a green "live"
+            indicator. If it says "connecting" for more than ~30s, re-check
+            Server URL / Stream key above.
+          </div>
+        )}
         {!primary && (
           <div className="text-muted-foreground">
             Fetching RTMP endpoint from MediaLive…
