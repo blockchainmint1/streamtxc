@@ -5,7 +5,8 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { VideoPlayerV2 } from "@/components/VideoPlayerV2";
 import { LiveChat } from "@/components/LiveChat";
-import { Radio, Youtube, Twitter, Facebook } from "lucide-react";
+import { Radio, Youtube, Twitter, Facebook, Eye } from "lucide-react";
+import { useLiveViewerCount } from "@/hooks/useLiveViewerCount";
 
 export const Route = createFileRoute("/live")({
   head: () => ({
@@ -121,14 +122,7 @@ function LivePage() {
                     </div>
                   )}
                 </div>
-                <div className="mt-4 flex items-center gap-2">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping" />
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
-                  </span>
-                  <span className="font-mono text-xs text-red-500 font-bold">LIVE</span>
-                  <h1 className="text-2xl font-bold ml-2">{stream.title}</h1>
-                </div>
+                <LiveHeader stream={stream} />
                 {stream.description && (
                   <p className="mt-2 text-muted-foreground whitespace-pre-wrap">
                     {stream.description}
