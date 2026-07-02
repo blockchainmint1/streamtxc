@@ -147,10 +147,17 @@ export const startLiveStream = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { startChannel, describeChannel } = await import("./aws-medialive.server");
 
-    // Only start if idle; otherwise treat as already-running.
+    // Only start if idle; otherwise treat as already-running. If describe
+    // fails (e.g. IAM missing DescribeChannel), still attempt the start —
+    // previously a describe failure silently skipped startChannel entirely.
     const current = await describeChannel().catch(() => null);
-    if (current && current.state !== "RUNNING" && current.state !== "STARTING") {
-      await startChannel();
+    if (!current || (current.state !== "RUNNING" && current.state !== "STARTING")) {
+      await startChannel().catch((err) => {
+        console.error("[live] startChannel failed", err);
+        throw new Error(
+          `Could not start the MediaLive channel: ${err instanceof Error ? err.message : "unknown error"}`,
+        );
+      });
     }
     const { error } = await supabaseAdmin
       .from("live_streams")
