@@ -61,9 +61,12 @@ export const postLiveChat = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => PostChatSchema.parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const w = data.wallet;
+    const displayName = w.length > 10 ? `${w.slice(0, 6)}…${w.slice(-4)}` : w;
     const { error } = await supabaseAdmin.from("live_chat_messages").insert({
       stream_id: data.streamId,
       wallet: data.wallet,
+      display_name: displayName,
       body: data.body,
     });
     if (error) throw new Error(error.message);

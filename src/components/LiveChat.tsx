@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { postLiveChat } from "@/lib/livestream.functions";
-import { useWallet, shortWalletId } from "@/lib/wallet";
+import { useWallet } from "@/lib/wallet";
 import { toast } from "sonner";
 
 interface ChatRow {
   id: string;
   stream_id: string;
-  wallet: string | null;
+  display_name: string | null;
   body: string;
   created_at: string;
 }
@@ -26,7 +26,7 @@ export function LiveChat({ streamId }: { streamId: string }) {
     async function load() {
       const { data } = await supabase
         .from("live_chat_messages")
-        .select("*")
+        .select("id,stream_id,display_name,body,created_at")
         .eq("stream_id", streamId)
         .order("created_at", { ascending: true })
         .limit(200);
@@ -88,7 +88,7 @@ export function LiveChat({ streamId }: { streamId: string }) {
         {messages.map((m) => (
           <div key={m.id} className="break-words">
             <span className="font-mono text-xs text-primary mr-2">
-              {m.wallet ? shortWalletId(m.wallet) : "anon"}
+              {m.display_name || "anon"}
             </span>
             <span>{m.body}</span>
           </div>

@@ -33,7 +33,6 @@ interface Stream {
   hls_url: string | null;
   status: string;
   started_at: string | null;
-  owner_wallet: string;
 }
 
 function LivePage() {
@@ -46,12 +45,12 @@ function LivePage() {
     async function refresh() {
       const { data: activeRows } = await supabase
         .from("live_streams")
-        .select("id,title,description,thumbnail_cid,hls_url,status,started_at,owner_wallet")
+        .select("id,title,description,thumbnail_cid,hls_url,status,started_at")
         .in("status", ["starting", "live"])
         .order("started_at", { ascending: false, nullsFirst: false });
       const { data: past } = await supabase
         .from("live_streams")
-        .select("id,title,description,thumbnail_cid,hls_url,status,started_at,owner_wallet")
+        .select("id,title,description,thumbnail_cid,hls_url,status,started_at")
         .in("status", ["ended", "archived"])
         .order("ended_at", { ascending: false, nullsFirst: false })
         .limit(10);
