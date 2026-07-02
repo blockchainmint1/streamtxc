@@ -26,7 +26,7 @@ export function NotificationPrefs({ wallet }: { wallet: string }) {
 
   const { data: prefs, isLoading } = useQuery({
     queryKey: ["wallet-prefs", wallet],
-    queryFn: () => fetchPrefs({ data: { wallet } }),
+    queryFn: () => fetchPrefs(),
   });
 
   const [emailDraft, setEmailDraft] = useState<string>("");
