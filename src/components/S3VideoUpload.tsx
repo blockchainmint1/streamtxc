@@ -18,6 +18,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useWallet } from "@/lib/wallet";
+import { getWallet } from "@/lib/wallet";
 import { formatBytes, MAX_S3_UPLOAD_BYTES } from "@/lib/fees";
 import {
   registerUpload,
