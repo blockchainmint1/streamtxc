@@ -67,6 +67,7 @@ import {
   archiveLiveStream,
   skipLiveArchive,
   getRtmpConfig,
+  getLiveSignalHealth,
 } from "@/lib/livestream.functions";
 import { Radio } from "lucide-react";
 
@@ -1090,6 +1091,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const archive = useServerFn(archiveLiveStream);
   const skipArchive = useServerFn(skipLiveArchive);
   const rtmpCfg = useServerFn(getRtmpConfig);
+  const signalHealth = useServerFn(getLiveSignalHealth);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["live-streams-admin"],
@@ -1105,6 +1107,12 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const [fbUrl, setFbUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [channelState, setChannelState] = useState<string | null>(null);
+  const [signal, setSignal] = useState<{
+    receiving: boolean;
+    lastSequence: number;
+    ageSec: number | null;
+    status: number;
+  } | null>(null);
   const [rtmpEndpoints, setRtmpEndpoints] = useState<
     { serverUrl: string; streamKey: string; fullUrl: string }[]
   >([]);
@@ -1137,6 +1145,35 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
       clearInterval(iv);
     };
   }, [isAdmin, wallet, describe]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    const probe = async () => {
+      try {
+        const r = await signalHealth({ data: { wallet } });
+        if (cancelled) return;
+        if ("ok" in r && r.ok) {
+          setSignal({
+            receiving: r.receiving,
+            lastSequence: r.lastSequence,
+            ageSec: r.ageSec,
+            status: r.status,
+          });
+        } else {
+          setSignal(null);
+        }
+      } catch {
+        if (!cancelled) setSignal(null);
+      }
+    };
+    probe();
+    const iv = setInterval(probe, 8_000);
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+    };
+  }, [isAdmin, wallet, signalHealth]);
 
   if (!isAdmin) return null;
 
