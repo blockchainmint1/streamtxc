@@ -53,7 +53,6 @@ interface Stream {
   status: string;
   started_at: string | null;
   ended_at: string | null;
-  owner_wallet: string;
   simulcast_youtube_url: string | null;
   simulcast_twitter_url: string | null;
   simulcast_facebook_url: string | null;
@@ -69,7 +68,7 @@ function LiveStreamPage() {
     async function load() {
       const { data } = await supabase
         .from("live_streams")
-        .select("id,title,description,thumbnail_cid,hls_url,status,started_at,ended_at,owner_wallet,simulcast_youtube_url,simulcast_twitter_url,simulcast_facebook_url")
+        .select("id,title,description,thumbnail_cid,hls_url,status,started_at,ended_at,simulcast_youtube_url,simulcast_twitter_url,simulcast_facebook_url")
         .eq("id", streamId)
         .maybeSingle();
       if (cancelled) return;
