@@ -461,7 +461,7 @@ export function S3VideoUpload({
         result.chainStatus === "stamp_failed"
           ? "Saved · chain stamp queued for retry"
           : "Row saved · TXC stamp broadcast");
-      if (!address) recordAnonUpload(result.cid, title);
+      if (!submitWallet) recordAnonUpload(result.cid, title);
       qc.invalidateQueries({ queryKey: ["recent-videos"] });
       setResultCid(result.cid);
 
