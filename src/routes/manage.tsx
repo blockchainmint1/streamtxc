@@ -1449,8 +1449,9 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
       <p className="mt-4 font-mono text-[11px] text-muted-foreground">
         Flow: Create → Go Live (starts MediaLive channel) → wait ~1 min for
         channel RUNNING → start StreamYard broadcast → click "Mark LIVE" once
-        video plays on /live → Stop when done (channel shuts down, archive
-        auto-uploads).
+        video plays on /live → Stop when done. After stop, choose
+        "Archive to library" to save the recording as a normal HLS video, or
+        "Skip" to let it expire from S3.
       </p>
     </section>
   );
