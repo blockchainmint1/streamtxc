@@ -17,6 +17,7 @@ import { Route as S3TestRouteImport } from './routes/s3-test'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ManifestoRouteImport } from './routes/manifesto'
 import { Route as ManageRouteImport } from './routes/manage'
+import { Route as LiveRouteImport } from './routes/live'
 import { Route as BrandRouteImport } from './routes/brand'
 import { Route as ApiRouteImport } from './routes/api'
 import { Route as AboutRouteImport } from './routes/about'
@@ -80,6 +81,11 @@ const ManifestoRoute = ManifestoRouteImport.update({
 const ManageRoute = ManageRouteImport.update({
   id: '/manage',
   path: '/manage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LiveRoute = LiveRouteImport.update({
+  id: '/live',
+  path: '/live',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BrandRoute = BrandRouteImport.update({
@@ -218,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/api': typeof ApiRouteWithChildren
   '/brand': typeof BrandRoute
+  '/live': typeof LiveRoute
   '/manage': typeof ManageRoute
   '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
@@ -252,6 +259,7 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/api': typeof ApiRouteWithChildren
   '/brand': typeof BrandRoute
+  '/live': typeof LiveRoute
   '/manage': typeof ManageRoute
   '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
@@ -287,6 +295,7 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/api': typeof ApiRouteWithChildren
   '/brand': typeof BrandRoute
+  '/live': typeof LiveRoute
   '/manage': typeof ManageRoute
   '/manifesto': typeof ManifestoRoute
   '/privacy': typeof PrivacyRoute
@@ -323,6 +332,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/api'
     | '/brand'
+    | '/live'
     | '/manage'
     | '/manifesto'
     | '/privacy'
@@ -357,6 +367,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/api'
     | '/brand'
+    | '/live'
     | '/manage'
     | '/manifesto'
     | '/privacy'
@@ -391,6 +402,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/api'
     | '/brand'
+    | '/live'
     | '/manage'
     | '/manifesto'
     | '/privacy'
@@ -426,6 +438,7 @@ export interface RootRouteChildren {
   AboutRoute: typeof AboutRoute
   ApiRoute: typeof ApiRouteWithChildren
   BrandRoute: typeof BrandRoute
+  LiveRoute: typeof LiveRoute
   ManageRoute: typeof ManageRoute
   ManifestoRoute: typeof ManifestoRoute
   PrivacyRoute: typeof PrivacyRoute
@@ -495,6 +508,13 @@ declare module '@tanstack/react-router' {
       path: '/manage'
       fullPath: '/manage'
       preLoaderRoute: typeof ManageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/live': {
+      id: '/live'
+      path: '/live'
+      fullPath: '/live'
+      preLoaderRoute: typeof LiveRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/brand': {
@@ -733,6 +753,7 @@ const rootRouteChildren: RootRouteChildren = {
   AboutRoute: AboutRoute,
   ApiRoute: ApiRouteWithChildren,
   BrandRoute: BrandRoute,
+  LiveRoute: LiveRoute,
   ManageRoute: ManageRoute,
   ManifestoRoute: ManifestoRoute,
   PrivacyRoute: PrivacyRoute,

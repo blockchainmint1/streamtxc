@@ -56,6 +56,16 @@ import { CheckCircle2, Film, Clock, ArrowUp, ArrowDown, ChevronsUpDown } from "l
 import { toast } from "sonner";
 import { NotificationPrefs } from "@/components/NotificationPrefs";
 import { listBugReports } from "@/lib/bug-reports.functions";
+import {
+  listRecentLiveStreams,
+  createLiveStream,
+  startLiveStream,
+  stopLiveStream,
+  markLiveStreamRunning,
+  updateLiveStream,
+  describeMediaLiveChannel,
+} from "@/lib/livestream.functions";
+import { Radio } from "lucide-react";
 
 export const Route = createFileRoute("/manage")({
   head: () => ({
@@ -728,6 +738,7 @@ function ManagePageInner() {
           </>
         )}
         {address && <BugReportsAdminSection wallet={address} />}
+        {address && <GoLiveAdminSection wallet={address} />}
       </main>
       <Footer />
     </div>
@@ -1061,6 +1072,293 @@ function EditVideoDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function GoLiveAdminSection({ wallet }: { wallet: string }) {
+  const isAdmin = wallet === ADMIN_WALLET;
+  const list = useServerFn(listRecentLiveStreams);
+  const create = useServerFn(createLiveStream);
+  const start = useServerFn(startLiveStream);
+  const stop = useServerFn(stopLiveStream);
+  const markRunning = useServerFn(markLiveStreamRunning);
+  const update = useServerFn(updateLiveStream);
+  const describe = useServerFn(describeMediaLiveChannel);
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["live-streams-admin"],
+    queryFn: () => list(),
+    enabled: isAdmin,
+    refetchInterval: 10_000,
+  });
+
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [ytUrl, setYtUrl] = useState("");
+  const [xUrl, setXUrl] = useState("");
+  const [fbUrl, setFbUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [channelState, setChannelState] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    describe({ data: { wallet } })
+      .then((r) => !cancelled && setChannelState(r.state))
+      .catch(() => !cancelled && setChannelState("unknown"));
+    const iv = setInterval(async () => {
+      try {
+        const r = await describe({ data: { wallet } });
+        if (!cancelled) setChannelState(r.state);
+      } catch {}
+    }, 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+    };
+  }, [isAdmin, wallet, describe]);
+
+  if (!isAdmin) return null;
+
+  async function handleCreate() {
+    if (!title.trim()) {
+      toast.error("Title required");
+      return;
+    }
+    setBusy(true);
+    try {
+      await create({
+        data: {
+          wallet,
+          title: title.trim(),
+          description: description.trim() || null,
+          simulcast_youtube_url: ytUrl.trim() || null,
+          simulcast_twitter_url: xUrl.trim() || null,
+          simulcast_facebook_url: fbUrl.trim() || null,
+        },
+      });
+      setTitle("");
+      setDescription("");
+      setYtUrl("");
+      setXUrl("");
+      setFbUrl("");
+      toast.success("Stream created — click Go Live when StreamYard is ready");
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleStart(id: string) {
+    setBusy(true);
+    try {
+      await start({ data: { wallet, id } });
+      toast.success("Channel starting — StreamYard should push RTMP now");
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Start failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleMarkLive(id: string) {
+    setBusy(true);
+    try {
+      await markRunning({ data: { wallet, id } });
+      toast.success("Marked LIVE — banner & badge now visible to viewers");
+      refetch();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleStop(id: string) {
+    if (!confirm("Stop this stream? MediaLive will shut down.")) return;
+    setBusy(true);
+    try {
+      await stop({ data: { wallet, id } });
+      toast.success("Stream stopped");
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Stop failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const rtmpUrl = "rtmp://52.45.63.166:1935/live/primary";
+  const streamKey = "live";
+
+  return (
+    <section className="mt-16 border-t border-border pt-8">
+      <div className="font-mono text-xs text-primary mb-3">[ GO LIVE · ADMIN ]</div>
+      <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+        <Radio className="h-5 w-5" /> Livestream
+      </h2>
+
+      <div className="border border-border rounded-sm p-4 bg-card mb-6 font-mono text-xs space-y-2">
+        <div>
+          <span className="text-muted-foreground">MediaLive channel: </span>
+          <span className={channelState === "RUNNING" ? "text-red-500" : "text-primary"}>
+            {channelState ?? "…"}
+          </span>
+        </div>
+        <div className="grid gap-1">
+          <div>
+            <span className="text-muted-foreground">StreamYard Server URL: </span>
+            <code className="text-primary select-all">{rtmpUrl}</code>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(rtmpUrl);
+                toast.success("Copied");
+              }}
+              className="ml-2 text-primary hover:underline"
+            >
+              copy
+            </button>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Stream key: </span>
+            <code className="text-primary select-all">{streamKey}</code>
+          </div>
+        </div>
+        <div className="text-muted-foreground">
+          In StreamYard: Destinations → Custom RTMP → paste those two fields.
+        </div>
+      </div>
+
+      <div className="border border-border rounded-sm p-4 bg-card mb-6 space-y-3">
+        <div className="font-mono text-xs text-primary">Create new stream</div>
+        <Input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Stream title"
+          className="font-mono"
+        />
+        <Textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="What's this stream about? (optional)"
+          className="font-mono min-h-20"
+        />
+        <div className="grid md:grid-cols-3 gap-2">
+          <Input
+            value={ytUrl}
+            onChange={(e) => setYtUrl(e.target.value)}
+            placeholder="YouTube live URL (optional)"
+            className="font-mono text-xs"
+          />
+          <Input
+            value={xUrl}
+            onChange={(e) => setXUrl(e.target.value)}
+            placeholder="X live URL (optional)"
+            className="font-mono text-xs"
+          />
+          <Input
+            value={fbUrl}
+            onChange={(e) => setFbUrl(e.target.value)}
+            placeholder="Facebook live URL (optional)"
+            className="font-mono text-xs"
+          />
+        </div>
+        <Button onClick={handleCreate} disabled={busy} className="font-mono">
+          Create stream
+        </Button>
+      </div>
+
+      {isLoading && (
+        <div className="font-mono text-xs text-muted-foreground">loading…</div>
+      )}
+
+      {data && data.length === 0 && (
+        <div className="font-mono text-xs text-muted-foreground">No streams yet.</div>
+      )}
+
+      {data && data.length > 0 && (
+        <div className="space-y-3">
+          {data.map((s: any) => {
+            const isActive = s.status === "starting" || s.status === "live";
+            return (
+              <div
+                key={s.id}
+                className="border border-border rounded-sm p-4 bg-card flex flex-col md:flex-row md:items-center gap-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate">{s.title}</div>
+                  <div className="font-mono text-[11px] text-muted-foreground">
+                    id: {s.id.slice(0, 8)}… · status:{" "}
+                    <span
+                      className={
+                        s.status === "live"
+                          ? "text-red-500"
+                          : s.status === "starting"
+                            ? "text-yellow-500"
+                            : "text-muted-foreground"
+                      }
+                    >
+                      {s.status}
+                    </span>
+                    {s.started_at && (
+                      <> · started {new Date(s.started_at).toLocaleString()}</>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {s.status === "scheduled" && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleStart(s.id)}
+                      disabled={busy}
+                      className="font-mono bg-red-500 hover:bg-red-600"
+                    >
+                      Go Live
+                    </Button>
+                  )}
+                  {s.status === "starting" && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleMarkLive(s.id)}
+                      disabled={busy}
+                      className="font-mono"
+                    >
+                      Mark LIVE
+                    </Button>
+                  )}
+                  {isActive && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleStop(s.id)}
+                      disabled={busy}
+                      className="font-mono"
+                    >
+                      Stop
+                    </Button>
+                  )}
+                  <Link
+                    to="/live"
+                    className="inline-flex items-center rounded-sm border border-border bg-background px-3 py-1.5 font-mono text-xs hover:border-primary hover:text-primary transition-colors"
+                  >
+                    view
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <p className="mt-4 font-mono text-[11px] text-muted-foreground">
+        Flow: Create → Go Live (starts MediaLive channel) → wait ~1 min for
+        channel RUNNING → start StreamYard broadcast → click "Mark LIVE" once
+        video plays on /live → Stop when done (channel shuts down, archive
+        auto-uploads).
+      </p>
+    </section>
   );
 }
 
