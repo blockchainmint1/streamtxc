@@ -205,7 +205,6 @@ function LivePreview({ src, poster }: { src: string; poster?: string }) {
       muted
       playsInline
       autoPlay
-      // @ts-expect-error - iOS attribute
       disablePictureInPicture
       poster={poster}
     />
