@@ -56,6 +56,16 @@ import { CheckCircle2, Film, Clock, ArrowUp, ArrowDown, ChevronsUpDown } from "l
 import { toast } from "sonner";
 import { NotificationPrefs } from "@/components/NotificationPrefs";
 import { listBugReports } from "@/lib/bug-reports.functions";
+import {
+  listRecentLiveStreams,
+  createLiveStream,
+  startLiveStream,
+  stopLiveStream,
+  markLiveStreamRunning,
+  updateLiveStream,
+  describeMediaLiveChannel,
+} from "@/lib/livestream.functions";
+import { Radio } from "lucide-react";
 
 export const Route = createFileRoute("/manage")({
   head: () => ({
@@ -728,6 +738,7 @@ function ManagePageInner() {
           </>
         )}
         {address && <BugReportsAdminSection wallet={address} />}
+        {address && <GoLiveAdminSection wallet={address} />}
       </main>
       <Footer />
     </div>
