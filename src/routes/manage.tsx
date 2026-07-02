@@ -66,6 +66,7 @@ import {
   describeMediaLiveChannel,
   archiveLiveStream,
   skipLiveArchive,
+  getRtmpConfig,
 } from "@/lib/livestream.functions";
 import { Radio } from "lucide-react";
 
@@ -1088,6 +1089,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const describe = useServerFn(describeMediaLiveChannel);
   const archive = useServerFn(archiveLiveStream);
   const skipArchive = useServerFn(skipLiveArchive);
+  const rtmpCfg = useServerFn(getRtmpConfig);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["live-streams-admin"],
@@ -1103,6 +1105,20 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const [fbUrl, setFbUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [channelState, setChannelState] = useState<string | null>(null);
+  const [rtmpEndpoints, setRtmpEndpoints] = useState<
+    { serverUrl: string; streamKey: string; fullUrl: string }[]
+  >([]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    rtmpCfg({ data: { wallet } })
+      .then((r) => !cancelled && setRtmpEndpoints(r.endpoints ?? []))
+      .catch(() => !cancelled && setRtmpEndpoints([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, wallet, rtmpCfg]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -1226,8 +1242,8 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
     }
   }
 
-  const rtmpUrl = "rtmp://52.45.63.166:1935/live/primary";
-  const streamKey = "live";
+  const primary = rtmpEndpoints[0];
+  const backup = rtmpEndpoints[1];
 
   return (
     <section className="mt-16 border-t border-border pt-8">
@@ -1243,29 +1259,53 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
             {channelState ?? "…"}
           </span>
         </div>
-        <div className="grid gap-1">
-          <div>
-            <span className="text-muted-foreground">StreamYard Server URL: </span>
-            <code className="text-primary select-all">{rtmpUrl}</code>
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(rtmpUrl);
-                toast.success("Copied");
-              }}
-              className="ml-2 text-primary hover:underline"
-            >
-              copy
-            </button>
+        {!primary && (
+          <div className="text-muted-foreground">
+            Fetching RTMP endpoint from MediaLive…
           </div>
-          <div>
-            <span className="text-muted-foreground">Stream key: </span>
-            <code className="text-primary select-all">{streamKey}</code>
+        )}
+        {primary && (
+          <div className="grid gap-1">
+            <div>
+              <span className="text-muted-foreground">StreamYard Server URL: </span>
+              <code className="text-primary select-all">{primary.serverUrl}</code>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(primary.serverUrl);
+                  toast.success("Copied");
+                }}
+                className="ml-2 text-primary hover:underline"
+              >
+                copy
+              </button>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Stream key: </span>
+              <code className="text-primary select-all">{primary.streamKey}</code>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(primary.streamKey);
+                  toast.success("Copied");
+                }}
+                className="ml-2 text-primary hover:underline"
+              >
+                copy
+              </button>
+            </div>
+            {backup && (
+              <div className="text-muted-foreground pt-1">
+                Backup: <code className="text-primary/70 select-all">{backup.serverUrl}</code> · key <code className="text-primary/70 select-all">{backup.streamKey}</code>
+              </div>
+            )}
+            <div className="text-muted-foreground pt-1">
+              In StreamYard: Destinations → Custom RTMP → Server URL + Stream key
+              go into their two separate fields. Channel must be <b>RUNNING</b>{" "}
+              before StreamYard can connect — click <b>Go Live</b> and wait ~60s.
+            </div>
           </div>
-        </div>
-        <div className="text-muted-foreground">
-          In StreamYard: Destinations → Custom RTMP → paste those two fields.
-        </div>
+        )}
       </div>
 
       <div className="border border-border rounded-sm p-4 bg-card mb-6 space-y-3">

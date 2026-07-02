@@ -214,6 +214,45 @@ export const describeMediaLiveChannel = createServerFn({ method: "POST" })
     return { state: info.state };
   });
 
+// Return the RTMP push endpoints authoritative from MediaLive (Input.destinations),
+// already split into a StreamYard-friendly Server URL + Stream Key pair.
+// StreamYard's "Server URL" is `rtmp://<ip>:1935/<app>` and "Stream Key" is `<streamName>`.
+export const getRtmpConfig = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ wallet: z.string() }).parse(input))
+  .handler(async ({ data }) => {
+    if (!isAdmin(data.wallet)) throw new Error("Forbidden");
+    const { describeInput } = await import("./aws-medialive.server");
+    let destinations: string[] = [];
+    try {
+      const info = await describeInput();
+      destinations = info.destinations;
+    } catch (err) {
+      console.warn("[live] describeInput failed, falling back to env", err);
+    }
+    if (destinations.length === 0) {
+      const envUrl = process.env.LIVE_RTMP_URL?.trim();
+      const envKey = process.env.LIVE_STREAM_KEY?.trim();
+      if (envUrl && envKey && !envUrl.includes(`/${envKey}`)) {
+        // Legacy secret shape: URL is already the app root, key is the stream name.
+        destinations.push(`${envUrl.replace(/\/$/, "")}/${envKey}`);
+      } else if (envUrl) {
+        destinations.push(envUrl);
+      }
+    }
+    const split = destinations.map((full) => {
+      // Full push URL: rtmp://host[:port]/app/streamName
+      const m = full.match(/^(rtmps?:\/\/[^/]+\/[^/]+)\/([^/?#]+)$/i);
+      if (m) return { serverUrl: m[1], streamKey: m[2], fullUrl: full };
+      // Fallback: split on last "/"
+      const idx = full.lastIndexOf("/");
+      if (idx > "rtmp://".length) {
+        return { serverUrl: full.slice(0, idx), streamKey: full.slice(idx + 1), fullUrl: full };
+      }
+      return { serverUrl: full, streamKey: "", fullUrl: full };
+    });
+    return { endpoints: split };
+  });
+
 // ---------- Admin: archive consent flow ----------
 //
 // After a stream ends, the raw .ts segments MediaLive wrote to the archive
