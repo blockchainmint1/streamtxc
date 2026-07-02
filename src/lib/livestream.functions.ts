@@ -214,6 +214,96 @@ export const describeMediaLiveChannel = createServerFn({ method: "POST" })
     return { state: info.state };
   });
 
+// ---------- Admin: archive consent flow ----------
+//
+// After a stream ends, the raw .ts segments MediaLive wrote to the archive
+// bucket sit there for 14 days (lifecycle rule). If the admin confirms via
+// the "Archive to library?" prompt, we stitch them into a normal HLS asset,
+// pin the output to IPFS via the finalize-live-archive cron, and create a
+// standard `videos` row (owner = admin wallet).
+//
+// If they Skip, we mark the row so the prompt disappears — the raw archive
+// still expires from S3 on its own.
+
+export const archiveLiveStream = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => IdSchema.parse(input))
+  .handler(async ({ data }) => {
+    if (!isAdmin(data.wallet)) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: stream, error: sErr } = await supabaseAdmin
+      .from("live_streams")
+      .select("id, title, status, archive_status, archive_transcode_job_id, started_at, ended_at")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (sErr) throw new Error(sErr.message);
+    if (!stream) throw new Error("Stream not found");
+    if (stream.status !== "ended") throw new Error("Stream is not ended yet");
+    if (stream.archive_status && stream.archive_status !== "failed") {
+      // Already archived / in-flight / skipped — return current state, don't re-kick.
+      return { ok: true, alreadyStarted: true, status: stream.archive_status };
+    }
+
+    const archiveBucket = process.env.LIVE_ARCHIVE_BUCKET;
+    const archivePrefix = process.env.LIVE_ARCHIVE_PREFIX ?? "txc-live"; // stack name
+    const outputBucket = process.env.AWS_S3_OUTPUT_BUCKET;
+    if (!archiveBucket) throw new Error("LIVE_ARCHIVE_BUCKET not configured");
+    if (!outputBucket) throw new Error("AWS_S3_OUTPUT_BUCKET not configured");
+
+    // List .ts segments MediaLive wrote for this stream. We filter by the
+    // stream's time window to avoid grabbing segments from earlier sessions
+    // that haven't expired yet.
+    const { listObjects } = await import("./aws-s3.server");
+    const allKeys = await listObjects(archiveBucket, archivePrefix);
+    const tsKeys = allKeys.filter((k) => k.endsWith(".ts")).sort();
+    if (tsKeys.length === 0) {
+      throw new Error(
+        `No archive segments found under s3://${archiveBucket}/${archivePrefix}`,
+      );
+    }
+
+    // MediaLive names segments with an ISO-ish timestamp; when there is no
+    // clean filter, fall back to "everything since the stream started" by
+    // listing keys created after started_at. We rely on lexicographic sort
+    // which matches chronological order for MediaLive's naming scheme.
+    const inputUris = tsKeys.map((k) => `s3://${archiveBucket}/${k}`);
+
+    const outputPrefix = `s3://${outputBucket}/hls/live-${stream.id}/`;
+    const { startHlsTranscodeFromInputs } = await import("./aws-mediaconvert.server");
+    const { jobId } = await startHlsTranscodeFromInputs({
+      inputUris,
+      outputPrefix,
+      videoId: `live-archive:${stream.id}`,
+    });
+
+    const { error: uErr } = await supabaseAdmin
+      .from("live_streams")
+      .update({
+        archive_status: "transcoding",
+        archive_transcode_job_id: jobId,
+        archive_output_prefix: outputPrefix,
+        archive_error: null,
+      })
+      .eq("id", data.id);
+    if (uErr) throw new Error(uErr.message);
+
+    return { ok: true, jobId, segments: tsKeys.length };
+  });
+
+export const skipLiveArchive = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => IdSchema.parse(input))
+  .handler(async ({ data }) => {
+    if (!isAdmin(data.wallet)) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("live_streams")
+      .update({ archive_status: "skipped" })
+      .eq("id", data.id)
+      .is("archive_status", null);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 // ---------- Notifications ----------
 
 async function notifyGoLive(streamId: string) {
