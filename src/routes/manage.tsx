@@ -1086,6 +1086,8 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const markRunning = useServerFn(markLiveStreamRunning);
   const update = useServerFn(updateLiveStream);
   const describe = useServerFn(describeMediaLiveChannel);
+  const archive = useServerFn(archiveLiveStream);
+  const skipArchive = useServerFn(skipLiveArchive);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["live-streams-admin"],
@@ -1186,6 +1188,39 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
       refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Stop failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleArchive(id: string) {
+    if (!confirm(
+      "Archive this stream to your library?\n\n" +
+        "We'll stitch the recording into a normal HLS video and pin it to " +
+        "IPFS. This takes a few minutes; the video will appear in your " +
+        "list when it's ready.",
+    )) return;
+    setBusy(true);
+    try {
+      const r = await archive({ data: { wallet, id } });
+      toast.success(
+        r.alreadyStarted
+          ? `Archive already ${r.status}`
+          : `Archiving ${r.segments ?? "?"} segments — check back in a few minutes`,
+      );
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Archive failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSkipArchive(id: string) {
+    setBusy(true);
+    try {
+      await skipArchive({ data: { wallet, id } });
+      refetch();
     } finally {
       setBusy(false);
     }
