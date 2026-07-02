@@ -642,6 +642,17 @@ export const listRecentVideos = createServerFn({ method: "POST" })
     };
   });
 
+// Columns that must never leak from the videos table via public reads:
+// derivation_index reveals the HD-wallet path used to mint per-video deposit
+// addresses; owner_nonce is used server-side in the ownership challenge flow.
+function stripSensitiveVideoFields<T extends Record<string, unknown> | null>(row: T): T {
+  if (!row) return row;
+  const clone: Record<string, unknown> = { ...row };
+  delete clone.derivation_index;
+  delete clone.owner_nonce;
+  return clone as T;
+}
+
 export const getVideo = createServerFn({ method: "POST" })
   .inputValidator((input) =>
     z.object({ cid: z.string().min(1).max(200) }).parse(input),
@@ -653,7 +664,7 @@ export const getVideo = createServerFn({ method: "POST" })
       .eq("cid", data.cid)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return video;
+    return stripSensitiveVideoFields(video);
   });
 
 /**
@@ -969,7 +980,7 @@ export const listVideosByCids = createServerFn({ method: "POST" })
       .in("cid", data.cids)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return videos ?? [];
+    return (videos ?? []).map((v) => stripSensitiveVideoFields(v));
   });
 
 /**

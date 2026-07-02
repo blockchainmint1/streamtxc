@@ -33,17 +33,22 @@ export const Route = createFileRoute("/api/stream/$cid/$")({
         if (!cid || cid.length > 200 || splat.length > 500) {
           return new Response("Bad path", { status: 400 });
         }
+        // Strict CID allowlist — never interpolate raw path segments into
+        // PostgREST filter syntax (`.or()` treats commas/parens as syntax).
+        const CID_RE = /^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[A-Za-z2-7]{50,})$/;
+        const cidIsValid = CID_RE.test(cid);
         // Count a view on playlist requests only (skip .ts segments).
-        if (splat.endsWith(".m3u8")) {
+        if (cidIsValid && splat.endsWith(".m3u8")) {
           try {
             const { supabaseAdmin } = await import(
               "@/integrations/supabase/client.server"
             );
-            const { data: v } = await supabaseAdmin
-              .from("videos")
-              .select("cid")
-              .or(`cid.eq.${cid},hls_cid.eq.${cid}`)
-              .maybeSingle();
+            // Two safe .eq() lookups instead of string-interpolated .or().
+            const [byCid, byHls] = await Promise.all([
+              supabaseAdmin.from("videos").select("cid").eq("cid", cid).maybeSingle(),
+              supabaseAdmin.from("videos").select("cid").eq("hls_cid", cid).maybeSingle(),
+            ]);
+            const v = byCid.data ?? byHls.data;
             if (v?.cid) {
               const ip =
                 request.headers.get("cf-connecting-ip") ??

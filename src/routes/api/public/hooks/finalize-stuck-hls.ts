@@ -8,17 +8,17 @@ import { createFileRoute } from "@tanstack/react-router";
  * async IPFS pinning. It does not pin inline because that can exceed request
  * timeouts and leave rows spinning forever.
  *
- * Auth: standard pg_cron `apikey` header (Supabase anon/publishable key).
- * The /api/public/* prefix bypasses Lovable's published-site auth, so
- * we require the apikey ourselves to keep the endpoint from being
- * trivially callable.
+ * Auth: `x-admin-token` header must match TXC_RPC_PASS (server-only
+ * secret). Same pattern as the other admin/cron endpoints. Using the
+ * publishable-key here was insecure because that key ships in the
+ * browser bundle.
  */
 export const Route = createFileRoute("/api/public/hooks/finalize-stuck-hls")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
-        const provided = request.headers.get("apikey");
+        const expected = process.env.TXC_RPC_PASS;
+        const provided = request.headers.get("x-admin-token");
         if (!expected || provided !== expected) {
           return new Response("Unauthorized", { status: 401 });
         }
