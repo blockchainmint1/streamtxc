@@ -33,6 +33,7 @@ import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
 import { Route as ApiPublicTxcVerifyMessageRouteImport } from './routes/api/public/txc-verify-message'
 import { Route as ApiPublicTxcHealthRouteImport } from './routes/api/public/txc-health'
 import { Route as ApiPublicImportStreamRouteImport } from './routes/api/public/import-stream'
+import { Route as EmbedLiveByWalletWalletRouteImport } from './routes/embed.live.by-wallet.$wallet'
 import { Route as ApiStreamCidSplatRouteImport } from './routes/api/stream.$cid.$'
 import { Route as ApiPublicNotifyVerifyEmailRouteImport } from './routes/api/public/notify/verify-email'
 import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/hooks/telegram'
@@ -168,6 +169,11 @@ const ApiPublicImportStreamRoute = ApiPublicImportStreamRouteImport.update({
   path: '/public/import-stream',
   getParentRoute: () => ApiRoute,
 } as any)
+const EmbedLiveByWalletWalletRoute = EmbedLiveByWalletWalletRouteImport.update({
+  id: '/embed/live/by-wallet/$wallet',
+  path: '/embed/live/by-wallet/$wallet',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiStreamCidSplatRoute = ApiStreamCidSplatRouteImport.update({
   id: '/$',
   path: '/$',
@@ -283,6 +289,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
   '/api/public/notify/verify-email': typeof ApiPublicNotifyVerifyEmailRoute
   '/api/stream/$cid/$': typeof ApiStreamCidSplatRoute
+  '/embed/live/by-wallet/$wallet': typeof EmbedLiveByWalletWalletRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -322,6 +329,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
   '/api/public/notify/verify-email': typeof ApiPublicNotifyVerifyEmailRoute
   '/api/stream/$cid/$': typeof ApiStreamCidSplatRoute
+  '/embed/live/by-wallet/$wallet': typeof EmbedLiveByWalletWalletRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -362,6 +370,7 @@ export interface FileRoutesById {
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
   '/api/public/notify/verify-email': typeof ApiPublicNotifyVerifyEmailRoute
   '/api/stream/$cid/$': typeof ApiStreamCidSplatRoute
+  '/embed/live/by-wallet/$wallet': typeof EmbedLiveByWalletWalletRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -403,6 +412,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/telegram'
     | '/api/public/notify/verify-email'
     | '/api/stream/$cid/$'
+    | '/embed/live/by-wallet/$wallet'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -442,6 +452,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/telegram'
     | '/api/public/notify/verify-email'
     | '/api/stream/$cid/$'
+    | '/embed/live/by-wallet/$wallet'
   id:
     | '__root__'
     | '/'
@@ -481,6 +492,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/telegram'
     | '/api/public/notify/verify-email'
     | '/api/stream/$cid/$'
+    | '/embed/live/by-wallet/$wallet'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -501,6 +513,7 @@ export interface RootRouteChildren {
   UWalletRoute: typeof UWalletRoute
   VCidRoute: typeof VCidRouteWithChildren
   EmbedLiveStreamIdRoute: typeof EmbedLiveStreamIdRoute
+  EmbedLiveByWalletWalletRoute: typeof EmbedLiveByWalletWalletRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -672,6 +685,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/import-stream'
       preLoaderRoute: typeof ApiPublicImportStreamRouteImport
       parentRoute: typeof ApiRoute
+    }
+    '/embed/live/by-wallet/$wallet': {
+      id: '/embed/live/by-wallet/$wallet'
+      path: '/embed/live/by-wallet/$wallet'
+      fullPath: '/embed/live/by-wallet/$wallet'
+      preLoaderRoute: typeof EmbedLiveByWalletWalletRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/stream/$cid/$': {
       id: '/api/stream/$cid/$'
@@ -860,6 +880,7 @@ const rootRouteChildren: RootRouteChildren = {
   UWalletRoute: UWalletRoute,
   VCidRoute: VCidRouteWithChildren,
   EmbedLiveStreamIdRoute: EmbedLiveStreamIdRoute,
+  EmbedLiveByWalletWalletRoute: EmbedLiveByWalletWalletRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
