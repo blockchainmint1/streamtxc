@@ -27,6 +27,7 @@ import { Route as UWalletRouteImport } from './routes/u.$wallet'
 import { Route as LiveStreamIdRouteImport } from './routes/live.$streamId'
 import { Route as EmbedCidRouteImport } from './routes/embed.$cid'
 import { Route as VCidRestoreRouteImport } from './routes/v.$cid.restore'
+import { Route as EmbedLiveStreamIdRouteImport } from './routes/embed.live.$streamId'
 import { Route as ApiStreamCidRouteImport } from './routes/api/stream.$cid'
 import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
 import { Route as ApiPublicTxcVerifyMessageRouteImport } from './routes/api/public/txc-verify-message'
@@ -135,6 +136,11 @@ const VCidRestoreRoute = VCidRestoreRouteImport.update({
   id: '/restore',
   path: '/restore',
   getParentRoute: () => VCidRoute,
+} as any)
+const EmbedLiveStreamIdRoute = EmbedLiveStreamIdRouteImport.update({
+  id: '/embed/live/$streamId',
+  path: '/embed/live/$streamId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiStreamCidRoute = ApiStreamCidRouteImport.update({
   id: '/stream/$cid',
@@ -262,6 +268,7 @@ export interface FileRoutesByFullPath {
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
+  '/embed/live/$streamId': typeof EmbedLiveStreamIdRoute
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/backfill-hls': typeof ApiPublicAdminBackfillHlsRoute
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
@@ -300,6 +307,7 @@ export interface FileRoutesByTo {
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
+  '/embed/live/$streamId': typeof EmbedLiveStreamIdRoute
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/backfill-hls': typeof ApiPublicAdminBackfillHlsRoute
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
@@ -339,6 +347,7 @@ export interface FileRoutesById {
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
+  '/embed/live/$streamId': typeof EmbedLiveStreamIdRoute
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/backfill-hls': typeof ApiPublicAdminBackfillHlsRoute
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
@@ -379,6 +388,7 @@ export interface FileRouteTypes {
     | '/api/public/txc-verify-message'
     | '/api/public/upload'
     | '/api/stream/$cid'
+    | '/embed/live/$streamId'
     | '/v/$cid/restore'
     | '/api/public/admin/backfill-hls'
     | '/api/public/admin/backfill-self-pins'
@@ -417,6 +427,7 @@ export interface FileRouteTypes {
     | '/api/public/txc-verify-message'
     | '/api/public/upload'
     | '/api/stream/$cid'
+    | '/embed/live/$streamId'
     | '/v/$cid/restore'
     | '/api/public/admin/backfill-hls'
     | '/api/public/admin/backfill-self-pins'
@@ -455,6 +466,7 @@ export interface FileRouteTypes {
     | '/api/public/txc-verify-message'
     | '/api/public/upload'
     | '/api/stream/$cid'
+    | '/embed/live/$streamId'
     | '/v/$cid/restore'
     | '/api/public/admin/backfill-hls'
     | '/api/public/admin/backfill-self-pins'
@@ -488,6 +500,7 @@ export interface RootRouteChildren {
   EmbedCidRoute: typeof EmbedCidRoute
   UWalletRoute: typeof UWalletRoute
   VCidRoute: typeof VCidRouteWithChildren
+  EmbedLiveStreamIdRoute: typeof EmbedLiveStreamIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -617,6 +630,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/v/$cid/restore'
       preLoaderRoute: typeof VCidRestoreRouteImport
       parentRoute: typeof VCidRoute
+    }
+    '/embed/live/$streamId': {
+      id: '/embed/live/$streamId'
+      path: '/embed/live/$streamId'
+      fullPath: '/embed/live/$streamId'
+      preLoaderRoute: typeof EmbedLiveStreamIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/stream/$cid': {
       id: '/api/stream/$cid'
@@ -839,6 +859,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmbedCidRoute: EmbedCidRoute,
   UWalletRoute: UWalletRoute,
   VCidRoute: VCidRouteWithChildren,
+  EmbedLiveStreamIdRoute: EmbedLiveStreamIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
