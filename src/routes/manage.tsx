@@ -1296,6 +1296,34 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
             {channelState ?? "…"}
           </span>
         </div>
+        <div>
+          <span className="text-muted-foreground">MediaPackage signal: </span>
+          {signal === null ? (
+            <span className="text-muted-foreground">…</span>
+          ) : signal.receiving ? (
+            <span className="text-red-500">
+              RECEIVING · seg #{signal.lastSequence} · {signal.ageSec}s ago
+            </span>
+          ) : signal.lastSequence > 0 ? (
+            <span className="text-yellow-500">
+              STALE · last seg #{signal.lastSequence}
+              {signal.ageSec !== null ? ` · ${signal.ageSec}s ago` : ""}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">
+              NO SEGMENTS YET — StreamYard is not delivering to MediaLive
+            </span>
+          )}
+        </div>
+        {signal && !signal.receiving && signal.lastSequence === 0 && channelState === "RUNNING" && (
+          <div className="text-muted-foreground pt-1 leading-relaxed">
+            The channel is up but nothing is flowing. In StreamYard, make sure
+            you clicked the big <b>Go live</b> button (not just added the
+            destination), and that the Custom RTMP tile shows a green "live"
+            indicator. If it says "connecting" for more than ~30s, re-check
+            Server URL / Stream key above.
+          </div>
+        )}
         {!primary && (
           <div className="text-muted-foreground">
             Fetching RTMP endpoint from MediaLive…
