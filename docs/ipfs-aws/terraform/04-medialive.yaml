@@ -170,7 +170,10 @@ Resources:
             - ChannelId: !Ref MpChannel
         - Id: s3-archive-dest
           Settings:
-            - Url: !Sub "s3://${ArchiveBucket}/${!AWS::StackName}"
+            # HLS output group writes `<basename>.m3u8` (master) + variant
+            # manifests + .ts segments under this basename. The archive
+            # flow reads `<basename>/index.m3u8` as MediaConvert input.
+            - Url: !Sub "s3://${ArchiveBucket}/${!AWS::StackName}/index"
       EncoderSettings:
         TimecodeConfig: { Source: EMBEDDED }
         AudioDescriptions:
@@ -260,23 +263,38 @@ Resources:
                 AudioDescriptionNames: [audio_aac]
                 OutputSettings:
                   MediaPackageOutputSettings: {}
-          - Name: archive-to-s3
+          # HLS-to-S3 archive: MediaConvert can probe framerate/codec
+          # from an HLS manifest, but not from raw MediaLive .ts archive
+          # segments (they omit framerate in the elementary stream,
+          # producing MediaConvert error 1040 "Invalid frame rate: 0/1").
+          - Name: archive-to-s3-hls
             OutputGroupSettings:
-              ArchiveGroupSettings:
+              HlsGroupSettings:
                 Destination: { DestinationRefId: s3-archive-dest }
-                RolloverInterval: 3600
+                HlsCdnSettings:
+                  HlsS3Settings: { NumRetries: 5 }
+                Mode: VOD
+                OutputSelection: MANIFESTS_AND_SEGMENTS
+                SegmentLength: 6
+                IndexNSegments: 10
+                KeepSegments: 21
+                ManifestDurationFormat: INTEGER
+                StreamInfResolution: INCLUDE
+                ClientCache: ENABLED
+                CodecSpecification: RFC_4281
             Outputs:
-              - OutputName: archive
+              - OutputName: archive_720p
                 VideoDescriptionName: video_720p
                 AudioDescriptionNames: [audio_aac]
                 OutputSettings:
-                  ArchiveOutputSettings:
-                    NameModifier: _archive
-                    ContainerSettings:
-                      M2tsSettings:
-                        AudioBufferModel: ATSC
-                        BufferModel: MULTIPLEX
-                        RateMode: CBR
+                  HlsOutputSettings:
+                    NameModifier: _720p
+                    HlsSettings:
+                      StandardHlsSettings:
+                        AudioRenditionSets: program_audio
+                        M3u8Settings:
+                          AudioFramesPerPes: 4
+                          PcrControl: PCR_EVERY_PES_PACKET
 
 Outputs:
   ChannelId:
