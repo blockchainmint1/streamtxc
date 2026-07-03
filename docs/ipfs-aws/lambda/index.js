@@ -1,4 +1,6 @@
 const { Readable } = require("stream");
+const { pipeline } = require("stream/promises");
+const http = require("http");
 const { createHmac } = require("crypto");
 const { S3Client, GetObjectCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");
 
@@ -6,6 +8,39 @@ const s3 = new S3Client({});
 const IPFS_API = process.env.IPFS_API;
 const BEARER = process.env.BEARER_TOKEN;
 const PINATA_JWT = process.env.PINATA_JWT || "";
+
+// Stream a request body into kubo with REAL backpressure. Node's global
+// fetch (undici) buffers the request body in memory when the receiver is
+// slower than the sender — for multi-GB S3 → IPFS streams that OOM-kills
+// the runtime (Runtime.OutOfMemory / signal: killed). Core node:http +
+// stream.pipeline() only keeps ~64 KB in flight.
+function postStream(urlStr, bodyIterable, contentType) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(urlStr);
+    const req = http.request(
+      {
+        hostname: u.hostname,
+        port: u.port || 80,
+        path: u.pathname + u.search,
+        method: "POST",
+        headers: { "Content-Type": contentType },
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () =>
+          resolve({ status: res.statusCode || 0, text: Buffer.concat(chunks).toString("utf8") })
+        );
+        res.on("error", reject);
+      }
+    );
+    req.on("error", reject);
+    pipeline(Readable.from(bodyIterable), req).catch((err) => {
+      req.destroy(err);
+      reject(err);
+    });
+  });
+}
 
 exports.handler = async (event) => {
   try {
