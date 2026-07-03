@@ -134,7 +134,7 @@ export async function startHlsTranscodeFromInputs(
         // ("Invalid frame rate: 0/1"). AdvancedInputFilter re-probes the
         // elementary stream and reconstructs the missing metadata before
         // handing it to the transcoder.
-        AdvancedInputFilter: "AUTO",
+        AdvancedInputFilter: "ENABLED",
         AdvancedInputFilterSettings: {
           Strength: "DEFAULT",
           AddTexture: "ENABLED",
