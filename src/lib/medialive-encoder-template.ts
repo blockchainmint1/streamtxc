@@ -18,7 +18,10 @@ export function buildChannelDestinations(args: {
       id: "s3-archive-dest",
       mediaPackageSettings: [],
       settings: [
-        { url: `s3://${args.archiveBucket}/${args.archivePrefix}` },
+        // HLS output group writes `<basename>.m3u8` + variant manifests +
+        // .ts segments under this basename. Downstream we find the master
+        // manifest at `<archivePrefix>/index.m3u8`.
+        { url: `s3://${args.archiveBucket}/${args.archivePrefix}/index` },
       ],
     },
   ];
@@ -100,26 +103,45 @@ export const ENCODER_SETTINGS = {
       ],
     },
     {
-      name: "archive-to-s3",
+      // HLS-to-S3 archive: writes `index.m3u8` (master) + variant
+      // manifests + .ts segments. We use HLS instead of the raw Archive
+      // output group because MediaConvert can probe framerate/codec from
+      // the HLS manifest, but not from raw MediaLive .ts segments (which
+      // omit framerate metadata in the elementary stream and cause
+      // MediaConvert error 1040 "Invalid frame rate: 0/1").
+      name: "archive-to-s3-hls",
       outputGroupSettings: {
-        archiveGroupSettings: {
+        hlsGroupSettings: {
           destination: { destinationRefId: "s3-archive-dest" },
-          rolloverInterval: 3600,
+          hlsCdnSettings: {
+            hlsS3Settings: { numRetries: 5 },
+          },
+          mode: "VOD",
+          outputSelection: "MANIFESTS_AND_SEGMENTS",
+          segmentLength: 6,
+          indexNSegments: 10,
+          keepSegments: 21,
+          manifestDurationFormat: "INTEGER",
+          streamInfResolution: "INCLUDE",
+          clientCache: "ENABLED",
+          codecSpecification: "RFC_4281",
         },
       },
       outputs: [
         {
-          outputName: "archive",
+          outputName: "archive_720p",
           videoDescriptionName: "video_720p",
           audioDescriptionNames: ["audio_aac"],
           outputSettings: {
-            archiveOutputSettings: {
-              nameModifier: "_archive",
-              containerSettings: {
-                m2tsSettings: {
-                  audioBufferModel: "ATSC",
-                  bufferModel: "MULTIPLEX",
-                  rateMode: "CBR",
+            hlsOutputSettings: {
+              nameModifier: "_720p",
+              hlsSettings: {
+                standardHlsSettings: {
+                  audioRenditionSets: "program_audio",
+                  m3u8Settings: {
+                    audioFramesPerPes: 4,
+                    pcrControl: "PCR_EVERY_PES_PACKET",
+                  },
                 },
               },
             },

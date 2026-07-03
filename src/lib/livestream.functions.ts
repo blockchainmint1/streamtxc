@@ -343,35 +343,52 @@ export const archiveLiveStream = createServerFn({ method: "POST" })
     if (!archiveBucket) throw new Error("LIVE_ARCHIVE_BUCKET not configured");
     if (!outputBucket) throw new Error("AWS_S3_OUTPUT_BUCKET not configured");
 
-    // List .ts segments MediaLive wrote for this stream. We filter by the
-    // stream's time window to avoid grabbing segments from earlier sessions
-    // that haven't expired yet.
-    // Filter out zero-byte/tiny junk segments (MediaLive leaves .tmp.zero
-    // files and occasionally sub-second stubs). MediaConvert fails with
-    // "Invalid frame rate: 0/1" if it's fed a segment with no real video.
-    const MIN_SEGMENT_BYTES = 1_000_000; // 1 MB
-    const isRealSegment = (o: { key: string; size: number }) =>
-      o.key.endsWith(".ts") && o.size >= MIN_SEGMENT_BYTES;
+    // New channels write archives as an HLS output group (master
+    // `index.m3u8` + variant manifests + .ts segments). Prefer that
+    // manifest as MediaConvert's input — the manifest carries framerate
+    // and codec metadata, which raw MediaLive .ts segments do not.
+    //
+    // Legacy channels (created before the HLS switch) wrote raw .ts
+    // archives via ArchiveGroupSettings; fall back to stitching those.
     const { listObjectsWithMeta } = await import("./aws-s3.server");
     const allObjs = await listObjectsWithMeta(archiveBucket, archivePrefix);
-    let tsKeys = allObjs.filter(isRealSegment).map((o) => o.key).sort();
-    // Fallback: some deployments wrote under different prefixes. Scan the
-    // whole bucket if the primary prefix came up empty.
-    if (tsKeys.length === 0) {
-      const rootObjs = await listObjectsWithMeta(archiveBucket, "");
-      tsKeys = rootObjs.filter(isRealSegment).map((o) => o.key).sort();
-    }
-    if (tsKeys.length === 0) {
-      throw new Error(
-        `No archive segments found under s3://${archiveBucket}/${archivePrefix}`,
-      );
-    }
+    const scanned =
+      allObjs.length > 0
+        ? allObjs
+        : await listObjectsWithMeta(archiveBucket, "");
 
-    // MediaLive names segments with an ISO-ish timestamp; when there is no
-    // clean filter, fall back to "everything since the stream started" by
-    // listing keys created after started_at. We rely on lexicographic sort
-    // which matches chronological order for MediaLive's naming scheme.
-    const inputUris = tsKeys.map((k) => `s3://${archiveBucket}/${k}`);
+    // Prefer the master HLS manifest: any *.m3u8 that isn't a variant
+    // (variants are named `<base>_<rendition>.m3u8`, e.g. `index_720p.m3u8`).
+    const manifests = scanned.filter((o) => o.key.endsWith(".m3u8"));
+    const master = manifests.find((o) => {
+      const base = o.key.split("/").pop() ?? "";
+      // Master has no `_<something>` before `.m3u8`. `index.m3u8` → ok;
+      // `index_720p.m3u8` → variant.
+      return !/_[^/]+\.m3u8$/.test(base);
+    }) ?? manifests[0];
+
+    let inputUris: string[];
+    let segmentCount: number;
+    if (master) {
+      inputUris = [`s3://${archiveBucket}/${master.key}`];
+      segmentCount = scanned.filter((o) => o.key.endsWith(".ts")).length;
+    } else {
+      // Legacy .ts-only archive. Filter zero-byte/tiny junk stubs
+      // (MediaLive leaves .tmp.zero files that break MediaConvert with
+      // error 1040 "Invalid frame rate: 0/1").
+      const MIN_SEGMENT_BYTES = 1_000_000; // 1 MB
+      const tsKeys = scanned
+        .filter((o) => o.key.endsWith(".ts") && o.size >= MIN_SEGMENT_BYTES)
+        .map((o) => o.key)
+        .sort();
+      if (tsKeys.length === 0) {
+        throw new Error(
+          `No archive segments found under s3://${archiveBucket}/${archivePrefix}`,
+        );
+      }
+      inputUris = tsKeys.map((k) => `s3://${archiveBucket}/${k}`);
+      segmentCount = tsKeys.length;
+    }
 
     const outputPrefix = `s3://${outputBucket}/hls/live-${stream.id}/`;
     const { startHlsTranscodeFromInputs } = await import("./aws-mediaconvert.server");
@@ -392,7 +409,7 @@ export const archiveLiveStream = createServerFn({ method: "POST" })
       .eq("id", data.id);
     if (uErr) throw new Error(uErr.message);
 
-    return { ok: true, jobId, segments: tsKeys.length };
+    return { ok: true, jobId, segments: segmentCount };
   });
 
 export const skipLiveArchive = createServerFn({ method: "POST" })
