@@ -31,6 +31,7 @@ import {
   verifyBulkExtensionTx,
   setVideoVisibility,
   mirrorOwnToSelfNode,
+  forceBackfillTranscript,
 } from "@/lib/videos.functions";
 import { useWallet, isSignableOwnershipTxcAddress } from "@/lib/wallet";
 import { listAnonUploads, removeAnonUpload, subscribeToAnonUploads } from "@/lib/anon-uploads";
@@ -53,6 +54,7 @@ import {
   CloudUpload,
 } from "lucide-react";
 import { CheckCircle2, Film, Clock, ArrowUp, ArrowDown, ChevronsUpDown } from "lucide-react";
+import { Captions } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationPrefs } from "@/components/NotificationPrefs";
 import { listBugReports } from "@/lib/bug-reports.functions";
@@ -341,6 +343,62 @@ function MirrorToSelfNodeButton({ cid, wallet }: { cid: string; wallet: string }
       }}
     >
       {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <CloudUpload className="h-3 w-3" />}
+    </Button>
+  );
+}
+
+function ForceCaptionsButton({
+  cid,
+  wallet,
+  hasTranscript,
+}: {
+  cid: string;
+  wallet: string;
+  hasTranscript: boolean;
+}) {
+  const qc = useQueryClient();
+  const run = useServerFn(forceBackfillTranscript);
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      size="icon"
+      variant="outline"
+      className="font-mono h-7 w-7"
+      title={hasTranscript ? "Regenerate closed captions" : "Generate closed captions"}
+      aria-label="Generate closed captions"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const res = await run({ data: { wallet, cid } });
+          if (res.action === "already_transcribed") {
+            toast.success("Captions already exist");
+          } else if (res.action === "transcribed_from_existing_audio") {
+            toast.success("Captions generated");
+          } else if (res.action === "audio_job_queued") {
+            toast.success("Audio job queued — captions will appear shortly");
+          } else if (res.action === "skipped_no_input") {
+            toast.error("Source video unavailable");
+          } else if (res.action === "skipped_too_large") {
+            toast.error("Source too large for automatic backfill");
+          } else {
+            toast.error(res.error ?? "Caption backfill failed");
+          }
+          qc.invalidateQueries({ queryKey: ["my-videos"] });
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Caption backfill failed");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? (
+        <Loader2 className="h-3 w-3 animate-spin" />
+      ) : (
+        <Captions
+          className={`h-3 w-3 ${hasTranscript ? "text-green-500" : ""}`}
+        />
+      )}
     </Button>
   );
 }
@@ -685,6 +743,11 @@ function ManagePageInner() {
                             hidden={!!v.hidden_at}
                           />
                           <MirrorToSelfNodeButton cid={v.cid} wallet={address!} />
+                          <ForceCaptionsButton
+                            cid={v.cid}
+                            wallet={address!}
+                            hasTranscript={!!v.transcript_cid}
+                          />
                           <EditVideoDialog
                             cid={v.cid}
                             initialTitle={v.title}
