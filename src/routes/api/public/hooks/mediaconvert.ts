@@ -193,10 +193,10 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
         // failures don't block the HLS flow.
         let transcript: { cid: string; bytes: number } | null = null;
         try {
-          const { maybeTranscribeZoomVideo } = await import(
+          const { maybeTranscribeVideo } = await import(
             "@/lib/transcription.server"
           );
-          const t = await maybeTranscribeZoomVideo(cid);
+          const t = await maybeTranscribeVideo(cid);
           if (t) transcript = { cid: t.transcriptCid, bytes: t.vttBytes };
         } catch (err) {
           console.warn(`[mediaconvert ${cid}] transcription failed:`, err);
