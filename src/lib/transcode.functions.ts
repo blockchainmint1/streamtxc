@@ -92,6 +92,38 @@ export const getTranscodeUploadUrl = createServerFn({ method: "POST" })
     return { url, bucket: e.inputBucket, key };
   });
 
+/**
+ * Preflight: check whether the S3 input bucket already has bytes for this
+ * CID at `inputs/<cid>`. Lets the browser skip a multi-GB re-upload when a
+ * prior attempt already landed the file — the common case after a browser
+ * tab reload, a spotty network, or a killed pin retry.
+ *
+ * Returns `{ exists: false }` when not present, or
+ * `{ exists: true, key, bucket, size, contentType }` when present.
+ */
+export const checkS3InputExists = createServerFn({ method: "POST" })
+  .inputValidator((d: { cid: string }) => {
+    if (!d.cid || typeof d.cid !== "string" || d.cid.length > 200) {
+      throw new Error("Invalid cid");
+    }
+    return d;
+  })
+  .handler(async ({ data }) => {
+    const e = transcodeEnv();
+    if (!e.inputBucket) return { exists: false as const };
+    const { headObject } = await import("./aws-s3.server");
+    const key = `inputs/${data.cid}`;
+    const meta = await headObject(e.inputBucket, key);
+    if (!meta) return { exists: false as const };
+    return {
+      exists: true as const,
+      bucket: e.inputBucket,
+      key,
+      size: meta.size,
+      contentType: meta.contentType,
+    };
+  });
+
 // ---- Multipart upload server fns (for large files: >50MB recommended) -----
 
 export const startMultipartUpload = createServerFn({ method: "POST" })
