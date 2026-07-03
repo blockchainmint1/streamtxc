@@ -499,7 +499,7 @@ export function S3VideoUpload({
             setStage("pin-hls", "pending", "queued — will start after transcode finishes");
             saveInflight({ cid: result.cid, jobId: kickoff.jobId ?? undefined, startedAt: Date.now() });
           } else {
-            throw new Error(kickoff.error ?? "kickoffHlsFromCid failed");
+            throw new Error(kickoff.reason ?? "kickoffHlsFromCid failed");
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Could not start transcode";
