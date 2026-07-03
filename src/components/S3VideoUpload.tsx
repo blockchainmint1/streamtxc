@@ -460,7 +460,53 @@ export function S3VideoUpload({
 
       const hit = await lookupCid({ data: { cidV1: cids.v1, cidV0: cids.v0 } });
       if (hit) {
-        pushLog("ok", `already pinned on IPFS as ${hit.cid} — skipping S3 upload + pin`);
+        pushLog("ok", `already pinned on IPFS as ${hit.cid} — skipping S3 upload + pin, will pull from IPFS → S3 server-side`);
+        const canonicalCid = hit.cid;
+        setStage("s3-upload", "done", "skipped — pulling from IPFS server-side");
+        setStage("pin-ipfs", "done", "skipped — already pinned");
+
+        setStage("register", "active");
+        const submitWallet = address ?? getWallet();
+        const result = await register({
+          data: {
+            wallet: submitWallet ?? undefined,
+            cid: canonicalCid,
+            title, description,
+            sizeBytes: file.size,
+            mimeType: file.type || "video/mp4",
+            months: 1,
+            thumbnailCid: thumbnailCid ?? undefined,
+            nsfw,
+            draftId: draftRef.current?.id,
+            draftToken: draftRef.current?.token,
+          },
+        });
+        pushLog("ok", `registered · ${result.chainStatus}`);
+        setStage("register", "done",
+          result.chainStatus === "stamp_failed"
+            ? "Saved · chain stamp queued for retry"
+            : "Row saved · TXC stamp broadcast");
+        if (!submitWallet) recordAnonUpload(result.cid, title);
+        qc.invalidateQueries({ queryKey: ["recent-videos"] });
+        setResultCid(result.cid);
+
+        setStage("transcode", "active", "fetching bytes from IPFS → S3 server-side…");
+        try {
+          const kickoff = await kickoffHlsFromCid({ data: { cid: canonicalCid } });
+          if (kickoff.ok) {
+            pushLog("ok", `MediaConvert job queued via IPFS pull · ${kickoff.jobId ?? ""}`);
+            setStage("transcode", "active", kickoff.jobId ? `job ${kickoff.jobId}` : "queued");
+            setStage("pin-hls", "pending", "queued — will start after transcode finishes");
+            saveInflight({ cid: result.cid, jobId: kickoff.jobId ?? undefined, startedAt: Date.now() });
+          } else {
+            throw new Error(kickoff.error ?? "kickoffHlsFromCid failed");
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Could not start transcode";
+          pushLog("err", `kickoffHlsFromCid failed: ${msg}`);
+          setStage("transcode", "error", msg);
+        }
+        return;
       } else {
         pushLog("ok", "no existing video found — fresh upload");
       }
