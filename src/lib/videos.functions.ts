@@ -50,6 +50,38 @@ function ownerMatches(rowOwner: string | null, claim: string): boolean {
   return rowOwner.toLowerCase() === claim.toLowerCase();
 }
 
+/**
+ * Owner (or admin) can force closed-caption backfill for a single video.
+ * Wraps backfillOneTranscript so the manage UI can trigger it per-row.
+ */
+export const forceBackfillTranscript = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
+  .inputValidator((input) =>
+    z
+      .object({
+        wallet: walletSchema,
+        cid: z.string().min(1).max(200),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const wallet = context.wallet;
+    const { data: v, error } = await supabaseAdmin
+      .from("videos")
+      .select("cid, owner_wallet")
+      .eq("cid", data.cid)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!v) throw new Error("Video not found");
+    const isOwner = ownerMatches(v.owner_wallet, wallet);
+    const isAdmin = wallet === SELF_NODE_ADMIN_WALLET;
+    if (!isOwner && !isAdmin) throw new Error("Not your video");
+
+    const { backfillOneTranscript } = await import("./backfill-transcripts.server");
+    const res = await backfillOneTranscript(data.cid);
+    return { ok: true, ...res };
+  });
+
 const cidStringSchema = z
   .string()
   .trim()
