@@ -45,6 +45,7 @@ import { Route as ApiPublicHooksFinalizeStuckHlsRouteImport } from './routes/api
 import { Route as ApiPublicHooksFinalizeLiveArchiveRouteImport } from './routes/api/public/hooks/finalize-live-archive'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
 import { Route as ApiPublicAdminFinalizeHlsRouteImport } from './routes/api/public/admin/finalize-hls'
+import { Route as ApiPublicAdminBackfillTranscriptsRouteImport } from './routes/api/public/admin/backfill-transcripts'
 import { Route as ApiPublicAdminBackfillSelfPinsRouteImport } from './routes/api/public/admin/backfill-self-pins'
 import { Route as ApiPublicAdminBackfillHlsRouteImport } from './routes/api/public/admin/backfill-hls'
 
@@ -238,6 +239,12 @@ const ApiPublicAdminFinalizeHlsRoute =
     path: '/public/admin/finalize-hls',
     getParentRoute: () => ApiRoute,
   } as any)
+const ApiPublicAdminBackfillTranscriptsRoute =
+  ApiPublicAdminBackfillTranscriptsRouteImport.update({
+    id: '/public/admin/backfill-transcripts',
+    path: '/public/admin/backfill-transcripts',
+    getParentRoute: () => ApiRoute,
+  } as any)
 const ApiPublicAdminBackfillSelfPinsRoute =
   ApiPublicAdminBackfillSelfPinsRouteImport.update({
     id: '/public/admin/backfill-self-pins',
@@ -278,6 +285,7 @@ export interface FileRoutesByFullPath {
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/backfill-hls': typeof ApiPublicAdminBackfillHlsRoute
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
+  '/api/public/admin/backfill-transcripts': typeof ApiPublicAdminBackfillTranscriptsRoute
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/finalize-live-archive': typeof ApiPublicHooksFinalizeLiveArchiveRoute
@@ -318,6 +326,7 @@ export interface FileRoutesByTo {
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/backfill-hls': typeof ApiPublicAdminBackfillHlsRoute
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
+  '/api/public/admin/backfill-transcripts': typeof ApiPublicAdminBackfillTranscriptsRoute
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/finalize-live-archive': typeof ApiPublicHooksFinalizeLiveArchiveRoute
@@ -359,6 +368,7 @@ export interface FileRoutesById {
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/backfill-hls': typeof ApiPublicAdminBackfillHlsRoute
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
+  '/api/public/admin/backfill-transcripts': typeof ApiPublicAdminBackfillTranscriptsRoute
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/finalize-live-archive': typeof ApiPublicHooksFinalizeLiveArchiveRoute
@@ -401,6 +411,7 @@ export interface FileRouteTypes {
     | '/v/$cid/restore'
     | '/api/public/admin/backfill-hls'
     | '/api/public/admin/backfill-self-pins'
+    | '/api/public/admin/backfill-transcripts'
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/finalize-live-archive'
@@ -441,6 +452,7 @@ export interface FileRouteTypes {
     | '/v/$cid/restore'
     | '/api/public/admin/backfill-hls'
     | '/api/public/admin/backfill-self-pins'
+    | '/api/public/admin/backfill-transcripts'
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/finalize-live-archive'
@@ -481,6 +493,7 @@ export interface FileRouteTypes {
     | '/v/$cid/restore'
     | '/api/public/admin/backfill-hls'
     | '/api/public/admin/backfill-self-pins'
+    | '/api/public/admin/backfill-transcripts'
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/finalize-live-archive'
@@ -771,6 +784,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAdminFinalizeHlsRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/public/admin/backfill-transcripts': {
+      id: '/api/public/admin/backfill-transcripts'
+      path: '/public/admin/backfill-transcripts'
+      fullPath: '/api/public/admin/backfill-transcripts'
+      preLoaderRoute: typeof ApiPublicAdminBackfillTranscriptsRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/public/admin/backfill-self-pins': {
       id: '/api/public/admin/backfill-self-pins'
       path: '/public/admin/backfill-self-pins'
@@ -808,6 +828,7 @@ interface ApiRouteChildren {
   ApiStreamCidRoute: typeof ApiStreamCidRouteWithChildren
   ApiPublicAdminBackfillHlsRoute: typeof ApiPublicAdminBackfillHlsRoute
   ApiPublicAdminBackfillSelfPinsRoute: typeof ApiPublicAdminBackfillSelfPinsRoute
+  ApiPublicAdminBackfillTranscriptsRoute: typeof ApiPublicAdminBackfillTranscriptsRoute
   ApiPublicAdminFinalizeHlsRoute: typeof ApiPublicAdminFinalizeHlsRoute
   ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
   ApiPublicHooksFinalizeLiveArchiveRoute: typeof ApiPublicHooksFinalizeLiveArchiveRoute
@@ -828,6 +849,8 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiStreamCidRoute: ApiStreamCidRouteWithChildren,
   ApiPublicAdminBackfillHlsRoute: ApiPublicAdminBackfillHlsRoute,
   ApiPublicAdminBackfillSelfPinsRoute: ApiPublicAdminBackfillSelfPinsRoute,
+  ApiPublicAdminBackfillTranscriptsRoute:
+    ApiPublicAdminBackfillTranscriptsRoute,
   ApiPublicAdminFinalizeHlsRoute: ApiPublicAdminFinalizeHlsRoute,
   ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
   ApiPublicHooksFinalizeLiveArchiveRoute:
