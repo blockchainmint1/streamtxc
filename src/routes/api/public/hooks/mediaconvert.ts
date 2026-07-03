@@ -39,7 +39,7 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
             jobId?: string;
             status?: string;
             errorMessage?: string;
-            userMetadata?: { videoId?: string };
+            userMetadata?: { videoId?: string; mode?: string };
             outputGroupDetails?: Array<{ playlistFilePaths?: string[] }>;
           };
         };
@@ -54,11 +54,41 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
         const cid = detail.userMetadata?.videoId; // we round-trip cid as videoId
         const jobId = detail.jobId;
         const status = detail.status;
+        const mode = detail.userMetadata?.mode;
         if (!cid || !jobId || !status) {
           return new Response("Missing fields", { status: 400 });
         }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+        // Audio-only backfill jobs: skip HLS pinning entirely; the only
+        // deliverable is captions for an already-transcoded video.
+        if (mode === "audio-only") {
+          if (status !== "COMPLETE") {
+            return new Response(
+              JSON.stringify({ ok: false, mode, status, error: detail.errorMessage ?? null }),
+              { status: 200, headers: { "content-type": "application/json" } },
+            );
+          }
+          try {
+            const { maybeTranscribeVideo } = await import(
+              "@/lib/transcription.server"
+            );
+            const t = await maybeTranscribeVideo(cid);
+            return Response.json({
+              ok: true,
+              mode: "audio-only",
+              transcriptCid: t?.transcriptCid ?? null,
+              transcriptBytes: t?.vttBytes ?? null,
+            });
+          } catch (err) {
+            console.warn(`[mediaconvert ${cid}] audio-only transcription failed:`, err);
+            return new Response(
+              JSON.stringify({ ok: false, mode: "audio-only", error: err instanceof Error ? err.message : String(err) }),
+              { status: 500, headers: { "content-type": "application/json" } },
+            );
+          }
+        }
 
         if (status !== "COMPLETE") {
           await supabaseAdmin

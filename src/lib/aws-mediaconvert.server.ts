@@ -280,6 +280,50 @@ export interface JobDescription {
   };
 }
 
+/**
+ * Kick a MediaConvert job that only produces the small AAC/MP4 audio-only
+ * output used for transcription. Used to backfill captions on videos that
+ * were transcoded before the audio-only group was added to the ladder.
+ *
+ * userMetadata.mode = "audio-only" so the mediaconvert webhook knows to
+ * short-circuit the HLS pin path and just run transcription.
+ */
+export async function startAudioOnlyTranscode(opts: CreateJobOpts): Promise<{ jobId: string }> {
+  const endpoint = process.env.AWS_MEDIACONVERT_ENDPOINT;
+  const roleArn = process.env.AWS_MEDIACONVERT_ROLE_ARN;
+  if (!endpoint || !roleArn) {
+    throw new Error("AWS_MEDIACONVERT_ENDPOINT and AWS_MEDIACONVERT_ROLE_ARN required");
+  }
+  const body = {
+    Role: roleArn,
+    UserMetadata: { videoId: opts.videoId, mode: "audio-only" },
+    Settings: {
+      Inputs: [
+        {
+          FileInput: opts.inputUri,
+          AudioSelectors: { "Audio Selector 1": { DefaultSelection: "DEFAULT" } },
+          VideoSelector: {},
+          TimecodeSource: "ZEROBASED",
+        },
+      ],
+      OutputGroups: [audioOnlyGroup(opts.outputPrefix)],
+    },
+  };
+  const client = aws();
+  const res = await client.fetch(`${endpoint.replace(/\/$/, "")}/2017-08-29/jobs`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`MediaConvert createJob (audio-only) failed [${res.status}]: ${text}`);
+  }
+  const json = (await res.json()) as { job?: { id?: string } };
+  if (!json.job?.id) throw new Error("MediaConvert returned no job id");
+  return { jobId: json.job.id };
+}
+
 /** Fetch the status/details of a MediaConvert job by id. */
 export async function describeJob(jobId: string): Promise<JobDescription> {
   const endpoint = process.env.AWS_MEDIACONVERT_ENDPOINT;
