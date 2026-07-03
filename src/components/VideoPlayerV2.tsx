@@ -25,6 +25,15 @@ interface VideoPlayerV2Props {
    * where the native volume control is easy to miss.
    */
   showTapToUnmute?: boolean;
+  /**
+   * Optional WebVTT captions URL. When provided, a <track kind="captions">
+   * is rendered and enabled by default so the browser shows CC controls.
+   * Must be same-origin (or CORS-enabled) — our /api/stream/:cid proxy is
+   * same-origin.
+   */
+  captionsSrc?: string;
+  captionsLabel?: string;
+  captionsLang?: string;
 }
 
 const QUALITY_KEY = "txc-player-quality";
@@ -49,6 +58,9 @@ export function VideoPlayerV2({
   className,
   showSourceBadge = true,
   showTapToUnmute = false,
+  captionsSrc,
+  captionsLabel = "English",
+  captionsLang = "en",
 }: VideoPlayerV2Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -241,7 +253,17 @@ export function VideoPlayerV2({
         playsInline
         tabIndex={0}
         className={className ?? "w-full h-full bg-black"}
-      />
+      >
+        {captionsSrc && (
+          <track
+            kind="captions"
+            src={captionsSrc}
+            srcLang={captionsLang}
+            label={captionsLabel}
+            default
+          />
+        )}
+      </video>
 
       {showTapToUnmute && isMuted && (
         <button
