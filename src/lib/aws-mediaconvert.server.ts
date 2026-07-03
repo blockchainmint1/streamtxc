@@ -77,6 +77,7 @@ export async function startHlsTranscode(opts: CreateJobOpts): Promise<{ jobId: s
             rendition("360p", 640, 360, 600_000, 64_000),
           ],
         },
+        audioOnlyGroup(opts.outputPrefix),
       ],
     },
   };
