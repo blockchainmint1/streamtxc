@@ -519,7 +519,11 @@ export function S3VideoUpload({
       // user retries — we don't want them uploading 3 GB again.
       let bucket: string;
       let key: string;
-      const pre = await preflightS3({ data: { cid: cids.v1 } }).catch(() => null);
+      pushLog("info", `preflight: checking S3 for existing inputs/${cids.v1}…`);
+      const pre = await preflightS3({ data: { cid: cids.v1 } }).catch((err) => {
+        pushLog("warn", `preflight S3 check failed — will attempt re-upload: ${err instanceof Error ? err.message : String(err)}`);
+        return null;
+      });
       if (pre && pre.exists && pre.size === file.size) {
         bucket = pre.bucket;
         key = pre.key;
@@ -529,6 +533,8 @@ export function S3VideoUpload({
       } else {
         if (pre && pre.exists) {
           pushLog("warn", `S3 has a stale object at inputs/${cids.v1} (${formatBytes(pre.size)}) but size differs — re-uploading`);
+        } else if (pre && !pre.exists) {
+          pushLog("info", `preflight: no existing S3 object for cid ${cids.v1} — fresh upload`);
         }
         const s3 = await getS3Url({ data: { cid: cids.v1, contentType: ct } });
         bucket = s3.bucket;
