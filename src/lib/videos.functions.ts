@@ -371,6 +371,33 @@ export const lookupPinnedCid = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    // Probe the self-hosted IPFS node first — that's where new uploads
+    // land now. If either CID form is already served by our own gateway,
+    // treat it as "pinned" and skip the S3 upload + re-pin.
+    const ownNode = process.env.IPFS_GATEWAY_DOMAIN;
+    const probeSelf = async (cid: string): Promise<boolean> => {
+      if (!ownNode) return false;
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 2000);
+      try {
+        const res = await fetch(`https://${ownNode}/ipfs/${cid}`, {
+          method: "HEAD",
+          signal: ctrl.signal,
+        });
+        return res.ok;
+      } catch {
+        return false;
+      } finally {
+        clearTimeout(t);
+      }
+    };
+    const [selfV1, selfV0] = await Promise.all([
+      probeSelf(data.cidV1),
+      probeSelf(data.cidV0),
+    ]);
+    if (selfV1) return { cid: data.cidV1, version: 1 as const };
+    if (selfV0) return { cid: data.cidV0, version: 0 as const };
+
     const jwt = process.env.PINATA_JWT;
     if (!jwt) return null;
     const probe = async (cid: string): Promise<boolean> => {
