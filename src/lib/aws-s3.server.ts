@@ -71,6 +71,29 @@ export async function listObjects(bucket: string, prefix: string): Promise<strin
   return (await listObjectsWithMeta(bucket, prefix)).map((o) => o.key);
 }
 
+/**
+ * HEAD a single S3 object. Returns null if the object doesn't exist (404),
+ * throws on other errors. Used as a preflight so we skip re-uploading a
+ * multi-GB file when a prior attempt already landed the bytes in S3.
+ */
+export async function headObject(
+  bucket: string,
+  key: string,
+): Promise<{ size: number; contentType: string | null; etag: string | null } | null> {
+  const client = s3Client();
+  const url = `${s3Host(bucket)}/${encodeKey(key)}`;
+  const res = await client.fetch(url, { method: "HEAD" });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`S3 head failed [${res.status}]: ${await res.text().catch(() => "")}`);
+  }
+  return {
+    size: Number(res.headers.get("content-length") ?? 0),
+    contentType: res.headers.get("content-type"),
+    etag: res.headers.get("etag"),
+  };
+}
+
 /** List objects under a prefix with sizes. Useful for filtering out junk/zero-byte files. */
 export async function listObjectsWithMeta(
   bucket: string,
