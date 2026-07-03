@@ -136,9 +136,7 @@ export async function startHlsTranscodeFromInputs(
         // handing it to the transcoder.
         AdvancedInputFilter: "ENABLED",
         AdvancedInputFilterSettings: {
-          Strength: "DEFAULT",
-          AddTexture: "ENABLED",
-          Sharpening: "DEFAULT",
+          Sharpening: "LOW",
         },
       })),
       OutputGroups: [
