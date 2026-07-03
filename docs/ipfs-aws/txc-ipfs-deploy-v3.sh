@@ -465,6 +465,8 @@ YAML
 # ───────────────────────────────────────────────────────────────
 cat > lambda/index.js <<'LAMBDAEOF'
 const { Readable } = require("stream");
+const { pipeline } = require("stream/promises");
+const http = require("http");
 const { createHmac } = require("crypto");
 const { S3Client, GetObjectCommand, ListObjectsV2Command } = require("@aws-sdk/client-s3");
 
@@ -472,6 +474,39 @@ const s3 = new S3Client({});
 const IPFS_API = process.env.IPFS_API;
 const BEARER = process.env.BEARER_TOKEN;
 const PINATA_JWT = process.env.PINATA_JWT || "";
+
+// Stream a request body into kubo with REAL backpressure. Node's global
+// fetch (undici) buffers the request body in memory when the receiver is
+// slower than the sender — for multi-GB S3 → IPFS streams that OOM-kills
+// the runtime (Runtime.OutOfMemory / signal: killed). Core node:http +
+// stream.pipeline() only keeps ~64 KB in flight.
+function postStream(urlStr, bodyIterable, contentType) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(urlStr);
+    const req = http.request(
+      {
+        hostname: u.hostname,
+        port: u.port || 80,
+        path: u.pathname + u.search,
+        method: "POST",
+        headers: { "Content-Type": contentType },
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () =>
+          resolve({ status: res.statusCode || 0, text: Buffer.concat(chunks).toString("utf8") })
+        );
+        res.on("error", reject);
+      }
+    );
+    req.on("error", reject);
+    pipeline(Readable.from(bodyIterable), req).catch((err) => {
+      req.destroy(err);
+      reject(err);
+    });
+  });
+}
 
 exports.handler = async (event) => {
   try {
@@ -492,12 +527,7 @@ exports.handler = async (event) => {
   }
 };
 
-// POST /add — multipart upload of raw bytes straight into kubo. Used by
-// the app for everything that isn't a MediaConvert HLS bundle: thumbnails,
-// JSON metadata, comment bodies, chain-stamp JSON, etc. The request body
-// is multipart/form-data with one or more "file" parts; we forward it
-// verbatim to /api/v0/add and return the resulting CID(s). When >1 part,
-// the caller can ask us to wrap them in a directory via ?wrap=1.
+// POST /add — multipart upload of raw bytes straight into kubo.
 async function addToNode(event) {
   if (!IPFS_API) return resp(503, { error: "IPFS_API not configured" });
   const ct = event.headers?.["content-type"] || event.headers?.["Content-Type"] || "";
@@ -523,8 +553,6 @@ async function addToNode(event) {
   }
   const text = await r.text();
   const entries = text.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
-  // When wrap=true kubo emits a final entry with Name=="" (the wrap dir);
-  // otherwise the root is just the last entry.
   const root = wrap
     ? (entries.find((e) => e.Name === "" || e.Name === "wrap") || entries[entries.length - 1])
     : entries[entries.length - 1];
@@ -570,18 +598,16 @@ async function pinFromS3(body) {
     yield Buffer.from(`--${boundary}--\r\n`);
   }
 
-  const ipfsRes = await fetch(`${IPFS_API}/api/v0/add?wrap-with-directory=true&cid-version=1&raw-leaves=true&pin=true&progress=false`, {
-    method: "POST",
-    body: Readable.from(multipartBody()),
-    duplex: "half",
-    headers: { "Content-Type": `multipart/form-data; boundary=${boundary}` },
-  });
+  const ipfsRes = await postStream(
+    `${IPFS_API}/api/v0/add?wrap-with-directory=true&cid-version=1&raw-leaves=true&pin=true&progress=false&chunker=size-1048576`,
+    multipartBody(),
+    `multipart/form-data; boundary=${boundary}`
+  );
   let result;
-  if (!ipfsRes.ok) {
-    const t = await ipfsRes.text();
-    result = { ok: false, error: "ipfs add failed", status: ipfsRes.status, body: t.slice(0, 1000) };
+  if (ipfsRes.status < 200 || ipfsRes.status >= 300) {
+    result = { ok: false, error: "ipfs add failed", status: ipfsRes.status, body: ipfsRes.text.slice(0, 1000) };
   } else {
-    const text = await ipfsRes.text();
+    const text = ipfsRes.text;
     const entries = text.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
     const root = entries.find((e) => e.Name === "wrap") || entries[entries.length - 1];
     result = {
@@ -646,6 +672,11 @@ async function pinCidOnNode(body) {
   if (!IPFS_API) return resp(503, { error: "IPFS_API not configured" });
   if (!body.cid) return resp(400, { error: "cid required" });
   const url = `${IPFS_API}/api/v0/pin/add?arg=${encodeURIComponent(body.cid)}&recursive=true&progress=false`;
+  // Kubo's /pin/add blocks until the whole DAG is fetched, which can take
+  // minutes for large CIDs and easily exceeds API Gateway's 30s timeout.
+  // Race the request against a short timeout: if it finishes fast, return
+  // the result; otherwise return 202 and let the node keep fetching in the
+  // background (Kubo continues the pin even after the HTTP client drops).
   const controller = new AbortController();
   const SOFT_TIMEOUT_MS = 20000;
   const timer = setTimeout(() => controller.abort(), SOFT_TIMEOUT_MS);
@@ -661,6 +692,7 @@ async function pinCidOnNode(body) {
   } catch (err) {
     clearTimeout(timer);
     if (err && err.name === "AbortError") {
+      // Pin is still in progress on the node. Caller can poll /pin/ls later.
       return resp(202, {
         ok: true,
         queued: true,
