@@ -129,6 +129,17 @@ export async function startHlsTranscodeFromInputs(
         AudioSelectors: { "Audio Selector 1": { DefaultSelection: "DEFAULT" } },
         VideoSelector: {},
         TimecodeSource: "ZEROBASED",
+        // MediaLive-archived .ts segments often lack framerate metadata in
+        // the container PMT, producing MediaConvert error 1040
+        // ("Invalid frame rate: 0/1"). AdvancedInputFilter re-probes the
+        // elementary stream and reconstructs the missing metadata before
+        // handing it to the transcoder.
+        AdvancedInputFilter: "AUTO",
+        AdvancedInputFilterSettings: {
+          Strength: "DEFAULT",
+          AddTexture: "ENABLED",
+          Sharpening: "DEFAULT",
+        },
       })),
       OutputGroups: [
         {
