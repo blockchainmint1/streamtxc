@@ -132,8 +132,13 @@ async function pinFromS3(body) {
     yield Buffer.from(`--${boundary}--\r\n`);
   }
 
+  // IMPORTANT: keep default chunker (256 KiB). The browser-side hasher
+  // (ipfs-only-hash) and Pinata both use size-262144; any override here
+  // makes Kubo return a different file CID for the same bytes, which
+  // desyncs the S3 key (browser CID) from the DB `cid` column (Lambda CID)
+  // and breaks MediaConvert lookups.
   const ipfsRes = await postStream(
-    `${IPFS_API}/api/v0/add?wrap-with-directory=true&cid-version=1&raw-leaves=true&pin=true&progress=false&chunker=size-1048576`,
+    `${IPFS_API}/api/v0/add?wrap-with-directory=true&cid-version=1&raw-leaves=true&pin=true&progress=false`,
     multipartBody(),
     `multipart/form-data; boundary=${boundary}`
   );
