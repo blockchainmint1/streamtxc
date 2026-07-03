@@ -132,18 +132,16 @@ async function pinFromS3(body) {
     yield Buffer.from(`--${boundary}--\r\n`);
   }
 
-  const ipfsRes = await fetch(`${IPFS_API}/api/v0/add?wrap-with-directory=true&cid-version=1&raw-leaves=true&pin=true&progress=false`, {
-    method: "POST",
-    body: Readable.from(multipartBody()),
-    duplex: "half",
-    headers: { "Content-Type": `multipart/form-data; boundary=${boundary}` },
-  });
+  const ipfsRes = await postStream(
+    `${IPFS_API}/api/v0/add?wrap-with-directory=true&cid-version=1&raw-leaves=true&pin=true&progress=false&chunker=size-1048576`,
+    multipartBody(),
+    `multipart/form-data; boundary=${boundary}`
+  );
   let result;
-  if (!ipfsRes.ok) {
-    const t = await ipfsRes.text();
-    result = { ok: false, error: "ipfs add failed", status: ipfsRes.status, body: t.slice(0, 1000) };
+  if (ipfsRes.status < 200 || ipfsRes.status >= 300) {
+    result = { ok: false, error: "ipfs add failed", status: ipfsRes.status, body: ipfsRes.text.slice(0, 1000) };
   } else {
-    const text = await ipfsRes.text();
+    const text = ipfsRes.text;
     const entries = text.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
     const root = entries.find((e) => e.Name === "wrap") || entries[entries.length - 1];
     result = {
