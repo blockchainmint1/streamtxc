@@ -316,7 +316,7 @@ export const archiveLiveStream = createServerFn({ method: "POST" })
 
     const { data: stream, error: sErr } = await supabaseAdmin
       .from("live_streams")
-      .select("id, title, status, archive_status, archive_transcode_job_id, started_at, ended_at")
+      .select("id, title, status, archive_status, archive_transcode_job_id, started_at, ended_at, channel_row_id")
       .eq("id", data.id)
       .maybeSingle();
     if (sErr) throw new Error(sErr.message);
@@ -328,7 +328,17 @@ export const archiveLiveStream = createServerFn({ method: "POST" })
     }
 
     const archiveBucket = process.env.LIVE_ARCHIVE_BUCKET;
-    const archivePrefix = process.env.LIVE_ARCHIVE_PREFIX ?? "txc-live"; // stack name
+    // Prefer the channel-specific prefix (per-user channels write to
+    // `per-user/<slug>/`). Fall back to the shared/admin stack prefix.
+    let archivePrefix = process.env.LIVE_ARCHIVE_PREFIX ?? "txc-live";
+    if (stream.channel_row_id) {
+      const { data: ch } = await supabaseAdmin
+        .from("live_channels")
+        .select("archive_prefix")
+        .eq("id", stream.channel_row_id)
+        .maybeSingle();
+      if (ch?.archive_prefix) archivePrefix = ch.archive_prefix;
+    }
     const outputBucket = process.env.AWS_S3_OUTPUT_BUCKET;
     if (!archiveBucket) throw new Error("LIVE_ARCHIVE_BUCKET not configured");
     if (!outputBucket) throw new Error("AWS_S3_OUTPUT_BUCKET not configured");
@@ -338,7 +348,13 @@ export const archiveLiveStream = createServerFn({ method: "POST" })
     // that haven't expired yet.
     const { listObjects } = await import("./aws-s3.server");
     const allKeys = await listObjects(archiveBucket, archivePrefix);
-    const tsKeys = allKeys.filter((k) => k.endsWith(".ts")).sort();
+    let tsKeys = allKeys.filter((k) => k.endsWith(".ts")).sort();
+    // Fallback: some deployments wrote under different prefixes. Scan the
+    // whole bucket if the primary prefix came up empty.
+    if (tsKeys.length === 0) {
+      const rootKeys = await listObjects(archiveBucket, "");
+      tsKeys = rootKeys.filter((k) => k.endsWith(".ts")).sort();
+    }
     if (tsKeys.length === 0) {
       throw new Error(
         `No archive segments found under s3://${archiveBucket}/${archivePrefix}`,
