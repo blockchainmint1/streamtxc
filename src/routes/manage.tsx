@@ -743,6 +743,11 @@ function ManagePageInner() {
                             hidden={!!v.hidden_at}
                           />
                           <MirrorToSelfNodeButton cid={v.cid} wallet={address!} />
+                          <ForceCaptionsButton
+                            cid={v.cid}
+                            wallet={address!}
+                            hasTranscript={!!v.transcript_cid}
+                          />
                           <EditVideoDialog
                             cid={v.cid}
                             initialTitle={v.title}
