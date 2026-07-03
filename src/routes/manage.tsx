@@ -31,6 +31,7 @@ import {
   verifyBulkExtensionTx,
   setVideoVisibility,
   mirrorOwnToSelfNode,
+  forceBackfillTranscript,
 } from "@/lib/videos.functions";
 import { useWallet, isSignableOwnershipTxcAddress } from "@/lib/wallet";
 import { listAnonUploads, removeAnonUpload, subscribeToAnonUploads } from "@/lib/anon-uploads";
@@ -53,6 +54,7 @@ import {
   CloudUpload,
 } from "lucide-react";
 import { CheckCircle2, Film, Clock, ArrowUp, ArrowDown, ChevronsUpDown } from "lucide-react";
+import { Captions } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationPrefs } from "@/components/NotificationPrefs";
 import { listBugReports } from "@/lib/bug-reports.functions";
