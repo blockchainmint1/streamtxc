@@ -32,6 +32,7 @@ import {
   isTranscodeConfigured,
   getTranscodeStatus,
   getMediaConvertJob,
+  checkS3InputExists,
 } from "@/lib/transcode.functions";
 import {
   pinS3ToIpfs,
@@ -164,6 +165,7 @@ export function S3VideoUpload({
   const patchDraft = useServerFn(patchUploadDraft);
   const getS3Url = useServerFn(getTranscodeUploadUrl);
   const startTx = useServerFn(startTranscode);
+  const preflightS3 = useServerFn(checkS3InputExists);
   const checkConfig = useServerFn(isTranscodeConfigured);
   const checkStatus = useServerFn(getTranscodeStatus);
   const describeJob = useServerFn(getMediaConvertJob);
