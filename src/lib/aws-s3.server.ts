@@ -68,8 +68,16 @@ export async function s3PutObject(opts: {
 
 /** List object keys under a prefix. Returns full keys (not stripped of prefix). */
 export async function listObjects(bucket: string, prefix: string): Promise<string[]> {
+  return (await listObjectsWithMeta(bucket, prefix)).map((o) => o.key);
+}
+
+/** List objects under a prefix with sizes. Useful for filtering out junk/zero-byte files. */
+export async function listObjectsWithMeta(
+  bucket: string,
+  prefix: string,
+): Promise<{ key: string; size: number }[]> {
   const client = s3Client();
-  const keys: string[] = [];
+  const out: { key: string; size: number }[] = [];
   let continuationToken: string | undefined;
   do {
     const url = new URL(s3Host(bucket));
@@ -81,12 +89,16 @@ export async function listObjects(bucket: string, prefix: string): Promise<strin
       throw new Error(`S3 list failed [${res.status}]: ${await res.text().catch(() => "")}`);
     }
     const xml = await res.text();
-    for (const m of xml.matchAll(/<Key>([^<]+)<\/Key>/g)) keys.push(m[1]);
+    for (const m of xml.matchAll(/<Contents>[\s\S]*?<\/Contents>/g)) {
+      const key = m[0].match(/<Key>([^<]+)<\/Key>/)?.[1];
+      const size = Number(m[0].match(/<Size>([^<]+)<\/Size>/)?.[1] ?? 0);
+      if (key) out.push({ key, size });
+    }
     const tokenMatch = xml.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/);
     const truncated = /<IsTruncated>true<\/IsTruncated>/.test(xml);
     continuationToken = truncated ? tokenMatch?.[1] : undefined;
   } while (continuationToken);
-  return keys;
+  return out;
 }
 
 /** Fetch an object's bytes. Use for small text files (playlists). */

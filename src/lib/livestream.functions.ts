@@ -346,14 +346,20 @@ export const archiveLiveStream = createServerFn({ method: "POST" })
     // List .ts segments MediaLive wrote for this stream. We filter by the
     // stream's time window to avoid grabbing segments from earlier sessions
     // that haven't expired yet.
-    const { listObjects } = await import("./aws-s3.server");
-    const allKeys = await listObjects(archiveBucket, archivePrefix);
-    let tsKeys = allKeys.filter((k) => k.endsWith(".ts")).sort();
+    // Filter out zero-byte/tiny junk segments (MediaLive leaves .tmp.zero
+    // files and occasionally sub-second stubs). MediaConvert fails with
+    // "Invalid frame rate: 0/1" if it's fed a segment with no real video.
+    const MIN_SEGMENT_BYTES = 1_000_000; // 1 MB
+    const isRealSegment = (o: { key: string; size: number }) =>
+      o.key.endsWith(".ts") && o.size >= MIN_SEGMENT_BYTES;
+    const { listObjectsWithMeta } = await import("./aws-s3.server");
+    const allObjs = await listObjectsWithMeta(archiveBucket, archivePrefix);
+    let tsKeys = allObjs.filter(isRealSegment).map((o) => o.key).sort();
     // Fallback: some deployments wrote under different prefixes. Scan the
     // whole bucket if the primary prefix came up empty.
     if (tsKeys.length === 0) {
-      const rootKeys = await listObjects(archiveBucket, "");
-      tsKeys = rootKeys.filter((k) => k.endsWith(".ts")).sort();
+      const rootObjs = await listObjectsWithMeta(archiveBucket, "");
+      tsKeys = rootObjs.filter(isRealSegment).map((o) => o.key).sort();
     }
     if (tsKeys.length === 0) {
       throw new Error(
