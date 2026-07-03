@@ -418,8 +418,21 @@ export function S3VideoUpload({
       setStage("prepare", "done", `cid: ${cids.v1.slice(0, 14)}…`);
 
       const hit = await lookupCid({ data: { cidV1: cids.v1, cidV0: cids.v0 } });
-      if (hit) pushLog("warn", `duplicate: video already exists with cid ${hit.cid}`);
-      else pushLog("ok", "no existing video found — fresh upload");
+      if (hit) {
+        pushLog("warn", `duplicate: video already exists with cid ${hit.cid} — skipping upload`);
+        setDuplicate({ cid: hit.cid, ownerWallet: "", title: "", createdAt: "", txHash: null });
+        setStage("s3-upload", "done", "skipped — already exists");
+        setStage("pin-ipfs", "done", "skipped — already exists");
+        setStage("register", "done", "skipped — already exists");
+        setStage("transcode", "done", "skipped — already exists");
+        setStage("pin-hls", "done", "skipped — already exists");
+        toast.info("This exact file is already on the site — opening the existing video.");
+        setTimeout(() => {
+          void navigate({ to: destination === "v" ? "/v/$cid" : "/v/$cid", params: { cid: hit.cid } });
+        }, 1500);
+        return;
+      }
+      pushLog("ok", "no existing video found — fresh upload");
 
       setStage("s3-upload", "active");
       const ct = file.type || "video/mp4";
