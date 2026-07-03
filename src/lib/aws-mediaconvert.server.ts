@@ -191,6 +191,14 @@ function rendition(
           GopSize: 60,
           GopSizeUnits: "FRAMES",
           CodecProfile: "MAIN",
+          // Force output framerate. Some MediaLive-archived .ts segments
+          // don't expose framerate metadata in a way MediaConvert can parse,
+          // producing error 1040 ("Frame rate is set to follow, but there
+          // is no frame rate information in the input stream info"). Our
+          // MediaLive channels encode at 30 fps, so specify it explicitly.
+          FramerateControl: "SPECIFIED",
+          FramerateNumerator: 30,
+          FramerateDenominator: 1,
         },
       },
     },
