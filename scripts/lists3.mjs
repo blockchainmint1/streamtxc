@@ -11,7 +11,7 @@ const all = [];
 do {
   const url = new URL(`https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/`);
   url.searchParams.set("list-type","2");
-  url.searchParams.set("prefix","txc-live");
+  // no prefix
   if (token) url.searchParams.set("continuation-token", token);
   const r = await aws.fetch(url);
   const t = await r.text();
