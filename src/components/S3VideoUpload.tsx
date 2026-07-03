@@ -420,7 +420,7 @@ export function S3VideoUpload({
       const hit = await lookupCid({ data: { cidV1: cids.v1, cidV0: cids.v0 } });
       if (hit) {
         pushLog("warn", `duplicate: video already exists with cid ${hit.cid} — skipping upload`);
-        setDuplicate({ cid: hit.cid, title: hit.title ?? null });
+        setDuplicate({ cid: hit.cid, ownerWallet: "", title: "", createdAt: "", txHash: null });
         setStage("s3-upload", "done", "skipped — already exists");
         setStage("pin-ipfs", "done", "skipped — already exists");
         setStage("register", "done", "skipped — already exists");
