@@ -84,6 +84,14 @@ export async function headObject(
   const url = `${s3Host(bucket)}/${encodeKey(key)}`;
   const res = await client.fetch(url, { method: "HEAD" });
   if (res.status === 404) return null;
+  if (res.status === 403) {
+    // Without s3:ListBucket, S3 returns 403 (not 404) for missing keys too —
+    // so a 403 here means the IAM user lacks GetObject/ListBucket on this
+    // bucket and resume-detection cannot work until the policy is widened.
+    throw new Error(
+      `S3 HEAD denied (403) on ${bucket}/${key} — the app's IAM user needs s3:GetObject + s3:ListBucket on this bucket for upload-resume detection`,
+    );
+  }
   if (!res.ok) {
     throw new Error(`S3 head failed [${res.status}]: ${await res.text().catch(() => "")}`);
   }
