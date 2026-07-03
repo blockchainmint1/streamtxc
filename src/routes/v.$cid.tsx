@@ -224,6 +224,11 @@ function WatchPage() {
               <VideoPlayerV2
                 src={streamUrl}
                 poster={ipfsThumbUrl(video.thumbnail_cid)}
+                captionsSrc={
+                  video.transcript_cid
+                    ? `/api/stream/${video.transcript_cid}`
+                    : undefined
+                }
               />
             </div>
             <h1 className="text-2xl font-bold tracking-tight">{video.title}</h1>
