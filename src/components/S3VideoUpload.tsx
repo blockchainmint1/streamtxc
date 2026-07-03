@@ -423,14 +423,34 @@ export function S3VideoUpload({
 
       setStage("s3-upload", "active");
       const ct = file.type || "video/mp4";
-      const { url: s3Url, bucket, key } = await getS3Url({ data: { cid: cids.v1, contentType: ct } });
-      pushLog("ok", `presigned url received · ${bucket}/${key}`);
-      pushLog("info", `uploading ${formatBytes(file.size)}…`);
-      const tUp = Date.now();
-      await putWithProgress(s3Url, file, ct, (p) => setS3Progress(p));
-      const upMs = Date.now() - tUp;
-      pushLog("ok", `S3 PUT complete in ${upMs}ms`);
-      setStage("s3-upload", "done");
+      // Preflight: if a prior attempt already landed the bytes in S3,
+      // skip the re-upload entirely and jump straight to pinning. This
+      // is the common case when a multi-GB pin was interrupted and the
+      // user retries — we don't want them uploading 3 GB again.
+      let bucket: string;
+      let key: string;
+      const pre = await preflightS3({ data: { cid: cids.v1 } }).catch(() => null);
+      if (pre && pre.exists && pre.size === file.size) {
+        bucket = pre.bucket;
+        key = pre.key;
+        pushLog("ok", `S3 already has this file · ${bucket}/${key} · ${formatBytes(pre.size)} — skipping re-upload`);
+        setS3Progress(100);
+        setStage("s3-upload", "done", "resumed from S3");
+      } else {
+        if (pre && pre.exists) {
+          pushLog("warn", `S3 has a stale object at inputs/${cids.v1} (${formatBytes(pre.size)}) but size differs — re-uploading`);
+        }
+        const s3 = await getS3Url({ data: { cid: cids.v1, contentType: ct } });
+        bucket = s3.bucket;
+        key = s3.key;
+        pushLog("ok", `presigned url received · ${bucket}/${key}`);
+        pushLog("info", `uploading ${formatBytes(file.size)}…`);
+        const tUp = Date.now();
+        await putWithProgress(s3.url, file, ct, (p) => setS3Progress(p));
+        const upMs = Date.now() - tUp;
+        pushLog("ok", `S3 PUT complete in ${upMs}ms`);
+        setStage("s3-upload", "done");
+      }
 
       setStage("pin-ipfs", "active");
       const pinned = await pinFromS3({ data: { bucket, keys: [key] } });
