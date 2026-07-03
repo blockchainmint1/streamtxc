@@ -417,22 +417,52 @@ export function S3VideoUpload({
       pushLog("ok", `cid v1: ${cids.v1}`);
       setStage("prepare", "done", `cid: ${cids.v1.slice(0, 14)}…`);
 
+      // First check our DB — is there already a video row for this CID? That
+      // catches both "already pinned + transcoded" AND "stuck mid-transcode"
+      // cases so the user doesn't waste time re-uploading multi-GB bytes.
+      for (const probeCid of [cids.v1, cids.v0]) {
+        const row = await checkStatus({ data: { cid: probeCid } }).catch(() => null);
+        if (!row) continue;
+        const st = row.transcode_status;
+        pushLog("warn", `found existing video row for cid ${probeCid} · status: ${st ?? "unknown"}`);
+        if (st === "complete" || st === "ready") {
+          setDuplicate({ cid: probeCid, ownerWallet: "", title: "", createdAt: "", txHash: null });
+          setStage("s3-upload", "done", "skipped — already exists");
+          setStage("pin-ipfs", "done", "skipped — already exists");
+          setStage("register", "done", "skipped — already exists");
+          setStage("transcode", "done", "skipped — already exists");
+          setStage("pin-hls", "done", "skipped — already exists");
+          toast.info("This exact file is already on the site — opening the existing video.");
+          setTimeout(() => {
+            void navigate({ to: destination === "v" ? "/v/$cid" : "/v/$cid", params: { cid: probeCid } });
+          }, 1500);
+          return;
+        }
+        if (st === "processing" || st === "pending" || st == null) {
+          // Row exists but transcode hasn't finished — resume by polling.
+          pushLog("info", `resuming existing job — skipping upload/pin, will poll transcode status`);
+          setStage("s3-upload", "done", "skipped — already uploaded");
+          setStage("pin-ipfs", "done", "skipped — already pinned");
+          setStage("register", "done", "skipped — already registered");
+          setStage("transcode", "active", row.transcode_job_id ? `job ${row.transcode_job_id}` : "polling…");
+          setStage("pin-hls", "pending", "queued — will start after transcode finishes");
+          setResultCid(probeCid);
+          saveInflight({ cid: probeCid, jobId: row.transcode_job_id ?? undefined, startedAt: Date.now() });
+          toast.info("This file is already uploaded — resuming its transcode job.");
+          return;
+        }
+        if (st === "failed") {
+          pushLog("warn", `previous transcode failed (${row.transcode_error ?? "unknown"}) — will retry the pipeline`);
+          // Fall through to Pinata check + normal upload path
+        }
+      }
+
       const hit = await lookupCid({ data: { cidV1: cids.v1, cidV0: cids.v0 } });
       if (hit) {
-        pushLog("warn", `duplicate: video already exists with cid ${hit.cid} — skipping upload`);
-        setDuplicate({ cid: hit.cid, ownerWallet: "", title: "", createdAt: "", txHash: null });
-        setStage("s3-upload", "done", "skipped — already exists");
-        setStage("pin-ipfs", "done", "skipped — already exists");
-        setStage("register", "done", "skipped — already exists");
-        setStage("transcode", "done", "skipped — already exists");
-        setStage("pin-hls", "done", "skipped — already exists");
-        toast.info("This exact file is already on the site — opening the existing video.");
-        setTimeout(() => {
-          void navigate({ to: destination === "v" ? "/v/$cid" : "/v/$cid", params: { cid: hit.cid } });
-        }, 1500);
-        return;
+        pushLog("ok", `already pinned on IPFS as ${hit.cid} — skipping S3 upload + pin`);
+      } else {
+        pushLog("ok", "no existing video found — fresh upload");
       }
-      pushLog("ok", "no existing video found — fresh upload");
 
       setStage("s3-upload", "active");
       const ct = file.type || "video/mp4";
