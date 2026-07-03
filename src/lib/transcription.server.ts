@@ -3,16 +3,16 @@
 // /audio/transcriptions endpoint, pin the resulting WebVTT to IPFS, and
 // stamp the transcript CID on the videos row.
 //
-// Only runs for videos where source='zoom' to keep transcription credits
-// off non-Zoom uploads. Idempotent: skips work if transcript_cid is set.
+// Runs for every finished transcode so every video gets closed
+// captions. Idempotent: skips work if transcript_cid is already set.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getObjectBlob } from "./aws-s3.server";
 import { pinFileToIPFS } from "./pinata.server";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1";
-const TRANSCRIBE_MODEL = "openai/whisper-1";
-const MAX_AUDIO_BYTES = 25 * 1024 * 1024; // OpenAI whisper-1 hard limit
+const TRANSCRIBE_MODEL = "openai/gpt-4o-mini-transcribe";
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024; // OpenAI transcription hard limit
 
 export interface TranscribeResult {
   transcriptText: string;
@@ -25,17 +25,16 @@ export interface TranscribeResult {
  * video isn't a Zoom import or already has a transcript. Returns null
  * when skipped.
  */
-export async function maybeTranscribeZoomVideo(
+export async function maybeTranscribeVideo(
   cid: string,
 ): Promise<TranscribeResult | null> {
   const { data: row, error } = await supabaseAdmin
     .from("videos")
-    .select("cid, source, transcript_cid")
+    .select("cid, transcript_cid")
     .eq("cid", cid)
     .maybeSingle();
   if (error) throw error;
   if (!row) return null;
-  if (row.source !== "zoom") return null;
   if (row.transcript_cid) return null;
 
   const key = await pickAudioKey(cid);

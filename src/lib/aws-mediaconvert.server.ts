@@ -77,6 +77,7 @@ export async function startHlsTranscode(opts: CreateJobOpts): Promise<{ jobId: s
             rendition("360p", 640, 360, 600_000, 64_000),
           ],
         },
+        audioOnlyGroup(opts.outputPrefix),
       ],
     },
   };
@@ -225,6 +226,45 @@ function rendition(
       },
     ],
     ContainerSettings: { Container: "M3U8", M3u8Settings: {} },
+  };
+}
+
+/**
+ * Audio-only output group. Produces a single small AAC/MP4 file at
+ * `<outputPrefix as audio/…>source.mp4` (e.g. audio/<cid>/source.mp4)
+ * — used by the transcription pipeline to feed a compact audio blob
+ * into the OpenAI-compatible /audio/transcriptions endpoint.
+ */
+function audioOnlyGroup(hlsPrefix: string) {
+  // hlsPrefix looks like s3://bucket/hls/<id>/ — swap for audio/
+  const audioPrefix = hlsPrefix.replace(/\/hls\//, "/audio/");
+  return {
+    Name: "Audio Only",
+    OutputGroupSettings: {
+      Type: "FILE_GROUP_SETTINGS",
+      FileGroupSettings: { Destination: audioPrefix },
+    },
+    Outputs: [
+      {
+        NameModifier: "source",
+        ContainerSettings: {
+          Container: "MP4",
+          Mp4Settings: { CslgAtom: "INCLUDE", FreeSpaceBox: "EXCLUDE", MoovPlacement: "PROGRESSIVE_DOWNLOAD" },
+        },
+        AudioDescriptions: [
+          {
+            CodecSettings: {
+              Codec: "AAC",
+              AacSettings: {
+                Bitrate: 64_000,
+                CodingMode: "CODING_MODE_2_0",
+                SampleRate: 44_100,
+              },
+            },
+          },
+        ],
+      },
+    ],
   };
 }
 
