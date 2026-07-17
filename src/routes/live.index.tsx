@@ -130,7 +130,7 @@ function LiveCard({ stream }: { stream: Stream }) {
       className="group border border-border rounded-sm bg-card overflow-hidden hover:border-primary transition-colors"
     >
       <div className="aspect-video bg-black relative">
-        {stream.hls_url ? (
+        {stream.hls_url && stream.status === "live" ? (
           <LivePreview src={stream.hls_url} poster={thumb ?? undefined} />
         ) : thumb ? (
           <img src={thumb} alt="" className="w-full h-full object-cover" loading="lazy" />
