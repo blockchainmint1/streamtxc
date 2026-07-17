@@ -57,7 +57,7 @@ function LiveEmbedPage() {
       {loaded && !stream && (
         <div className="text-white/60 font-mono text-sm">Stream not found</div>
       )}
-      {stream && stream.hls_url ? (
+      {stream && stream.hls_url && stream.status === "live" ? (
         <VideoPlayerV2
           src={stream.hls_url}
           autoPlay={autoplay}
@@ -68,7 +68,11 @@ function LiveEmbedPage() {
         />
       ) : stream ? (
         <div className="text-white/60 font-mono text-sm text-center px-4">
-          {stream.status === "ended" ? "Stream has ended" : "Waiting for stream…"}
+          {stream.status === "ended"
+            ? "Stream has ended"
+            : stream.status === "starting"
+              ? "Starting soon…"
+              : "Waiting for stream…"}
         </div>
       ) : null}
     </div>
