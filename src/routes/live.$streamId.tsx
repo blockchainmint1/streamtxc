@@ -110,7 +110,7 @@ function LiveStreamPage() {
           <div className="grid lg:grid-cols-[1fr_360px] gap-6">
             <div>
               <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden">
-                {stream.hls_url ? (
+                {stream.hls_url && stream.status === "live" ? (
                   <VideoPlayerV2
                     src={stream.hls_url}
                     autoPlay
@@ -121,7 +121,11 @@ function LiveStreamPage() {
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-muted-foreground font-mono text-sm">
-                    Waiting for stream URL…
+                    {stream.status === "ended"
+                      ? "Stream ended."
+                      : stream.status === "starting"
+                        ? "Starting soon — waiting for the broadcaster…"
+                        : "Waiting for stream URL…"}
                   </div>
                 )}
               </div>
