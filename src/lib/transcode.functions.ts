@@ -68,10 +68,6 @@ export const kickoffHlsFromCid = createServerFn({ method: "POST" })
     }
   });
 
-export const getPinataGateway = createServerFn({ method: "GET" }).handler(
-  async () => ({ gateway: process.env.PINATA_GATEWAY_DOMAIN ?? null }),
-);
-
 export const getTranscodeUploadUrl = createServerFn({ method: "POST" })
   .inputValidator((d: { cid: string; contentType: string }) => {
     if (!d.cid || d.cid.length > 200) throw new Error("Invalid cid");
