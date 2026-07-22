@@ -39,6 +39,7 @@ function EmbedByWallet() {
           className="w-full h-full"
           showSourceBadge={false}
           showTapToUnmute
+          isLive
         />
       ) : !q.isLoading ? (
         <div className="text-center px-4">

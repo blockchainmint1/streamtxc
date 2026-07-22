@@ -118,6 +118,7 @@ function LiveStreamPage() {
                     className="w-full h-full"
                     showSourceBadge={false}
                     showTapToUnmute
+                    isLive
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-muted-foreground font-mono text-sm">

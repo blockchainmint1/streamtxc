@@ -34,6 +34,12 @@ interface VideoPlayerV2Props {
   captionsSrc?: string;
   captionsLabel?: string;
   captionsLang?: string;
+  /**
+   * When true, snap playback to the live edge on load. Prevents replaying
+   * archived segments from an EVENT-type HLS manifest (MediaPackage retains
+   * prior session history in the same endpoint).
+   */
+  isLive?: boolean;
 }
 
 const QUALITY_KEY = "txc-player-quality";
@@ -61,6 +67,7 @@ export function VideoPlayerV2({
   captionsSrc,
   captionsLabel = "English",
   captionsLang = "en",
+  isLive = false,
 }: VideoPlayerV2Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -154,7 +161,30 @@ export function VideoPlayerV2({
       video.addEventListener("loadedmetadata", onMeta);
     }
 
+    // Live streams: jump to the live edge whenever the seekable window
+    // grows, so we never replay stale segments left in the manifest from a
+    // previous session.
+    let snapToLive: (() => void) | null = null;
+    if (isLive) {
+      snapToLive = () => {
+        try {
+          if (video.seekable && video.seekable.length > 0) {
+            const end = video.seekable.end(video.seekable.length - 1);
+            if (isFinite(end) && end - video.currentTime > 3) {
+              video.currentTime = Math.max(0, end - 1);
+            }
+          }
+        } catch {}
+      };
+      video.addEventListener("loadedmetadata", snapToLive);
+      video.addEventListener("durationchange", snapToLive);
+    }
+
     return () => {
+      if (snapToLive) {
+        video.removeEventListener("loadedmetadata", snapToLive);
+        video.removeEventListener("durationchange", snapToLive);
+      }
       if (hls) hls.destroy();
       hlsRef.current = null;
     };
