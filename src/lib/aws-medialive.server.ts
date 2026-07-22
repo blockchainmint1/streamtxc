@@ -108,10 +108,11 @@ export async function createRtmpInput(args: {
   streamName: string; // e.g. `wallet-abc123/primary`
   securityGroupId: string;
 }): Promise<{ inputId: string; destinations: string[] }> {
+  const sg = await ensureInputSecurityGroup(args.securityGroupId);
   const raw = await call("POST", `/prod/inputs`, {
     name: args.name,
     type: "RTMP_PUSH",
-    inputSecurityGroups: [args.securityGroupId],
+    inputSecurityGroups: [sg],
     destinations: [{ streamName: args.streamName }],
     requestId: `input-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
   });
@@ -120,6 +121,40 @@ export async function createRtmpInput(args: {
     ? input.destinations.map((d: any) => String(d?.url ?? "")).filter(Boolean)
     : [];
   return { inputId: String(input?.id), destinations };
+}
+
+// Resolves the configured InputSecurityGroup id; if it's missing or invalid,
+// finds an existing open (0.0.0.0/0) SG or creates a new one so provisioning
+// keeps working even after AWS SGs get manually deleted.
+export async function ensureInputSecurityGroup(preferredId?: string): Promise<string> {
+  if (preferredId) {
+    try {
+      await call("GET", `/prod/inputSecurityGroups/${preferredId}`);
+      return preferredId;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/not found|404/i.test(msg)) throw err;
+      console.warn(`[medialive] InputSecurityGroup ${preferredId} not found; falling back`);
+    }
+  }
+  try {
+    const list = await call("GET", `/prod/inputSecurityGroups`);
+    const groups: any[] = Array.isArray(list?.inputSecurityGroups) ? list.inputSecurityGroups : [];
+    const open = groups.find((g) =>
+      Array.isArray(g?.whitelistRules) &&
+      g.whitelistRules.some((r: any) => String(r?.cidr) === "0.0.0.0/0"),
+    );
+    if (open?.id) return String(open.id);
+  } catch {
+    // fall through to create
+  }
+  const created = await call("POST", `/prod/inputSecurityGroups`, {
+    whitelistRules: [{ cidr: "0.0.0.0/0" }],
+  });
+  const sg = created?.securityGroup ?? created;
+  const id = String(sg?.id ?? "");
+  if (!id) throw new Error("Failed to create MediaLive InputSecurityGroup");
+  return id;
 }
 
 export async function deleteInput(inputId: string) {
