@@ -113,6 +113,7 @@ export async function createRtmpInput(args: {
     type: "RTMP_PUSH",
     inputSecurityGroups: [args.securityGroupId],
     destinations: [{ streamName: args.streamName }],
+    requestId: `input-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
   });
   const input = raw?.input ?? raw;
   const destinations = Array.isArray(input?.destinations)
