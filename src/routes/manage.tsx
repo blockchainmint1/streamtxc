@@ -1388,7 +1388,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   useEffect(() => {
     if (!isAdmin) return;
     let cancelled = false;
-    rtmpCfg({ data: { wallet } })
+    rtmpCfg()
       .then((r) => !cancelled && setRtmpEndpoints(r.endpoints ?? []))
       .catch(() => !cancelled && setRtmpEndpoints([]));
     return () => {
@@ -1399,12 +1399,12 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   useEffect(() => {
     if (!isAdmin) return;
     let cancelled = false;
-    describe({ data: { wallet } })
+    describe()
       .then((r) => !cancelled && setChannelState(r.state))
       .catch(() => !cancelled && setChannelState("unknown"));
     const iv = setInterval(async () => {
       try {
-        const r = await describe({ data: { wallet } });
+        const r = await describe();
         if (!cancelled) setChannelState(r.state);
       } catch {}
     }, 15_000);
@@ -1419,7 +1419,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
     let cancelled = false;
     const probe = async () => {
       try {
-        const r = await signalHealth({ data: { wallet } });
+        const r = await signalHealth();
         if (cancelled) return;
         if ("ok" in r && r.ok) {
           setSignal({
@@ -1454,7 +1454,6 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
     try {
       await create({
         data: {
-          wallet,
           title: title.trim(),
           description: description.trim() || null,
           simulcast_youtube_url: ytUrl.trim() || null,
@@ -1479,7 +1478,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   async function handleStart(id: string) {
     setBusy(true);
     try {
-      await start({ data: { wallet, id } });
+      await start({ data: { id } });
       toast.success("Channel starting — StreamYard should push RTMP now");
       refetch();
     } catch (err) {
@@ -1492,7 +1491,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   async function handleMarkLive(id: string) {
     setBusy(true);
     try {
-      await markRunning({ data: { wallet, id } });
+      await markRunning({ data: { id } });
       toast.success("Marked LIVE — banner & badge now visible to viewers");
       refetch();
     } finally {
@@ -1504,7 +1503,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
     if (!confirm("Stop this stream? MediaLive will shut down.")) return;
     setBusy(true);
     try {
-      await stop({ data: { wallet, id } });
+      await stop({ data: { id } });
       toast.success("Stream stopped");
       refetch();
     } catch (err) {
@@ -1523,7 +1522,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
     )) return;
     setBusy(true);
     try {
-      const r = await archive({ data: { wallet, id } });
+      const r = await archive({ data: { id } });
       toast.success(
         r.alreadyStarted
           ? `Archive already ${r.status}`
@@ -1540,7 +1539,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   async function handleSkipArchive(id: string) {
     setBusy(true);
     try {
-      await skipArchive({ data: { wallet, id } });
+      await skipArchive({ data: { id } });
       refetch();
     } finally {
       setBusy(false);
