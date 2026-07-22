@@ -186,12 +186,29 @@ function LivePreview({ src, poster }: { src: string; poster?: string }) {
       video.src = src;
     }
 
-    const tryPlay = () => video.play().catch(() => {});
+    // Snap to the live edge so we never replay archived segments from an
+    // EVENT-type MediaPackage manifest (which retains prior session history).
+    const snapToLive = () => {
+      try {
+        if (video.seekable && video.seekable.length > 0) {
+          const end = video.seekable.end(video.seekable.length - 1);
+          if (isFinite(end) && end - video.currentTime > 2) {
+            video.currentTime = Math.max(0, end - 1);
+          }
+        }
+      } catch {}
+    };
+    const tryPlay = () => {
+      snapToLive();
+      video.play().catch(() => {});
+    };
     video.addEventListener("loadedmetadata", tryPlay);
+    video.addEventListener("durationchange", snapToLive);
     tryPlay();
 
     return () => {
       video.removeEventListener("loadedmetadata", tryPlay);
+      video.removeEventListener("durationchange", snapToLive);
       if (hls) hls.destroy();
       video.removeAttribute("src");
       video.load();
