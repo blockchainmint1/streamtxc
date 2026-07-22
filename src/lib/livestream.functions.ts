@@ -1,10 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireWalletSession } from "./wallet-auth.functions";
 
 const ADMIN_WALLET = "TeiqbqMxQG4JrDfrzdvTZcqhhai8KT5JTc";
 
-function isAdmin(wallet: string | null | undefined) {
-  return !!wallet && wallet === ADMIN_WALLET;
+function assertAdmin(wallet: string | null | undefined) {
+  if (!wallet || wallet !== ADMIN_WALLET) throw new Error("Forbidden");
 }
 
 // ---------- Public reads ----------
@@ -76,7 +77,6 @@ export const postLiveChat = createServerFn({ method: "POST" })
 // ---------- Admin: create / update / start / stop ----------
 
 const CreateSchema = z.object({
-  wallet: z.string(),
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().max(2000).optional().nullable(),
   thumbnail_cid: z.string().trim().max(120).optional().nullable(),
@@ -87,9 +87,10 @@ const CreateSchema = z.object({
 });
 
 export const createLiveStream = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input: unknown) => CreateSchema.parse(input))
-  .handler(async ({ data }) => {
-    if (!isAdmin(data.wallet)) throw new Error("Forbidden");
+  .handler(async ({ data, context }) => {
+    assertAdmin(context.wallet);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const hls = process.env.LIVE_HLS_URL ?? null;
     const channel = process.env.MEDIALIVE_CHANNEL_ID ?? null;
@@ -103,7 +104,7 @@ export const createLiveStream = createServerFn({ method: "POST" })
         simulcast_youtube_url: data.simulcast_youtube_url || null,
         simulcast_twitter_url: data.simulcast_twitter_url || null,
         simulcast_facebook_url: data.simulcast_facebook_url || null,
-        owner_wallet: data.wallet,
+        owner_wallet: context.wallet,
         medialive_channel_id: channel,
         hls_url: hls,
         status: "scheduled",
@@ -115,7 +116,6 @@ export const createLiveStream = createServerFn({ method: "POST" })
   });
 
 const UpdateSchema = z.object({
-  wallet: z.string(),
   id: z.string().uuid(),
   patch: z.object({
     title: z.string().trim().min(1).max(200).optional(),
@@ -129,9 +129,10 @@ const UpdateSchema = z.object({
 });
 
 export const updateLiveStream = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input: unknown) => UpdateSchema.parse(input))
-  .handler(async ({ data }) => {
-    if (!isAdmin(data.wallet)) throw new Error("Forbidden");
+  .handler(async ({ data, context }) => {
+    assertAdmin(context.wallet);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("live_streams")
@@ -141,12 +142,13 @@ export const updateLiveStream = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-const IdSchema = z.object({ wallet: z.string(), id: z.string().uuid() });
+const IdSchema = z.object({ id: z.string().uuid() });
 
 export const startLiveStream = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input: unknown) => IdSchema.parse(input))
-  .handler(async ({ data }) => {
-    if (!isAdmin(data.wallet)) throw new Error("Forbidden");
+  .handler(async ({ data, context }) => {
+    assertAdmin(context.wallet);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { startChannel, describeChannel } = await import("./aws-medialive.server");
 
@@ -184,9 +186,10 @@ export const startLiveStream = createServerFn({ method: "POST" })
   });
 
 export const markLiveStreamRunning = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input: unknown) => IdSchema.parse(input))
-  .handler(async ({ data }) => {
-    if (!isAdmin(data.wallet)) throw new Error("Forbidden");
+  .handler(async ({ data, context }) => {
+    assertAdmin(context.wallet);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("live_streams")
@@ -197,9 +200,10 @@ export const markLiveStreamRunning = createServerFn({ method: "POST" })
   });
 
 export const stopLiveStream = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input: unknown) => IdSchema.parse(input))
-  .handler(async ({ data }) => {
-    if (!isAdmin(data.wallet)) throw new Error("Forbidden");
+  .handler(async ({ data, context }) => {
+    assertAdmin(context.wallet);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { stopChannel } = await import("./aws-medialive.server");
     try {
@@ -216,9 +220,9 @@ export const stopLiveStream = createServerFn({ method: "POST" })
   });
 
 export const describeMediaLiveChannel = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => z.object({ wallet: z.string() }).parse(input))
-  .handler(async ({ data }) => {
-    if (!isAdmin(data.wallet)) throw new Error("Forbidden");
+  .middleware([requireWalletSession])
+  .handler(async ({ context }) => {
+    assertAdmin(context.wallet);
     const { describeChannel } = await import("./aws-medialive.server");
     const info = await describeChannel();
     return { state: info.state };
@@ -232,9 +236,9 @@ export const describeMediaLiveChannel = createServerFn({ method: "POST" })
 // number increments every ~4s. This is the fastest way to diagnose "channel
 // says RUNNING but /live is a spinner".
 export const getLiveSignalHealth = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => z.object({ wallet: z.string() }).parse(input))
-  .handler(async ({ data }) => {
-    if (!isAdmin(data.wallet)) throw new Error("Forbidden");
+  .middleware([requireWalletSession])
+  .handler(async ({ context }) => {
+    assertAdmin(context.wallet);
     const hls = process.env.LIVE_HLS_URL;
     if (!hls) return { ok: false, reason: "LIVE_HLS_URL not configured" as const };
     try {
@@ -262,9 +266,9 @@ export const getLiveSignalHealth = createServerFn({ method: "POST" })
 // already split into a StreamYard-friendly Server URL + Stream Key pair.
 // StreamYard's "Server URL" is `rtmp://<ip>:1935/<app>` and "Stream Key" is `<streamName>`.
 export const getRtmpConfig = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => z.object({ wallet: z.string() }).parse(input))
-  .handler(async ({ data }) => {
-    if (!isAdmin(data.wallet)) throw new Error("Forbidden");
+  .middleware([requireWalletSession])
+  .handler(async ({ context }) => {
+    assertAdmin(context.wallet);
     const { describeInput } = await import("./aws-medialive.server");
     let destinations: string[] = [];
     try {
@@ -309,9 +313,10 @@ export const getRtmpConfig = createServerFn({ method: "POST" })
 // still expires from S3 on its own.
 
 export const archiveLiveStream = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input: unknown) => IdSchema.parse(input))
-  .handler(async ({ data }) => {
-    if (!isAdmin(data.wallet)) throw new Error("Forbidden");
+  .handler(async ({ data, context }) => {
+    assertAdmin(context.wallet);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: stream, error: sErr } = await supabaseAdmin
@@ -413,9 +418,10 @@ export const archiveLiveStream = createServerFn({ method: "POST" })
   });
 
 export const skipLiveArchive = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input: unknown) => IdSchema.parse(input))
-  .handler(async ({ data }) => {
-    if (!isAdmin(data.wallet)) throw new Error("Forbidden");
+  .handler(async ({ data, context }) => {
+    assertAdmin(context.wallet);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("live_streams")

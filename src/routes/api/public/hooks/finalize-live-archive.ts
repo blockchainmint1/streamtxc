@@ -8,15 +8,17 @@ import { createFileRoute } from "@tanstack/react-router";
  *   2) inserts a normal `videos` row (owner = stream.owner_wallet),
  *   3) marks the stream `archive_status='ready'` + stores the resulting cid.
  *
- * Auth: shared with the other pg_cron hooks — Supabase publishable key in
- * the `apikey` header.
+ * Auth: `x-admin-token` header must match TXC_RPC_PASS (server-only
+ * secret). Same pattern as the other admin/cron endpoints. Using the
+ * publishable key here was insecure because that key ships in the
+ * browser bundle.
  */
 export const Route = createFileRoute("/api/public/hooks/finalize-live-archive")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const expected = process.env.SUPABASE_PUBLISHABLE_KEY;
-        const provided = request.headers.get("apikey");
+        const expected = process.env.TXC_RPC_PASS;
+        const provided = request.headers.get("x-admin-token");
         if (!expected || provided !== expected) {
           return new Response("Unauthorized", { status: 401 });
         }
