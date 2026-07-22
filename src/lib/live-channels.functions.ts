@@ -118,10 +118,9 @@ export const provisionMyLiveChannel = createServerFn({ method: "POST" })
     if (existing) return { alreadyProvisioned: true, id: existing.id };
 
     const roleArn = process.env.MEDIALIVE_CHANNEL_ROLE_ARN;
-    const sgId = process.env.MEDIALIVE_INPUT_SECURITY_GROUP_ID;
+    const sgId = process.env.MEDIALIVE_INPUT_SECURITY_GROUP_ID; // may be stale / missing; resolved below
     const archiveBucket = process.env.LIVE_ARCHIVE_BUCKET;
     if (!roleArn) throw new Error("MEDIALIVE_CHANNEL_ROLE_ARN not configured");
-    if (!sgId) throw new Error("MEDIALIVE_INPUT_SECURITY_GROUP_ID not configured");
     if (!archiveBucket) throw new Error("LIVE_ARCHIVE_BUCKET not configured");
 
     const slug = shortId(context.wallet);
@@ -135,6 +134,7 @@ export const provisionMyLiveChannel = createServerFn({ method: "POST" })
       deleteInput,
       deleteMediaPackageChannel,
       deleteHlsOriginEndpoint,
+      ensureInputSecurityGroup,
     } = await import("./aws-medialive.server");
     const { ENCODER_SETTINGS, INPUT_SPECIFICATION, buildChannelDestinations } = await import(
       "./medialive-encoder-template"
@@ -151,10 +151,11 @@ export const provisionMyLiveChannel = createServerFn({ method: "POST" })
       mpEndpointId = ep.endpointId;
       hlsUrl = ep.url;
 
+      const resolvedSg = await ensureInputSecurityGroup(sgId);
       const inp = await createRtmpInput({
         name: `${slug}-rtmp`,
         streamName: `${slug}/primary`,
-        securityGroupId: sgId,
+        securityGroupId: resolvedSg,
       });
       inputId = inp.inputId;
       const fullRtmp = inp.destinations[0] ?? "";
