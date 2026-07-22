@@ -65,6 +65,7 @@ function LiveEmbedPage() {
           className="w-full h-full"
           showSourceBadge={false}
           showTapToUnmute
+          isLive
         />
       ) : stream ? (
         <div className="text-white/60 font-mono text-sm text-center px-4">
