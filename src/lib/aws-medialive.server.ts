@@ -113,6 +113,7 @@ export async function createRtmpInput(args: {
     type: "RTMP_PUSH",
     inputSecurityGroups: [args.securityGroupId],
     destinations: [{ streamName: args.streamName }],
+    requestId: `input-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
   });
   const input = raw?.input ?? raw;
   const destinations = Array.isArray(input?.destinations)
@@ -137,6 +138,7 @@ export async function createMediaLiveChannel(args: {
     name: args.name,
     channelClass: "SINGLE_PIPELINE",
     roleArn: args.roleArn,
+    requestId: `channel-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
     inputAttachments: [
       {
         inputId: args.inputId,
