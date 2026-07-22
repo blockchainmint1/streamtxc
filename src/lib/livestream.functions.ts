@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-const ADMIN_WALLET = "TeiqbqMxQG4JrDfrzdvTZcqhhai8KT5JTc";
+const ADMIN_WALLET = "Thaotk2YYWiXG9EozU5dqABx7EB26fGrhn";
 
 function isAdmin(wallet: string | null | undefined) {
   return !!wallet && wallet === ADMIN_WALLET;

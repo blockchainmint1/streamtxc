@@ -25,7 +25,7 @@ import { getTxcUsdPrice } from "./txc-price.server";
  * IPFS node from the manage UI. Kept here (not in env) because it gates a
  * UI button, not a secret. Owner check still applies on top.
  */
-const SELF_NODE_ADMIN_WALLET = "TeiqbqMxQG4JrDfrzdvTZcqhhai8KT5JTc";
+const SELF_NODE_ADMIN_WALLET = "Thaotk2YYWiXG9EozU5dqABx7EB26fGrhn";
 
 // Accepts either an EVM-style 0x… (legacy mock-wallet rows) or a real TXC
 // base58 address (LTC clone — starts with L/M/T/3 etc. or bech32 txc1…).
