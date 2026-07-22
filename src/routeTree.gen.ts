@@ -44,6 +44,7 @@ import { Route as ApiPublicHooksIpfsPinCompleteRouteImport } from './routes/api/
 import { Route as ApiPublicHooksFinalizeStuckHlsRouteImport } from './routes/api/public/hooks/finalize-stuck-hls'
 import { Route as ApiPublicHooksFinalizeLiveArchiveRouteImport } from './routes/api/public/hooks/finalize-live-archive'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
+import { Route as ApiPublicAdminImpersonateWalletRouteImport } from './routes/api/public/admin/impersonate-wallet'
 import { Route as ApiPublicAdminFinalizeHlsRouteImport } from './routes/api/public/admin/finalize-hls'
 import { Route as ApiPublicAdminBackfillTranscriptsRouteImport } from './routes/api/public/admin/backfill-transcripts'
 import { Route as ApiPublicAdminBackfillSelfPinsRouteImport } from './routes/api/public/admin/backfill-self-pins'
@@ -233,6 +234,12 @@ const ApiPublicAdminRetryStampsRoute =
     path: '/public/admin/retry-stamps',
     getParentRoute: () => ApiRoute,
   } as any)
+const ApiPublicAdminImpersonateWalletRoute =
+  ApiPublicAdminImpersonateWalletRouteImport.update({
+    id: '/public/admin/impersonate-wallet',
+    path: '/public/admin/impersonate-wallet',
+    getParentRoute: () => ApiRoute,
+  } as any)
 const ApiPublicAdminFinalizeHlsRoute =
   ApiPublicAdminFinalizeHlsRouteImport.update({
     id: '/public/admin/finalize-hls',
@@ -287,6 +294,7 @@ export interface FileRoutesByFullPath {
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
   '/api/public/admin/backfill-transcripts': typeof ApiPublicAdminBackfillTranscriptsRoute
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
+  '/api/public/admin/impersonate-wallet': typeof ApiPublicAdminImpersonateWalletRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/finalize-live-archive': typeof ApiPublicHooksFinalizeLiveArchiveRoute
   '/api/public/hooks/finalize-stuck-hls': typeof ApiPublicHooksFinalizeStuckHlsRoute
@@ -328,6 +336,7 @@ export interface FileRoutesByTo {
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
   '/api/public/admin/backfill-transcripts': typeof ApiPublicAdminBackfillTranscriptsRoute
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
+  '/api/public/admin/impersonate-wallet': typeof ApiPublicAdminImpersonateWalletRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/finalize-live-archive': typeof ApiPublicHooksFinalizeLiveArchiveRoute
   '/api/public/hooks/finalize-stuck-hls': typeof ApiPublicHooksFinalizeStuckHlsRoute
@@ -370,6 +379,7 @@ export interface FileRoutesById {
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
   '/api/public/admin/backfill-transcripts': typeof ApiPublicAdminBackfillTranscriptsRoute
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
+  '/api/public/admin/impersonate-wallet': typeof ApiPublicAdminImpersonateWalletRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
   '/api/public/hooks/finalize-live-archive': typeof ApiPublicHooksFinalizeLiveArchiveRoute
   '/api/public/hooks/finalize-stuck-hls': typeof ApiPublicHooksFinalizeStuckHlsRoute
@@ -413,6 +423,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/backfill-self-pins'
     | '/api/public/admin/backfill-transcripts'
     | '/api/public/admin/finalize-hls'
+    | '/api/public/admin/impersonate-wallet'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/finalize-live-archive'
     | '/api/public/hooks/finalize-stuck-hls'
@@ -454,6 +465,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/backfill-self-pins'
     | '/api/public/admin/backfill-transcripts'
     | '/api/public/admin/finalize-hls'
+    | '/api/public/admin/impersonate-wallet'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/finalize-live-archive'
     | '/api/public/hooks/finalize-stuck-hls'
@@ -495,6 +507,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/backfill-self-pins'
     | '/api/public/admin/backfill-transcripts'
     | '/api/public/admin/finalize-hls'
+    | '/api/public/admin/impersonate-wallet'
     | '/api/public/admin/retry-stamps'
     | '/api/public/hooks/finalize-live-archive'
     | '/api/public/hooks/finalize-stuck-hls'
@@ -777,6 +790,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAdminRetryStampsRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/public/admin/impersonate-wallet': {
+      id: '/api/public/admin/impersonate-wallet'
+      path: '/public/admin/impersonate-wallet'
+      fullPath: '/api/public/admin/impersonate-wallet'
+      preLoaderRoute: typeof ApiPublicAdminImpersonateWalletRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/public/admin/finalize-hls': {
       id: '/api/public/admin/finalize-hls'
       path: '/public/admin/finalize-hls'
@@ -830,6 +850,7 @@ interface ApiRouteChildren {
   ApiPublicAdminBackfillSelfPinsRoute: typeof ApiPublicAdminBackfillSelfPinsRoute
   ApiPublicAdminBackfillTranscriptsRoute: typeof ApiPublicAdminBackfillTranscriptsRoute
   ApiPublicAdminFinalizeHlsRoute: typeof ApiPublicAdminFinalizeHlsRoute
+  ApiPublicAdminImpersonateWalletRoute: typeof ApiPublicAdminImpersonateWalletRoute
   ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
   ApiPublicHooksFinalizeLiveArchiveRoute: typeof ApiPublicHooksFinalizeLiveArchiveRoute
   ApiPublicHooksFinalizeStuckHlsRoute: typeof ApiPublicHooksFinalizeStuckHlsRoute
@@ -852,6 +873,7 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiPublicAdminBackfillTranscriptsRoute:
     ApiPublicAdminBackfillTranscriptsRoute,
   ApiPublicAdminFinalizeHlsRoute: ApiPublicAdminFinalizeHlsRoute,
+  ApiPublicAdminImpersonateWalletRoute: ApiPublicAdminImpersonateWalletRoute,
   ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
   ApiPublicHooksFinalizeLiveArchiveRoute:
     ApiPublicHooksFinalizeLiveArchiveRoute,
