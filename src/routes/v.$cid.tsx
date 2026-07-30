@@ -204,11 +204,16 @@ function WatchPage() {
   const error = tx?.transcode_error ?? video.transcode_error ?? null;
 
   const chainStatus = chain?.status ?? video.status;
-  // No HLS yet and the pipeline is still working: the original upload may be a
-  // fragmented MP4, which browsers refuse to play from a plain <video src>.
-  const preparing =
-    !hlsUrl &&
-    (status === "pending" || status === "processing" || status === "pinning");
+  // Without an HLS bundle we fall back to the original MP4 in a plain
+  // <video src>. That only works for progressive (faststart) MP4s — a
+  // fragmented MP4 (moov with mvex + empty sample tables, then moof/mdat
+  // pairs) has no index, so Chrome and Firefox refuse it and the player
+  // sits at readyState 0 forever with no error. Rather than show a dead
+  // black box, surface the pipeline state and a direct download.
+  const transcodeWorking =
+    status === "pending" || status === "processing" || status === "pinning";
+  const preparing = !hlsUrl && transcodeWorking;
+  const noPlayableSource = !hlsUrl && !transcodeWorking && status === "failed";
   const blockNumber = chain?.blockNumber ?? video.block_number ?? null;
   const blockHash = chain?.blockHash ?? video.block_hash ?? null;
   const txHash = chain?.txHash ?? video.tx_hash ?? null;
@@ -226,17 +231,31 @@ function WatchPage() {
           {/* Player + meta */}
           <div className="lg:col-span-2 space-y-4">
             <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden">
-              {preparing ? (
+              {preparing || noPlayableSource ? (
                 <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-center px-6">
-                  <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
-                  <div className="font-mono text-xs text-amber-500">
-                    [ PREPARING PLAYBACK ]
+                  {preparing ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+                  ) : (
+                    <AlertTriangle className="h-6 w-6 text-destructive" />
+                  )}
+                  <div
+                    className={`font-mono text-xs ${preparing ? "text-amber-500" : "text-destructive"}`}
+                  >
+                    {preparing
+                      ? "[ PREPARING PLAYBACK ]"
+                      : "[ NO STREAMABLE RENDITION ]"}
                   </div>
-                  <p className="font-mono text-[11px] text-muted-foreground max-w-md">
-                    The original file is pinned to IPFS, but it's a fragmented
-                    MP4 that browsers can't play directly. Streaming renditions
-                    are being built — this page refreshes itself automatically.
+                  <p className="font-mono text-[11px] text-muted-foreground max-w-md leading-relaxed">
+                    {preparing
+                      ? "The original is pinned to IPFS, but some recordings are fragmented MP4s that browsers can't play directly. Streaming renditions are being built — this page updates itself when they're ready."
+                      : "Transcoding failed, and the original file isn't in a format browsers can play in-page. The file itself is intact on IPFS."}
                   </p>
+                  <a
+                    href={`/api/stream/${video.cid}`}
+                    className="font-mono text-[11px] text-primary hover:underline"
+                  >
+                    download the original →
+                  </a>
                 </div>
               ) : (
                 <VideoPlayerV2
