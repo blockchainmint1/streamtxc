@@ -204,6 +204,11 @@ function WatchPage() {
   const error = tx?.transcode_error ?? video.transcode_error ?? null;
 
   const chainStatus = chain?.status ?? video.status;
+  // No HLS yet and the pipeline is still working: the original upload may be a
+  // fragmented MP4, which browsers refuse to play from a plain <video src>.
+  const preparing =
+    !hlsUrl &&
+    (status === "pending" || status === "processing" || status === "pinning");
   const blockNumber = chain?.blockNumber ?? video.block_number ?? null;
   const blockHash = chain?.blockHash ?? video.block_hash ?? null;
   const txHash = chain?.txHash ?? video.tx_hash ?? null;
