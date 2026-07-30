@@ -204,11 +204,16 @@ function WatchPage() {
   const error = tx?.transcode_error ?? video.transcode_error ?? null;
 
   const chainStatus = chain?.status ?? video.status;
-  // No HLS yet and the pipeline is still working: the original upload may be a
-  // fragmented MP4, which browsers refuse to play from a plain <video src>.
-  const preparing =
-    !hlsUrl &&
-    (status === "pending" || status === "processing" || status === "pinning");
+  // Without an HLS bundle we fall back to the original MP4 in a plain
+  // <video src>. That only works for progressive (faststart) MP4s — a
+  // fragmented MP4 (moov with mvex + empty sample tables, then moof/mdat
+  // pairs) has no index, so Chrome and Firefox refuse it and the player
+  // sits at readyState 0 forever with no error. Rather than show a dead
+  // black box, surface the pipeline state and a direct download.
+  const transcodeWorking =
+    status === "pending" || status === "processing" || status === "pinning";
+  const preparing = !hlsUrl && transcodeWorking;
+  const noPlayableSource = !hlsUrl && !transcodeWorking && status === "failed";
   const blockNumber = chain?.blockNumber ?? video.block_number ?? null;
   const blockHash = chain?.blockHash ?? video.block_hash ?? null;
   const txHash = chain?.txHash ?? video.tx_hash ?? null;
