@@ -65,10 +65,36 @@ export const Route = createFileRoute("/api/stream/$cid/$")({
         // the splat path to whichever gateway answers. For HLS bundles
         // this means a missing self-node pin still streams via Pinata.
         const base = await resolveGatewayUrl(cid);
+        const target = `${base}/${splat}`;
+
+        // Playlists must be PROXIED, not redirected. hls.js resolves relative
+        // URLs against the response's final URL — after a 302 that's the IPFS
+        // gateway origin, so variant playlists / segments get fetched
+        // cross-origin and are blocked (no CORS on the gateway), leaving the
+        // player stuck with readyState 0. Playlists are tiny text files, so
+        // streaming them through our origin keeps every child URL same-origin.
+        if (splat.endsWith(".m3u8")) {
+          const upstream = await fetch(target, {
+            headers: { accept: "application/vnd.apple.mpegurl,*/*" },
+          });
+          if (!upstream.ok) {
+            return new Response("Playlist not found", { status: 502 });
+          }
+          const body = await upstream.text();
+          return new Response(body, {
+            status: 200,
+            headers: {
+              "content-type": "application/vnd.apple.mpegurl",
+              "cache-control": "public, max-age=60",
+              "access-control-allow-origin": "*",
+            },
+          });
+        }
+
         return new Response(null, {
           status: 302,
           headers: {
-            location: `${base}/${splat}`,
+            location: target,
             "cache-control": "no-store",
             "access-control-allow-origin": "*",
           },
