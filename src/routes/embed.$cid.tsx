@@ -1,5 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { VideoPlayer } from "@/components/VideoPlayer";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { VideoPlayerV2 } from "@/components/VideoPlayerV2";
+import { getVideo } from "@/lib/videos.functions";
+import { ipfsHlsUrl, ipfsThumbUrl } from "@/lib/ipfs-gateway";
 
 export const Route = createFileRoute("/embed/$cid")({
   component: EmbedPage,
@@ -13,13 +17,34 @@ export const Route = createFileRoute("/embed/$cid")({
 function EmbedPage() {
   const { cid } = Route.useParams();
   const { autoplay, mute, t } = Route.useSearch();
+  const fetchVideo = useServerFn(getVideo);
+
+  // Poll until HLS renditions exist so freshly-uploaded videos upgrade
+  // from the raw original to adaptive HLS without a manual reload.
+  const { data: video } = useQuery({
+    queryKey: ["embed-video", cid],
+    queryFn: () => fetchVideo({ data: { cid } }),
+    refetchInterval: (q) => (q.state.data?.hls_cid ? false : 15_000),
+  });
+
+  const hlsUrl = ipfsHlsUrl(video?.hls_cid, video?.cid ?? cid);
+  const src = hlsUrl ?? `/api/stream/${cid}`;
+
   return (
     <div className="w-screen h-screen bg-black">
-      <VideoPlayer
-        src={`/api/stream/${cid}`}
+      <VideoPlayerV2
+        src={src}
+        poster={ipfsThumbUrl(video?.thumbnail_cid)}
+        captionsSrc={
+          video?.transcript_cid
+            ? `/api/stream/${video.transcript_cid}`
+            : undefined
+        }
         autoPlay={autoplay}
         muted={mute || autoplay}
         startAt={t}
+        showSourceBadge={false}
+        showTapToUnmute={autoplay}
         className="w-full h-full"
       />
     </div>
