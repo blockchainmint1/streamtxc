@@ -231,17 +231,31 @@ function WatchPage() {
           {/* Player + meta */}
           <div className="lg:col-span-2 space-y-4">
             <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden">
-              {preparing ? (
+              {preparing || noPlayableSource ? (
                 <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-center px-6">
-                  <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
-                  <div className="font-mono text-xs text-amber-500">
-                    [ PREPARING PLAYBACK ]
+                  {preparing ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+                  ) : (
+                    <AlertTriangle className="h-6 w-6 text-destructive" />
+                  )}
+                  <div
+                    className={`font-mono text-xs ${preparing ? "text-amber-500" : "text-destructive"}`}
+                  >
+                    {preparing
+                      ? "[ PREPARING PLAYBACK ]"
+                      : "[ NO STREAMABLE RENDITION ]"}
                   </div>
-                  <p className="font-mono text-[11px] text-muted-foreground max-w-md">
-                    The original file is pinned to IPFS, but it's a fragmented
-                    MP4 that browsers can't play directly. Streaming renditions
-                    are being built — this page refreshes itself automatically.
+                  <p className="font-mono text-[11px] text-muted-foreground max-w-md leading-relaxed">
+                    {preparing
+                      ? "The original is pinned to IPFS, but some recordings are fragmented MP4s that browsers can't play directly. Streaming renditions are being built — this page updates itself when they're ready."
+                      : "Transcoding failed, and the original file isn't in a format browsers can play in-page. The file itself is intact on IPFS."}
                   </p>
+                  <a
+                    href={`/api/stream/${video.cid}`}
+                    className="font-mono text-[11px] text-primary hover:underline"
+                  >
+                    download the original →
+                  </a>
                 </div>
               ) : (
                 <VideoPlayerV2
