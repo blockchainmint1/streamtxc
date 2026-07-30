@@ -204,6 +204,11 @@ function WatchPage() {
   const error = tx?.transcode_error ?? video.transcode_error ?? null;
 
   const chainStatus = chain?.status ?? video.status;
+  // No HLS yet and the pipeline is still working: the original upload may be a
+  // fragmented MP4, which browsers refuse to play from a plain <video src>.
+  const preparing =
+    !hlsUrl &&
+    (status === "pending" || status === "processing" || status === "pinning");
   const blockNumber = chain?.blockNumber ?? video.block_number ?? null;
   const blockHash = chain?.blockHash ?? video.block_hash ?? null;
   const txHash = chain?.txHash ?? video.tx_hash ?? null;
@@ -221,15 +226,29 @@ function WatchPage() {
           {/* Player + meta */}
           <div className="lg:col-span-2 space-y-4">
             <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden">
-              <VideoPlayerV2
-                src={streamUrl}
-                poster={ipfsThumbUrl(video.thumbnail_cid)}
-                captionsSrc={
-                  video.transcript_cid
-                    ? `/api/stream/${video.transcript_cid}`
-                    : undefined
-                }
-              />
+              {preparing ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-center px-6">
+                  <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+                  <div className="font-mono text-xs text-amber-500">
+                    [ PREPARING PLAYBACK ]
+                  </div>
+                  <p className="font-mono text-[11px] text-muted-foreground max-w-md">
+                    The original file is pinned to IPFS, but it's a fragmented
+                    MP4 that browsers can't play directly. Streaming renditions
+                    are being built — this page refreshes itself automatically.
+                  </p>
+                </div>
+              ) : (
+                <VideoPlayerV2
+                  src={streamUrl}
+                  poster={ipfsThumbUrl(video.thumbnail_cid)}
+                  captionsSrc={
+                    video.transcript_cid
+                      ? `/api/stream/${video.transcript_cid}`
+                      : undefined
+                  }
+                />
+              )}
             </div>
             <h1 className="text-2xl font-bold tracking-tight">{video.title}</h1>
             {video.description && (
