@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { VideoPlayerV2 } from "@/components/VideoPlayerV2";
 import { getVideo } from "@/lib/videos.functions";
-import { ipfsHlsUrl, ipfsThumbUrl } from "@/lib/ipfs-gateway";
+import { hlsUrlForVideo, ipfsThumbUrl } from "@/lib/ipfs-gateway";
 
 export const Route = createFileRoute("/embed/$cid")({
   component: EmbedPage,
@@ -27,7 +27,7 @@ function EmbedPage() {
     refetchInterval: (q) => (q.state.data?.hls_cid ? false : 15_000),
   });
 
-  const hlsUrl = ipfsHlsUrl(video?.hls_cid, video?.cid ?? cid);
+  const hlsUrl = hlsUrlForVideo(video);
   const src = hlsUrl ?? `/api/stream/${cid}`;
 
   return (
