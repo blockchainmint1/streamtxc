@@ -108,7 +108,24 @@ export function VideoPlayerV2({
     let hls: Hls | null = null;
 
     if (isHls && Hls.isSupported()) {
-      hls = new Hls({ enableWorker: true, maxBufferLength: 30 });
+      hls = new Hls(
+        isLive
+          ? {
+              enableWorker: true,
+              // Live: give the player a real buffer cushion. Segments are
+              // 6s, so 3 segments (~18s) behind the edge is the sweet spot
+              // between latency and resilience to jitter.
+              maxBufferLength: 30,
+              backBufferLength: 30,
+              liveSyncDurationCount: 3,
+              liveMaxLatencyDurationCount: 12,
+              lowLatencyMode: false,
+              // -1 = start at hls.js' computed live sync position (NOT the
+              // absolute manifest edge, which has no buffer ahead of it).
+              startPosition: -1,
+            }
+          : { enableWorker: true, maxBufferLength: 30 },
+      );
       hlsRef.current = hls;
       hls.loadSource(src);
       hls.attachMedia(video);
@@ -165,13 +182,22 @@ export function VideoPlayerV2({
     // grows, so we never replay stale segments left in the manifest from a
     // previous session.
     let snapToLive: (() => void) | null = null;
-    if (isLive) {
+    // Only needed for native/Safari HLS. With hls.js, `startPosition: -1` +
+    // liveSyncDuration already park us near the edge WITH a buffer; forcing
+    // currentTime to `seekable.end - 1` on every manifest refresh seeks past
+    // the buffered range and causes constant rebuffering (the "choppy"
+    // playback viewers reported).
+    if (isLive && !(isHls && Hls.isSupported())) {
+      let snapped = false;
       snapToLive = () => {
         try {
+          if (snapped) return;
           if (video.seekable && video.seekable.length > 0) {
             const end = video.seekable.end(video.seekable.length - 1);
-            if (isFinite(end) && end - video.currentTime > 3) {
-              video.currentTime = Math.max(0, end - 1);
+            if (isFinite(end) && end - video.currentTime > 30) {
+              // Stay ~2 segments behind the edge so there is data to play.
+              video.currentTime = Math.max(0, end - 12);
+              snapped = true;
             }
           }
         } catch {}
