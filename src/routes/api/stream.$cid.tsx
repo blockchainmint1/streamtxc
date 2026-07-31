@@ -20,6 +20,26 @@ export const Route = createFileRoute("/api/stream/$cid")({
           return new Response("Bad CID", { status: 400 });
         }
 
+        // Thumbnails/posters hit this same endpoint. They are immutable
+        // content-addressed images and are NOT playbacks, so skip the
+        // view-tracking round trip and let the browser/CDN cache the
+        // redirect. Before this, every card on the home page paid ~1s
+        // (gateway probe + DB write) on every render.
+        const dest = request.headers.get("sec-fetch-dest");
+        const accept = request.headers.get("accept") ?? "";
+        const isImage = dest === "image" || accept.startsWith("image/");
+        if (isImage) {
+          const target = await resolveGatewayUrl(cid);
+          return new Response(null, {
+            status: 302,
+            headers: {
+              location: target,
+              "cache-control": "public, max-age=86400, immutable",
+              "access-control-allow-origin": "*",
+            },
+          });
+        }
+
         const ip =
           request.headers.get("cf-connecting-ip") ??
           request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
