@@ -262,6 +262,8 @@ export function pinataGatewayUrl(cid: string): string {
  *
  * Keep the timeout tight — this runs on every stream redirect.
  */
+const gatewayProbeCache = new Map<string, { url: string; expires: number }>();
+
 export async function resolveGatewayUrl(
   cid: string,
   timeoutMs = 1500,
