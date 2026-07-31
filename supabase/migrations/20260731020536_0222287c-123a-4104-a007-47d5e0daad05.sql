@@ -1,0 +1,1 @@
+UPDATE public.videos SET status = 'active' WHERE source = 'live-archive' AND status = 'ready';
