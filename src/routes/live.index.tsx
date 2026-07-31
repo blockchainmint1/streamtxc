@@ -172,8 +172,11 @@ function LivePreview({ src, poster }: { src: string; poster?: string }) {
     if (Hls.isSupported() && src.endsWith(".m3u8")) {
       hls = new Hls({
         enableWorker: true,
-        maxBufferLength: 6,
+        maxBufferLength: 20,
         liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 12,
+        lowLatencyMode: false,
+        startPosition: -1,
         capLevelToPlayerSize: true,
       });
       hls.loadSource(src);
@@ -186,14 +189,17 @@ function LivePreview({ src, poster }: { src: string; poster?: string }) {
       video.src = src;
     }
 
-    // Snap to the live edge so we never replay archived segments from an
-    // EVENT-type MediaPackage manifest (which retains prior session history).
+    // Snap forward only if we're way behind (stale EVENT-manifest history).
+    // Never chase the absolute edge — seeking past the buffered range on
+    // every manifest refresh is what made playback stutter.
+    const usingHlsJs = Hls.isSupported() && src.endsWith(".m3u8");
     const snapToLive = () => {
+      if (usingHlsJs) return;
       try {
         if (video.seekable && video.seekable.length > 0) {
           const end = video.seekable.end(video.seekable.length - 1);
-          if (isFinite(end) && end - video.currentTime > 2) {
-            video.currentTime = Math.max(0, end - 1);
+          if (isFinite(end) && end - video.currentTime > 30) {
+            video.currentTime = Math.max(0, end - 12);
           }
         }
       } catch {}
