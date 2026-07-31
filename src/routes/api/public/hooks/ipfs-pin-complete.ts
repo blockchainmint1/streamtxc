@@ -84,7 +84,7 @@ export const Route = createFileRoute("/api/public/hooks/ipfs-pin-complete")({
             title: stream.title,
             size_bytes: event.totalBytes ?? 0,
             mime_type: "application/vnd.apple.mpegurl",
-            status: "ready",
+            status: "active",
             months_prepaid: 0,
             expires_at: expiresAt,
             hls_cid: event.cid,
