@@ -95,7 +95,10 @@ export const Route = createFileRoute("/api/stream/$cid/$")({
           status: 302,
           headers: {
             location: target,
-            "cache-control": "no-store",
+            // Segments and other bundle files are content-addressed and
+            // immutable — cache the redirect so repeat playback doesn't
+            // re-enter the Worker (and re-probe the gateway) per segment.
+            "cache-control": "public, max-age=31536000, immutable",
             "access-control-allow-origin": "*",
           },
         });

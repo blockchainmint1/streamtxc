@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { getVideo } from "@/lib/videos.functions";
 import { pollTxStatus } from "@/lib/videos.functions";
 import { getTranscodeStatus } from "@/lib/transcode.functions";
-import { ipfsThumbUrl, ipfsHlsUrl } from "@/lib/ipfs-gateway";
+import { ipfsThumbUrl, hlsUrlForVideo } from "@/lib/ipfs-gateway";
 import { CidField } from "@/components/CidField";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { OnChainProofPanel } from "@/components/OnChainProofPanel";
@@ -193,7 +193,11 @@ function WatchPage() {
     );
   }
 
-  const hlsUrl = ipfsHlsUrl(video.hls_cid, video.cid);
+  const hlsUrl = hlsUrlForVideo({
+    ...video,
+    hls_cid: tx?.hls_cid ?? video.hls_cid,
+    renditions: tx?.renditions ?? video.renditions,
+  });
   const streamUrl = hlsUrl ?? `/api/stream/${video.cid}`;
   const status = tx?.transcode_status ?? video.transcode_status ?? null;
   const renditions = (tx?.renditions ?? video.renditions ?? null) as
