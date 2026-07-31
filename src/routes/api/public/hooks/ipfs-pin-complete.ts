@@ -114,6 +114,8 @@ export const Route = createFileRoute("/api/public/hooks/ipfs-pin-complete")({
           return Response.json({ ok: true, liveStreamId, cid: event.cid });
         }
 
+        if (!videoCid) return new Response("Missing video cid", { status: 400 });
+
         // Lambda reported a pin failure — mark the row failed so the UI stops spinning.
         if (event.error || !event.cid) {
           await supabaseAdmin
