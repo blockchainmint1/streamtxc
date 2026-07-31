@@ -269,17 +269,26 @@ export async function resolveGatewayUrl(
   const ownNode = process.env.IPFS_GATEWAY_DOMAIN;
   if (!ownNode) return pinataGatewayUrl(cid);
   const selfUrl = `https://${ownNode}/ipfs/${cid}`;
+  // Short-lived memo so a page full of thumbnails (or a segment burst)
+  // doesn't re-probe the same CID dozens of times within one isolate.
+  const cached = gatewayProbeCache.get(cid);
+  if (cached && cached.expires > Date.now()) return cached.url;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(selfUrl, { method: "HEAD", signal: ctrl.signal });
-    if (res.ok) return selfUrl;
+    if (res.ok) {
+      gatewayProbeCache.set(cid, { url: selfUrl, expires: Date.now() + 300_000 });
+      return selfUrl;
+    }
   } catch {
     // network error / abort — fall through
   } finally {
     clearTimeout(t);
   }
-  return pinataGatewayUrl(cid);
+  const fallback = pinataGatewayUrl(cid);
+  gatewayProbeCache.set(cid, { url: fallback, expires: Date.now() + 60_000 });
+  return fallback;
 }
 
 /**
