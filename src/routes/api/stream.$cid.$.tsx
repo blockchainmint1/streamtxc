@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { resolveGatewayUrl } from "@/lib/pinata.server";
+import { resolveGatewayUrl, fetchThroughGateways } from "@/lib/pinata.server";
 import { recordView } from "@/lib/videos.functions";
 
 async function hashIp(ip: string): Promise<string> {
@@ -74,13 +74,13 @@ export const Route = createFileRoute("/api/stream/$cid/$")({
         // player stuck with readyState 0. Playlists are tiny text files, so
         // streaming them through our origin keeps every child URL same-origin.
         if (splat.endsWith(".m3u8")) {
-          const upstream = await fetch(target, {
+          const hit = await fetchThroughGateways(cid, splat, {
             headers: { accept: "application/vnd.apple.mpegurl,*/*" },
           });
-          if (!upstream.ok) {
+          if (!hit) {
             return new Response("Playlist not found", { status: 502 });
           }
-          const body = await upstream.text();
+          const body = await hit.res.text();
           return new Response(body, {
             status: 200,
             headers: {

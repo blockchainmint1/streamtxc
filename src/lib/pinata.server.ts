@@ -338,6 +338,52 @@ export async function resolveGatewayUrl(
  * CID is gone from IPFS as a whole, only that our gateway can't serve
  * it within the timeout window.
  */
+export function selfNodeGatewayUrl(cid: string): string | null {
+  const ownNode = process.env.IPFS_GATEWAY_DOMAIN;
+  return ownNode ? `https://${ownNode}/ipfs/${cid}` : null;
+}
+
+/** Drop a memoized gateway choice for a CID (used after a failed fetch). */
+export function invalidateGatewayProbe(cid: string): void {
+  gatewayProbeCache.delete(cid);
+}
+
+/**
+ * Fetch `<gateway>/<cid>/<path>` with an automatic cross-gateway retry.
+ *
+ * The HEAD probe in `resolveGatewayUrl` is only a hint: under load (or with
+ * the breaker briefly open) it can pick Pinata for a bundle that only exists
+ * on the self-hosted node — or vice-versa. A single miss then surfaced as a
+ * hard 502 and dead playback. Here we always try the other gateway before
+ * giving up, and invalidate the bad memo so later requests re-probe.
+ */
+export async function fetchThroughGateways(
+  cid: string,
+  path: string,
+  init?: RequestInit,
+): Promise<{ res: Response; base: string } | null> {
+  const suffix = path ? `/${path.replace(/^\/+/, "")}` : "";
+  const primary = await resolveGatewayUrl(cid);
+  const self = selfNodeGatewayUrl(cid);
+  const pinata = pinataGatewayUrl(cid);
+  const candidates = [primary, primary === self ? pinata : self, pinata].filter(
+    (u, i, a): u is string => !!u && a.indexOf(u) === i,
+  );
+  for (const base of candidates) {
+    try {
+      const res = await fetch(`${base}${suffix}`, init);
+      if (res.ok) {
+        if (base !== primary) invalidateGatewayProbe(cid);
+        return { res, base };
+      }
+    } catch {
+      // try the next gateway
+    }
+  }
+  invalidateGatewayProbe(cid);
+  return null;
+}
+
 export async function headCidOnGateway(
   cid: string,
   timeoutMs = 4000,
