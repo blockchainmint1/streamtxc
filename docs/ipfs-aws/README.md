@@ -3,7 +3,7 @@
 Goal: stand up a private IPFS node on EC2 inside a VPC, plus a Lambda
 (in the same VPC) that streams S3 → IPFS and returns a root CID. The
 Cloudflare Worker (Lovable) calls that Lambda from the MediaConvert
-webhook, then pins the CID to Pinata as backup, then writes to chain.
+webhook, then writes the CID to chain.
 
 If you are using AWS CloudShell, use the one-shot script instead of
 pasting individual README snippets. It creates the templates, deploys
@@ -84,8 +84,8 @@ export PRIVATE_SUBNET=subnet-yyyyyyyy    # has NAT gateway route
 ## 2. EC2: IPFS (Kubo) node
 
 Deploys a t3.medium running Kubo with 200GB EBS, swarm port 4001 open
-to the internet (so the CID is discoverable on the public DHT — Pinata
-needs this to back up), and API port 5001 locked to the Lambda's SG.
+to the internet so the CID is discoverable on the public DHT, and API port
+5001 locked to the Lambda's SG.
 
 ```bash
 aws cloudformation deploy \
@@ -201,8 +201,7 @@ gateway domain into the player, and rewrite the MediaConvert webhook
 to:
 
 1. Call your Lambda → get CID (seconds, not 74s)
-2. POST CID to Pinata `/pinning/pinByHash` (backup pin, instant)
-3. Write CID + manifest to chain
+2. Write CID + manifest to chain
 
 ---
 
@@ -228,9 +227,8 @@ includes it.
 
 - **Lambda times out**: check it's in the same AZ as the EC2 node, or
   at least same VPC. CloudWatch Logs group: `/aws/lambda/${STACK}-pinner`.
-- **Pinata `pinByHash` says "not found"**: your EC2 node isn't reachable
-  on port 4001. Check the security group lets `0.0.0.0/0` in on 4001
-  TCP+UDP. May take 5-10 min for the DHT to propagate.
+- **Other peers cannot discover the CID**: check the security group lets
+  `0.0.0.0/0` in on port 4001 TCP+UDP. DHT propagation may take 5-10 minutes.
 - **Gateway returns blank**: try `curl http://$IPFS_GATEWAY_DOMAIN:8080/api/v0/id`
   — if that 404s, Kubo isn't running. SSH in via SSM (no key needed,
   IAM role attached): `aws ssm start-session --target <instance-id>` then

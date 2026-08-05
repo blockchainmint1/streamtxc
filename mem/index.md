@@ -1,8 +1,8 @@
 # Project Memory
 
 ## Core
-IPFS: `/api/stream/*` must use `resolveGatewayUrl()` — self-node first, Pinata fallback. Never swap back to bare `gatewayUrl()`.
+IPFS: use only `ipfs.honest.money` (or `IPFS_GATEWAY_DOMAIN`); never add Pinata code, packages, domains, secrets, or fallback.
 
 ## Memories
 - [Streaming/CDN research links](mem://references/streaming-cdn-research) — Bunny Stream, EdgeNext CDN, IPFS streaming article
-- [IPFS gateway fallback](mem://constraints/ipfs-gateway-fallback) — /api/stream/* HEAD-probes self-node, falls through to Pinata on miss
+- [IPFS gateway policy](mem://constraints/ipfs-gateway-fallback) — all gateway and pin operations use the self-hosted node only

@@ -282,7 +282,7 @@ export const finalizeUpload = createServerFn({ method: "POST" })
     }
     const blob = new Blob([binary as BlobPart], { type: data.mimeType });
 
-    // 1. Pin to IPFS via Pinata
+    // 1. Pin to our self-hosted IPFS node
     const pin = await pinFileToIPFS(blob, data.filename);
 
     // Reject duplicates BEFORE we stamp the chain.
@@ -373,11 +373,8 @@ const cidSchema = z
   .regex(/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[A-Za-z2-7]{50,})$/, "Invalid IPFS CID");
 
 /**
- * Look up whether either form (CIDv1 or CIDv0) of a file is already pinned
- * in OUR Pinata account. Used by the upload flow to skip re-uploading bytes
- * we already host. We deliberately don't probe the public IPFS network — a
- * gateway hit doesn't mean Pinata has it, and a missing pin would hang the
- * downstream addByCid probe for 30s.
+ * Look up whether either form (CIDv1 or CIDv0) is already available on our
+ * self-hosted node so the upload flow can skip re-uploading bytes we host.
  */
 export const lookupPinnedCid = createServerFn({ method: "POST" })
   .inputValidator((input) =>
@@ -800,7 +797,7 @@ export const listVideosByOwner = createServerFn({ method: "POST" })
 
 /**
  * Best-effort: ask our node to re-pin every `unpinned` CID owned by `wallet`
- * by fetching it from the public IPFS DHT. Pinata returns success even if
+ * by fetching it from the public IPFS DHT. The node may return success even if
  * the content isn't yet found — the actual fetch happens asynchronously.
  * We don't flip the row back to `active` here; the payment-watcher does
  * that once a renewal payment lands.
@@ -852,7 +849,7 @@ export const probeAvailability = createServerFn({ method: "POST" })
       .maybeSingle();
     const unpinnedFlag = !!row?.unpinned_at;
     // Trust the DB. The payment-watcher only sets `unpinned_at` after it
-    // actually unpins from Pinata, and only clears it after re-pinning AND
+    // actually unpins from our node, and only clears it after re-pinning AND
     // verifying the gateway can serve the bytes again. A live HEAD probe
     // here was producing false negatives (Worker→dedicated-gateway HEAD
     // requests occasionally fail / time out even when the bytes are fine),
@@ -871,7 +868,7 @@ export const probeAvailability = createServerFn({ method: "POST" })
 
 /**
  * Public single-CID restore. Asks our node to re-fetch this CID from the
- * IPFS DHT. Best-effort — Pinata may say "queued" even if no peer is
+ * IPFS DHT. Best-effort — the node may say "queued" even if no peer is
  * actually seeding it. Status is not flipped here; the watch page's
  * probeAvailability call decides truth from the live gateway HEAD.
  */
@@ -898,7 +895,7 @@ export const restoreOneFromIpfs = createServerFn({ method: "POST" })
 /**
  * Owner-only re-seed. Called after the browser has re-uploaded the
  * original file via /api/public/upload — that endpoint already pinned
- * the bytes to our Pinata account, so by the time we get here the CID
+ * the bytes to our IPFS node, so by the time we get here the CID
  * is back on the gateway. We just verify, clear `unpinned_at`, flip
  * status to `active`, and stamp an `R` (renewal/re-seed) event.
  */
@@ -925,7 +922,7 @@ export const reseedVideo = createServerFn({ method: "POST" })
     }
 
     // The browser already POSTed the file through /api/public/upload,
-    // which pins it to our Pinata account. Confirm the gateway now
+    // which pins it to our IPFS node. Confirm the gateway now
     // serves the CID before we flip any DB state.
     const reachable = await headCidOnGateway(data.cid, 8000);
     if (!reachable) {

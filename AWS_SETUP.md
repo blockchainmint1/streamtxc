@@ -1,9 +1,9 @@
 # AWS MediaConvert + S3 setup for adaptive HLS transcoding
 
 The transcode pipeline is OFF by default. When the env vars below aren't set,
-uploads continue to work exactly as before (single MP4 pinned to Pinata,
+uploads continue to work as a single MP4 pinned to the self-hosted IPFS node,
 streamed directly). Once configured, every new upload also runs through
-MediaConvert and gets a 3-rendition HLS bundle pinned to Pinata.
+MediaConvert and gets a 3-rendition HLS bundle pinned to that node.
 
 ## 1. Two S3 buckets
 
@@ -11,7 +11,7 @@ MediaConvert and gets a 3-rendition HLS bundle pinned to Pinata.
 - **Output bucket** (e.g. `txc-transcode-output`) — MediaConvert writes HLS outputs here.
 
 Lifecycle policy (recommended): expire both buckets after 7 days. Originals
-are already pinned to Pinata; HLS outputs are pinned by the webhook. Neither
+are already pinned to IPFS; HLS outputs are pinned by the webhook. Neither
 needs to live in S3 long-term.
 
 ## 2. IAM role for MediaConvert
@@ -117,4 +117,4 @@ The shared secret becomes `MEDIACONVERT_WEBHOOK_SECRET`.
 
 MediaConvert "Professional" tier (HEVC, 4K) is ~$0.03/min/output. We use
 H.264 "Basic" at ~$0.0075/min/output. A 10-minute video × 3 renditions ≈
-**$0.225/upload**. Pinata pinning cost depends on plan.
+**$0.225/upload**. Self-hosted IPFS storage and transfer costs depend on usage.
