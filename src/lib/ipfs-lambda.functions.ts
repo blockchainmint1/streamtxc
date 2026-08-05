@@ -1,5 +1,5 @@
 // Server functions wrapping the self-hosted IPFS pinning Lambda
-// (POST /pin, POST /pin-by-hash). Lambda streams S3 objects into the
+// (POST /pin, POST /pin-cid). Lambda streams S3 objects into the
 // kubo node at IPFS_API and returns the resulting wrap-dir CID plus a
 // per-file manifest (inner file CIDs match locally-computed v1 CIDs
 // since the Lambda uses cid-version=1 + raw-leaves=true).
