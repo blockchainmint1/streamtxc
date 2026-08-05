@@ -2,12 +2,28 @@ import { AwsClient } from "aws4fetch";
 const region = "us-east-1";
 const cw = new AwsClient({ accessKeyId: process.env.AWS_ACCESS_KEY_ID, secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY, region, service: "monitoring" });
 const iid = "i-098f7c9b38a69033e";
-const end = new Date(), start = new Date(Date.now() - 6*3600*1000);
-const q = (id, metric, stat) => ({ Id: id, MetricStat: { Metric: { Namespace: "AWS/EC2", MetricName: metric, Dimensions: [{ Name: "InstanceId", Value: iid }] }, Period: 300, Stat: stat } });
-const body = { StartTime: start.toISOString(), EndTime: end.toISOString(), MetricDataQueries: [
-  q("cpu","CPUUtilization","Maximum"), q("netout","NetworkOut","Sum"), q("netin","NetworkIn","Sum"),
-  q("sc","StatusCheckFailed","Maximum"), q("cbal","CPUCreditBalance","Minimum"), q("rops","EBSReadOps","Sum") ] };
-const r = await cw.fetch(`https://monitoring.${region}.amazonaws.com/`, { method: "POST", headers: { "content-type": "application/x-amz-json-1.1", "x-amz-target": "GraniteServiceVersion20100801.GetMetricData" }, body: JSON.stringify(body) });
+const end = new Date(), start = new Date(Date.now() - 12*3600*1000);
+const p = new URLSearchParams({ Action: "GetMetricData", Version: "2010-08-01",
+  StartTime: start.toISOString(), EndTime: end.toISOString(), ScanBy: "TimestampDescending" });
+const metrics = [["cpu","CPUUtilization","Maximum"],["netout","NetworkOut","Sum"],["netin","NetworkIn","Sum"],
+  ["sc","StatusCheckFailed","Maximum"],["scsys","StatusCheckFailed_System","Maximum"],["scinst","StatusCheckFailed_Instance","Maximum"],
+  ["rb","EBSReadBytes","Sum"],["wb","EBSWriteBytes","Sum"]];
+metrics.forEach(([id,name,stat],i)=>{ const n=i+1;
+  p.set(`MetricDataQueries.member.${n}.Id`, id);
+  p.set(`MetricDataQueries.member.${n}.MetricStat.Metric.Namespace`, "AWS/EC2");
+  p.set(`MetricDataQueries.member.${n}.MetricStat.Metric.MetricName`, name);
+  p.set(`MetricDataQueries.member.${n}.MetricStat.Metric.Dimensions.member.1.Name`, "InstanceId");
+  p.set(`MetricDataQueries.member.${n}.MetricStat.Metric.Dimensions.member.1.Value`, iid);
+  p.set(`MetricDataQueries.member.${n}.MetricStat.Period`, "300");
+  p.set(`MetricDataQueries.member.${n}.MetricStat.Stat`, stat); });
+const r = await cw.fetch(`https://monitoring.${region}.amazonaws.com/`, { method:"POST", headers:{"content-type":"application/x-www-form-urlencoded"}, body: p.toString() });
 const t = await r.text();
 console.log("status", r.status);
-try { const j = JSON.parse(t); for (const m of j.MetricDataResults ?? []) { const v = m.Values ?? []; console.log(m.Id, m.StatusCode, "n="+v.length, "last10:", v.slice(0,10).map(x=>Math.round(x*100)/100).join(", ")); if(m.Timestamps?.length) console.log("   newest ts", m.Timestamps[0], "oldest", m.Timestamps.at(-1)); } if(j.Messages?.length) console.log(j.Messages); } catch { console.log(t.slice(0,600)); }
+if (!r.ok) { console.log(t.slice(0,700)); process.exit(0); }
+for (const blk of t.split("<member>").slice(1)) {
+  const id = blk.match(/<Id>(.*?)<\/Id>/)?.[1]; if(!id) continue;
+  const vals = [...blk.matchAll(/<member>([\d.eE+-]+)<\/member>/g)].map(m=>parseFloat(m[1]));
+  const ts = [...blk.matchAll(/<member>(\d{4}-\d\d-\d\dT[^<]+)<\/member>/g)].map(m=>m[1]);
+  console.log(`\n${id}: points=${vals.length} newest=${ts[0]??"-"} oldest=${ts.at(-1)??"-"}`);
+  console.log("  newest→older:", vals.slice(0,14).map(v=>v>10000?(v/1048576).toFixed(1)+"MB":Math.round(v*100)/100).join(" | "));
+}
