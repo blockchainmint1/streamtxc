@@ -10,7 +10,7 @@ import { listRecentVideos } from "@/lib/videos.functions";
 import { formatBytes } from "@/lib/fees";
 import { shortWalletId } from "@/lib/wallet";
 import { ArrowUpRight, Upload, Database, Coins, Eye, Play } from "lucide-react";
-import { ipfsThumbUrl } from "@/lib/ipfs-gateway";
+import { ipfsStreamUrl, ipfsThumbUrl } from "@/lib/ipfs-gateway";
 
 type SortKey = "newest" | "most-viewed" | "expensive" | "comments" | "leaving-soon";
 const PAGE = 9;
@@ -180,7 +180,7 @@ function IndexPage() {
                     />
                   ) : (
                     <video
-                      src={`/api/stream/${v.cid}#t=0.5`}
+                      src={`${ipfsStreamUrl(v.cid)}#t=0.5`}
                       preload="metadata"
                       muted
                       playsInline

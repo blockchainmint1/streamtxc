@@ -34,7 +34,9 @@ export const Route = createFileRoute("/api/stream/$cid")({
             status: 302,
             headers: {
               location: target,
-              "cache-control": "public, max-age=86400, immutable",
+              // Never cache the redirect itself: gateway configuration can
+              // change even though the content addressed bytes cannot.
+              "cache-control": "no-store",
               "access-control-allow-origin": "*",
             },
           });

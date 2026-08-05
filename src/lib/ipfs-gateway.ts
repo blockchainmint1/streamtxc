@@ -4,9 +4,15 @@
 // gatewayUrl() in ipfs.server.ts resolves to. The self-hosted gateway controls every hit
 // (thumbnails, CID existence probes, video stream redirects).
 
+const GATEWAY_CACHE_VERSION = "self-20260805";
+
+export function ipfsStreamUrl(cid: string): string {
+  return `/api/stream/${cid}?gateway=${GATEWAY_CACHE_VERSION}`;
+}
+
 export function ipfsThumbUrl(cid: string | null | undefined): string | undefined {
   if (!cid) return undefined;
-  return `/api/stream/${cid}`;
+  return ipfsStreamUrl(cid);
 }
 
 /**
@@ -20,9 +26,9 @@ export function ipfsHlsUrl(
 ): string | undefined {
   if (!hlsCid) return undefined;
   if (sourceCid) {
-    return `/api/stream/${hlsCid}/hls/${sourceCid}/${sourceCid}.m3u8`;
+    return `/api/stream/${hlsCid}/hls/${sourceCid}/${sourceCid}.m3u8?gateway=${GATEWAY_CACHE_VERSION}`;
   }
-  return `/api/stream/${hlsCid}/master.m3u8`;
+  return `/api/stream/${hlsCid}/master.m3u8?gateway=${GATEWAY_CACHE_VERSION}`;
 }
 
 /**
@@ -53,7 +59,7 @@ export function hlsUrlForVideo(video: {
       names.find((n) =>
         names.some((o) => o !== n && o.startsWith(`${n.replace(/\.m3u8$/, "")}-`)),
       ) ?? names[0];
-    return `/api/stream/${video.hls_cid}/hls/live-${video.live_stream_id}/${master}`;
+    return `/api/stream/${video.hls_cid}/hls/live-${video.live_stream_id}/${master}?gateway=${GATEWAY_CACHE_VERSION}`;
   }
 
   return ipfsHlsUrl(video.hls_cid, video.cid);
