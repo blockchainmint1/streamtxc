@@ -293,8 +293,18 @@ export async function resolveGatewayUrl(
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(selfUrl, { method: "HEAD", signal: ctrl.signal });
-    if (res.ok) {
+    // `redirect: "manual"` so a directory CID's 301 (kubo appends a trailing
+    // slash for UnixFS dirs) is visible to us instead of being followed.
+    const res = await fetch(selfUrl, {
+      method: "HEAD",
+      redirect: "manual",
+      signal: ctrl.signal,
+    });
+    // Anything under 400 means the node HAS the content: 200 for files,
+    // 301/302 for directory CIDs (HLS bundles). Treating a 3xx as a miss
+    // sent every HLS master to Pinata, which doesn't hold our self-pinned
+    // bundles — the "does not have this content pinned" playback failure.
+    if (res.status < 400) {
       selfNode.fails = 0;
       gatewayProbeCache.set(cid, { url: selfUrl, expires: Date.now() + 300_000 });
       return selfUrl;
