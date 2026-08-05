@@ -366,7 +366,7 @@ function UploadPage() {
         return;
       }
 
-      // 3. Not on IPFS yet — stream the file through our Worker to Pinata.
+      // 3. Not on IPFS yet — stream the file through our Worker to our node.
       setStage("uploading");
       const safeName = sanitizeFilename(file.name);
       const pinResult = await uploadViaWorker(file, safeName, (pct) =>
