@@ -99,7 +99,7 @@ export function VideoPlayerV2({
     void video.play().catch(() => {});
   }
 
-  const isHls = src.endsWith(".m3u8");
+  const isHls = src.split(/[?#]/, 1)[0]?.endsWith(".m3u8") ?? false;
 
   useEffect(() => {
     const video = videoRef.current;

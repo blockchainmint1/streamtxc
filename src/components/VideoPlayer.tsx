@@ -25,7 +25,7 @@ export function VideoPlayer({
     if (!video) return;
 
     let hls: Hls | null = null;
-    const isHls = src.endsWith(".m3u8");
+    const isHls = src.split(/[?#]/, 1)[0]?.endsWith(".m3u8") ?? false;
 
     if (isHls && Hls.isSupported()) {
       hls = new Hls({ enableWorker: true });
