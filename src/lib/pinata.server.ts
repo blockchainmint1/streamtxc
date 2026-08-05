@@ -264,9 +264,22 @@ export function pinataGatewayUrl(cid: string): string {
  */
 const gatewayProbeCache = new Map<string, { url: string; expires: number }>();
 
+/**
+ * Domain-level circuit breaker for the self-hosted node.
+ *
+ * Per-CID memoization isn't enough when the node itself is unreachable
+ * (bad DNS, box down, SG change): every *new* CID still pays the full
+ * probe timeout, so a page of thumbnails or an HLS segment burst stalls
+ * for seconds each. After a few consecutive failures we stop probing
+ * entirely and go straight to Pinata, retrying the node occasionally.
+ */
+const selfNode = { fails: 0, openUntil: 0 };
+const SELF_NODE_FAIL_THRESHOLD = 3;
+const SELF_NODE_OPEN_MS = 60_000;
+
 export async function resolveGatewayUrl(
   cid: string,
-  timeoutMs = 1500,
+  timeoutMs = 800,
 ): Promise<string> {
   const ownNode = process.env.IPFS_GATEWAY_DOMAIN;
   if (!ownNode) return pinataGatewayUrl(cid);
@@ -275,18 +288,33 @@ export async function resolveGatewayUrl(
   // doesn't re-probe the same CID dozens of times within one isolate.
   const cached = gatewayProbeCache.get(cid);
   if (cached && cached.expires > Date.now()) return cached.url;
+  // Breaker open: the node is known-bad right now, don't pay the timeout.
+  if (selfNode.openUntil > Date.now()) return pinataGatewayUrl(cid);
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(selfUrl, { method: "HEAD", signal: ctrl.signal });
     if (res.ok) {
+      selfNode.fails = 0;
       gatewayProbeCache.set(cid, { url: selfUrl, expires: Date.now() + 300_000 });
       return selfUrl;
     }
+    // A 404 means the node is alive but doesn't have this CID — that's a
+    // per-CID miss, not a node outage, so it must not trip the breaker.
+    if (res.status >= 500) selfNode.fails += 1;
+    else selfNode.fails = 0;
   } catch {
-    // network error / abort — fall through
+    // network error / abort — the node itself looks unreachable
+    selfNode.fails += 1;
   } finally {
     clearTimeout(t);
+  }
+  if (selfNode.fails >= SELF_NODE_FAIL_THRESHOLD) {
+    selfNode.openUntil = Date.now() + SELF_NODE_OPEN_MS;
+    selfNode.fails = 0;
+    console.warn(
+      `resolveGatewayUrl: self-hosted node ${ownNode} unreachable — serving from Pinata for ${SELF_NODE_OPEN_MS / 1000}s`,
+    );
   }
   const fallback = pinataGatewayUrl(cid);
   gatewayProbeCache.set(cid, { url: fallback, expires: Date.now() + 60_000 });
