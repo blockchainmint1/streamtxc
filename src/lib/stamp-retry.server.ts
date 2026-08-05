@@ -6,7 +6,7 @@
 //     update the most recent stamp_failed C row + the videos row.
 //   - For the T event: reuse the metaCid we already pinned to IPFS
 //     (stored in chain_events.metadata.metaCid for the failed T row),
-//     so we don't burn a fresh Pinata pin on every retry. If we can't
+//     so we don't create a fresh IPFS pin on every retry. If we can't
 //     find one, fall back to re-pinning from the current videos row.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -15,7 +15,7 @@ import {
   stampRawPayload,
   TXC_PROTO_TAG,
 } from "./txc.server";
-import { pinJsonToIPFS } from "./pinata.server";
+import { pinJsonToIPFS } from "./ipfs.server";
 
 export interface RetryResult {
   cid: string;

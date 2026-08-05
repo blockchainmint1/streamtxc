@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { resolveGatewayUrl } from "@/lib/pinata.server";
+import { resolveGatewayUrl } from "@/lib/ipfs.server";
 import { recordView } from "@/lib/videos.functions";
 
 async function hashIp(ip: string): Promise<string> {
@@ -58,19 +58,16 @@ export const Route = createFileRoute("/api/stream/$cid")({
           console.error("view tracking failed", e);
         }
 
-        // Redirect the browser straight to our dedicated Pinata gateway.
+        // Redirect the browser straight to our dedicated IPFS gateway.
         // Streaming through the Worker added a hop and CPU/subrequest cost;
-        // a 302 lets the player do native HTTP Range requests against Pinata
+        // a 302 lets the player do native HTTP Range requests against IPFS
         // directly, which is dramatically faster on a paid dedicated gateway.
         // IMPORTANT: do NOT cache the redirect — caching it means rewatches
         // never hit the Worker, so recordView() never runs and view_count
         // gets stuck at 1. The actual video bytes are still cached by Pinata
         // and the browser via Range requests, so this only costs us a tiny
         // 302 per playback.
-        // Self-node first, Pinata fallback. HEAD-probes the self-hosted
-        // gateway with a short timeout; if it can't serve this CID (e.g.
-        // pin hasn't been mirrored yet) we 302 to Pinata so the player
-        // never sees a hang. See mem://constraints/ipfs-gateway-fallback.
+        // All media resolves through the self-hosted gateway.
         const location = await resolveGatewayUrl(cid);
         return new Response(null, {
           status: 302,

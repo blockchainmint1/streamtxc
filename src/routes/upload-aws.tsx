@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, formatDate, formatTxc, MAX_UPLOAD_BYTES } from "@/lib/fees";
 import {
-  getUploadUrl,
   registerUpload,
   addByCid,
   getQuote,
@@ -61,7 +60,7 @@ export const Route = createFileRoute("/upload-aws")({
 });
 
 /**
- * Pinata's TUS upload encodes the filename into a base64 metadata header
+ * Upload metadata encodes the filename into a base64 header
  * via `btoa`, which throws on any character outside Latin1 (emoji, smart
  * quotes, accented chars in some encodings, etc.). Strip the file name
  * down to ASCII before handing it to the SDK.

@@ -11,7 +11,7 @@ import {
   type TxcEventType,
   type StampResult,
 } from "./txc.server";
-import { pinJsonToIPFS } from "./pinata.server";
+import { pinJsonToIPFS } from "./ipfs.server";
 
 // Non-crypto stub-id helper. Used only when no real RPC is configured
 // (local dev / tests). Must NOT pull in node:crypto — this file ends up

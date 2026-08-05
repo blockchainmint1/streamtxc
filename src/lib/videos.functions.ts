@@ -6,10 +6,9 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireWalletSession } from "./wallet-auth.functions";
 import {
   pinFileToIPFS,
-  createPresignedUploadUrl,
   pinByCid,
   headCidOnGateway,
-} from "./pinata.server";
+} from "./ipfs.server";
 import { mockPaymentTx } from "./chain";
 import { getTxStatus, explorerTxUrl } from "./txc.server";
 import { assignVideoWallet } from "./txc-wallets.server";
@@ -138,23 +137,7 @@ export const getQuote = createServerFn({ method: "POST" })
     };
   });
 
-// --- Direct browser → Pinata upload ---------------------------------------
-
-/** Step 1: get a presigned URL the browser can POST the file to. */
-export const getUploadUrl = createServerFn({ method: "POST" })
-  .inputValidator((input) =>
-    z
-      .object({
-        filename: z.string().min(1).max(255),
-        sizeBytes: z.number().int().positive().max(MAX_UPLOAD_BYTES),
-      })
-      .parse(input),
-  )
-  .handler(async ({ data }) => {
-    return await createPresignedUploadUrl({ filename: data.filename });
-  });
-
-/** Step 2: after the browser uploads, persist metadata + mock payment. */
+/** After the browser uploads, persist metadata + mock payment. */
 export const registerUpload = createServerFn({ method: "POST" })
   .inputValidator((input) =>
     z
@@ -430,26 +413,6 @@ export const lookupPinnedCid = createServerFn({ method: "POST" })
     if (selfV1) return { cid: data.cidV1, version: 1 as const };
     if (selfV0) return { cid: data.cidV0, version: 0 as const };
 
-    const jwt = process.env.PINATA_JWT;
-    if (!jwt) return null;
-    const probe = async (cid: string): Promise<boolean> => {
-      try {
-        const res = await fetch(
-          `https://api.pinata.cloud/v3/files/public?cid=${encodeURIComponent(cid)}`,
-          { headers: { Authorization: `Bearer ${jwt}` } },
-        );
-        if (!res.ok) return false;
-        const json = (await res.json()) as {
-          data?: { files?: { id: string }[] };
-        };
-        return (json.data?.files?.length ?? 0) > 0;
-      } catch {
-        return false;
-      }
-    };
-    const [v1, v0] = await Promise.all([probe(data.cidV1), probe(data.cidV0)]);
-    if (v1) return { cid: data.cidV1, version: 1 as const };
-    if (v0) return { cid: data.cidV0, version: 0 as const };
     return null;
   });
 
@@ -481,17 +444,15 @@ export const addByCid = createServerFn({ method: "POST" })
     const thumbnailCid = draft?.thumbnailCid ?? data.thumbnailCid ?? null;
     const nsfw = draft?.nsfw ?? data.nsfw;
 
-    // 1) Kick off Pinata's "fetch this CID from the IPFS network" job FIRST.
+    // 1) Ask our node to fetch and pin this CID from the IPFS network first.
     //    Without this, the gateway HEAD probe below has nothing to serve and
     //    will hang waiting for IPFS DHT discovery to finish.
     await pinByCid(data.cid, data.title);
 
     // 2) Probe the gateway to learn size + mime, with a generous timeout.
     //    IPFS DHT lookups for fresh CIDs can take 20-30s on a cold gateway.
-    const gatewayDomain = process.env.PINATA_GATEWAY_DOMAIN;
-    const url = gatewayDomain
-      ? `https://${gatewayDomain}/ipfs/${data.cid}`
-      : `https://gateway.pinata.cloud/ipfs/${data.cid}`;
+    const gatewayDomain = process.env.IPFS_GATEWAY_DOMAIN || "ipfs.honest.money";
+    const url = `https://${gatewayDomain}/ipfs/${data.cid}`;
 
     let sizeBytes = 0;
     let mimeType = "video/mp4";
@@ -838,7 +799,7 @@ export const listVideosByOwner = createServerFn({ method: "POST" })
   });
 
 /**
- * Best-effort: ask Pinata to re-pin every `unpinned` CID owned by `wallet`
+ * Best-effort: ask our node to re-pin every `unpinned` CID owned by `wallet`
  * by fetching it from the public IPFS DHT. Pinata returns success even if
  * the content isn't yet found — the actual fetch happens asynchronously.
  * We don't flip the row back to `active` here; the payment-watcher does
@@ -909,7 +870,7 @@ export const probeAvailability = createServerFn({ method: "POST" })
   });
 
 /**
- * Public single-CID restore. Asks Pinata to re-fetch this CID from the
+ * Public single-CID restore. Asks our node to re-fetch this CID from the
  * IPFS DHT. Best-effort — Pinata may say "queued" even if no peer is
  * actually seeding it. Status is not flipped here; the watch page's
  * probeAvailability call decides truth from the live gateway HEAD.
@@ -1786,7 +1747,7 @@ export const finalizeOwnTranscode = createServerFn({ method: "POST" })
       if (!json.cid) throw new Error("Lambda /pin returned no cid");
       pinned = { cid: json.cid, size: json.totalBytes ?? 0 };
     } else {
-      const { pinDirectoryToIPFS } = await import("./pinata.server");
+      const { pinDirectoryToIPFS } = await import("./ipfs.server");
       const files: Array<{ path: string; body: Blob; contentType?: string }> = [];
       for (const key of keys) {
         const blob = await getObjectBlob(outputBucket, key);
@@ -1797,15 +1758,6 @@ export const finalizeOwnTranscode = createServerFn({ method: "POST" })
         });
       }
       pinned = await pinDirectoryToIPFS(files, `hls-${data.cid}`);
-    }
-
-    // Pinata backup (best-effort, never throws). pinDirectoryToIPFS already
-    // does this in the fallback branch above; this covers the Lambda /pin path.
-    if (lambdaToken && (lambdaName || lambdaUrl)) {
-      const { pinByCid } = await import("./pinata.server");
-      pinByCid(pinned.cid, `hls-${data.cid}`).catch((e) =>
-        console.warn(`[rebuild-hls ${data.cid}] pinata backup failed:`, e),
-      );
     }
 
     const renditions = keys

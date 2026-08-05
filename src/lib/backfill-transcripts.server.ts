@@ -13,7 +13,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { headObject, s3PutObject } from "./aws-s3.server";
 import { startAudioOnlyTranscode } from "./aws-mediaconvert.server";
 import { maybeTranscribeVideo } from "./transcription.server";
-import { gatewayUrl } from "./pinata.server";
+import { gatewayUrl } from "./ipfs.server";
 
 const SINGLE_PUT_MAX_BYTES = 200 * 1024 * 1024;
 

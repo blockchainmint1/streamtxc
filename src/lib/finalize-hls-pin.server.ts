@@ -126,7 +126,7 @@ export async function retryFinalizePinFromS3(cid: string): Promise<{
     if (!json.cid) throw new Error("Lambda /pin returned no cid");
     pinned = { cid: json.cid, size: json.totalBytes ?? 0 };
   } else {
-    const { pinDirectoryToIPFS } = await import("./pinata.server");
+    const { pinDirectoryToIPFS } = await import("./ipfs.server");
     const files: Array<{ path: string; body: Blob; contentType?: string }> = [];
     for (const key of keys) {
       const blob = await getObjectBlob(outputBucket, key);

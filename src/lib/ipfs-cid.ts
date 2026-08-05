@@ -1,8 +1,8 @@
-// Browser-side CID computation. Mirrors Pinata's defaults:
+// Browser-side CID computation. Mirrors our kubo import settings:
 //   cidVersion: 1, rawLeaves: true, chunker: 256 KiB.
 // Lets us check "is this file already on IPFS?" before uploading the bytes.
 //
-// We compute BOTH CIDv1 (current Pinata default — rawLeaves:true) AND CIDv0
+// We compute BOTH CIDv1 (rawLeaves:true) AND CIDv0
 // (legacy default — rawLeaves:false, dag-pb leaves) because the same bytes
 // produce different CIDs under each scheme, and a file pinned by an older
 // client (or by `ipfs add` with default flags) will only resolve under v0.
@@ -22,7 +22,7 @@ export async function computeCidV0(file: File | Blob): Promise<string> {
 }
 
 /**
- * Compute both CIDv1 (Pinata default) and CIDv0 (legacy `ipfs add` default).
+ * Compute both CIDv1 and CIDv0 (legacy `ipfs add` default).
  *
  * Uses a Web Worker that streams the file so multi-GB uploads don't freeze
  * the tab or balloon memory. Falls back to the buffered path if Workers
@@ -94,4 +94,4 @@ function hashInWorker(
 // was "on IPFS". That was unreliable — the stream endpoint 302s to a host
 // that returns the SPA shell as 200 for unknown CIDs, producing false hits.
 // Use the `lookupPinnedCid` server fn in videos.functions.ts instead, which
-// queries our Pinata account directly.
+// queries our self-hosted node directly.
