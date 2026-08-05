@@ -1,7 +1,7 @@
 # Project Memory
 
 ## Core
-IPFS: use only `ipfs.honest.money` (or `IPFS_GATEWAY_DOMAIN`); never add Pinata code, packages, domains, secrets, or fallback.
+IPFS: use only `ipfs.honest.money` (or `IPFS_GATEWAY_DOMAIN`); never add third-party gateway code, packages, secrets, or fallback.
 
 ## Memories
 - [Streaming/CDN research links](mem://references/streaming-cdn-research) — Bunny Stream, EdgeNext CDN, IPFS streaming article

@@ -452,7 +452,7 @@ Outputs:
 YAML
 
 # ───────────────────────────────────────────────────────────────
-# Lambda code: S3 → IPFS streamer, /pin /pin-by-hash /health
+# Lambda code: S3 → IPFS streamer, /pin /pin-cid /health
 # ───────────────────────────────────────────────────────────────
 cat > lambda/index.js <<'LAMBDAEOF'
 const { Readable } = require("stream");
