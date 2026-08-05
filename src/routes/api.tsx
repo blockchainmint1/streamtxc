@@ -310,7 +310,7 @@ curl -X POST ${base}/_serverFn/completeWalletLogin \\
           icon={<Film className="h-5 w-5" />}
         >
           <p>
-            302-redirects to our dedicated Pinata gateway for the given IPFS
+            302-redirects to our dedicated self-hosted gateway for the given IPFS
             CID. Supports HTTP Range requests, so it works as a drop-in{" "}
             <code className="font-mono text-foreground">&lt;video src&gt;</code>{" "}
             for any browser, native app, or video player. Each call also

@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { MAX_UPLOAD_BYTES } from "@/lib/fees";
 
 // Allow common browser video formats only. Blocks abuse of the platform's
-// Pinata account for arbitrary content pinning.
+// IPFS node for arbitrary content pinning.
 const ALLOWED_MIME_TYPES = new Set([
   "video/mp4",
   "video/webm",
@@ -21,8 +21,7 @@ const ALLOWED_MIME_TYPES = new Set([
  *   2. Ask the IPFS pinning Lambda to stream that S3 key into our kubo
  *      node and return the CID.
  *
- * Pinata is no longer touched on the hot upload path — every new video
- * lands on our own IPFS infra.
+ * Every new video lands on our own IPFS infrastructure.
  */
 export const Route = createFileRoute("/api/public/upload")({
   server: {

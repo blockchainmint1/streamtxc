@@ -64,7 +64,7 @@ export const Route = createFileRoute("/api/stream/$cid")({
         // directly, which is dramatically faster on a paid dedicated gateway.
         // IMPORTANT: do NOT cache the redirect — caching it means rewatches
         // never hit the Worker, so recordView() never runs and view_count
-        // gets stuck at 1. The actual video bytes are still cached by Pinata
+        // gets stuck at 1. The actual video bytes are still cached by the gateway
         // and the browser via Range requests, so this only costs us a tiny
         // 302 per playback.
         // All media resolves through the self-hosted gateway.

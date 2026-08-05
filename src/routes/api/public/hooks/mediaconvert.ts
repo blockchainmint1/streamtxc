@@ -7,7 +7,7 @@ import { createHmac, timingSafeEqual } from "crypto";
  * Expected event shape (CloudWatch / EventBridge "MediaConvert Job State Change"):
  *   { detail: { jobId, status: 'COMPLETE'|'ERROR'|..., userMetadata: { videoId } } }
  *
- * On COMPLETE: list HLS outputs in S3, pin them to Pinata as one directory,
+ * On COMPLETE: list HLS outputs in S3, pin them to IPFS as one directory,
  * write the directory CID + rendition manifest back to the videos row, and
  * re-stamp metadata to chain so the new CIDs are anchored.
  *
@@ -155,7 +155,7 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
 
         // Prefer the self-hosted IPFS Lambda via direct AWS Invoke
         // (bypasses the 30s API Gateway HTTP API timeout). Fall back to
-        // direct Pinata directory pin when the Lambda isn't reachable.
+        // direct self-hosted directory add when the Lambda isn't reachable.
         let pinnedCid: string;
         let pinnedSize = 0;
         const lambdaToken = process.env.IPFS_LAMBDA_TOKEN;

@@ -37,7 +37,7 @@ function PrivacyPage() {
               streamTXC is a wallet-native publishing tool. We don&rsquo;t ask
               for your email, your name, or your phone number. The only
               identifier we use is your TXC wallet address, which is already
-              public on-chain. Files you upload are pinned to IPFS via Pinata
+               public on-chain. Files you upload are pinned to our self-hosted IPFS node
               and addressed by their CID &mdash; the content hash &mdash; not
               by you.
             </p>
@@ -96,7 +96,7 @@ function PrivacyPage() {
               </li>
               <li>
                 The file is streamed once from the source through our server
-                directly to Pinata for IPFS pinning. We do not write a copy
+                 through temporary object storage to our IPFS node. Temporary upload objects are deleted
                 to disk.
               </li>
               <li>
@@ -133,9 +133,7 @@ function PrivacyPage() {
 
           <Section title="Third-party services we rely on">
             <ul className="list-disc pl-6 space-y-2">
-              <li>
-                <strong>Pinata</strong> &mdash; IPFS pinning provider.
-              </li>
+               <li><strong>IPFS</strong> &mdash; content-addressed storage through our self-hosted node.</li>
               <li>
                 <strong>Cloudflare</strong> &mdash; edge hosting and
                 CDN-style streaming.

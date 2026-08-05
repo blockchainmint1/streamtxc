@@ -1,7 +1,7 @@
 // Server functions for the HLS transcode pipeline.
 //
 // Flow (client-side orchestration in upload.tsx):
-//   1. Pin original to Pinata (existing /api/public/upload).
+//   1. Pin original to self-hosted IPFS (existing /api/public/upload).
 //   2. Call `getTranscodeUploadUrl({ cid, contentType })` → presigned S3 PUT.
 //   3. Browser PUTs the same file to S3.
 //   4. Call `startTranscode({ cid })` → kicks off MediaConvert, sets

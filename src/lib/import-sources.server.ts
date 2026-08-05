@@ -2,7 +2,7 @@
 //
 // Each resolver returns the direct streaming URL plus enough metadata to
 // build a progress bar (filename, size). The streaming endpoint then opens
-// `fetch(directUrl)` and pipes the body into Pinata.
+// `fetch(directUrl)` and pipes the body into our self-hosted IPFS node.
 //
 // Adding a new source = add a host to `HOST_ALLOWLIST` and wire one
 // resolver function below.

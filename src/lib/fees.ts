@@ -6,9 +6,9 @@ export const FALLBACK_TXC_USD = 0.10; // used only if the price feed is down
 export const REWARD_CREDIT_PER_VIEW_USD = 0.0001; // USD equivalent
 export const VIEW_DEBOUNCE_SECONDS = 30;
 // 100 MB cap. Cloudflare Workers reject request bodies larger than ~100 MB,
-// and we proxy uploads through our Worker → Pinata to keep Pinata's CORS
+// and we proxy uploads through our Worker → self-hosted IPFS to keep CORS
 // allowlist off the critical path. Larger files? Pin to IPFS first
-// (e.g. pinata.cloud) and use the "Add by CID" flow.
+// and use the "Add by CID" flow.
 export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 // Cap for the S3-presigned-PUT path. The browser uploads
 // directly to S3, bypassing the Cloudflare Worker body limit. S3's single

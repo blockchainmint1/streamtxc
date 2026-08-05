@@ -454,7 +454,7 @@ export function S3VideoUpload({
         }
         if (st === "failed") {
           pushLog("warn", `previous transcode failed (${row.transcode_error ?? "unknown"}) — will retry the pipeline`);
-          // Fall through to Pinata check + normal upload path
+          // Fall through to the node check + normal upload path
         }
       }
 

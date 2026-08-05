@@ -122,7 +122,7 @@ export async function retryStuckStampForVideo(cid: string): Promise<RetryResult>
 
   if (needsTRetry) {
     try {
-      // Reuse the already-pinned metaCid if we have one — saves a Pinata pin.
+      // Reuse the already-pinned metaCid if we have one — avoids another IPFS add.
       let metaCid: string | null =
         video.metadata_cid ||
         (existingT?.metadata as { metaCid?: string } | null)?.metaCid ||

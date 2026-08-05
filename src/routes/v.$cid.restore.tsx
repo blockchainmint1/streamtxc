@@ -97,7 +97,7 @@ function RestorePage() {
             const json = JSON.parse(xhr.responseText) as { cid?: string; error?: string };
             if (xhr.status >= 200 && xhr.status < 300 && json.cid) {
               if (json.cid !== video.cid && json.cid !== computedCid?.v0) {
-                reject(new Error(`Pinata returned a different CID (${json.cid}). The file may have been transcoded by your OS.`));
+                reject(new Error(`IPFS returned a different CID (${json.cid}). The file may have been transcoded by your OS.`));
                 return;
               }
               resolve();

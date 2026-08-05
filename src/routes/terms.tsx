@@ -150,7 +150,7 @@ function TermsPage() {
 
           <Section title="Third-party services">
             <p>
-              streamTXC relies on Pinata, Cloudflare, Supabase, IPFS, and the
+               streamTXC relies on Cloudflare, Lovable Cloud, IPFS, and the
               Texitcoin network. Those services have their own terms and we
               aren&rsquo;t responsible for what they do or don&rsquo;t do.
               Wallets, browser extensions, and gateways you choose to use are
