@@ -200,7 +200,7 @@ bafybeigsqgnxogzyi7fdyogldjvia3juqkxnjv...
 
 # Anyone can fetch it from any IPFS gateway:
 curl -L https://ipfs.io/ipfs/{cid} -o video.mp4
-curl -L https://gateway.pinata.cloud/ipfs/{cid} -o video.mp4
+curl -L https://ipfs.honest.money/ipfs/{cid} -o video.mp4
 curl -L ${base}/api/stream/{cid}    -o video.mp4`}</Code>
           <p className="text-xs text-muted-foreground">
             Treat the CID as the canonical link to a video — pass it around,

@@ -174,8 +174,8 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
             pinnedCid = json.cid;
             pinnedSize = json.totalBytes ?? 0;
           } catch (err) {
-            console.warn(`hls-pin: lambda /pin failed (${err instanceof Error ? err.message : err}) — falling back to Pinata`);
-            const { pinDirectoryToIPFS } = await import("@/lib/pinata.server");
+            console.warn(`hls-pin: lambda /pin failed (${err instanceof Error ? err.message : err}) — retrying through the self-hosted add endpoint`);
+            const { pinDirectoryToIPFS } = await import("@/lib/ipfs.server");
             const files: Array<{ path: string; body: Blob; contentType?: string }> = [];
             for (const key of keys) {
               const blob = await getObjectBlob(outputBucket, key);
@@ -190,8 +190,8 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
             pinnedSize = fb.size;
           }
         } else {
-          console.log(`[mediaconvert ${cid}] pinning ${keys.length} files to Pinata (self-hosted Lambda not configured)`);
-          const { pinDirectoryToIPFS } = await import("@/lib/pinata.server");
+          console.log(`[mediaconvert ${cid}] pinning ${keys.length} files to the self-hosted IPFS node`);
+          const { pinDirectoryToIPFS } = await import("@/lib/ipfs.server");
           const files: Array<{ path: string; body: Blob; contentType?: string }> = [];
           for (const key of keys) {
             const blob = await getObjectBlob(outputBucket, key);
@@ -211,12 +211,6 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
         const finalized = await finalizeHlsPin({
           cid, jobId, hlsCid: pinned.cid, renditions,
         });
-
-        // Pinata backup: best-effort mirror of the HLS wrap CID. Never throws.
-        const { pinByCid } = await import("@/lib/pinata.server");
-        pinByCid(pinned.cid, `hls-${cid}`).catch((e) =>
-          console.warn(`[mediaconvert ${cid}] pinata backup failed:`, e),
-        );
 
         // For Zoom imports: transcribe the audio-only MediaConvert output
         // and stamp the transcript CID onto the row. Best-effort —
