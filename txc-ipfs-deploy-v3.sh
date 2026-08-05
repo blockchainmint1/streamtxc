@@ -8,7 +8,6 @@
 #   - An HTTP API Gateway in front of the Lambda with:
 #       POST /pin           (bearer auth, the main entrypoint)
 #       POST /add           (bearer auth, multipart upload → kubo /api/v0/add)
-#       POST /pin-by-hash   (bearer auth, proxies to Pinata if PINATA_JWT set)
 #       POST /pin-cid       (bearer auth, pins an existing CID on our IPFS node)
 #       GET  /health        (no auth, returns {ok:true})
 #   - A CloudWatch log group with 30-day retention
@@ -28,7 +27,6 @@
 #   export IPFS_DOMAIN=ipfs.honest.money
 #   export VPC_ID=vpc-xxxx  PUBLIC_SUBNET=subnet-xxxx  PRIVATE_SUBNET=subnet-yyyy
 #   export BEARER_TOKEN=...  # optional; otherwise existing Lambda token is reused
-#   export PINATA_JWT=eyJ...   # optional, enables /pin-by-hash
 
 set -Eeuo pipefail
 trap 'echo ""; echo "❌ STOPPED at line $LINENO. Copy the last ~20 lines to Lovable."' ERR
@@ -39,7 +37,6 @@ S3_BUCKET="${S3_BUCKET:-}"
 IPFS_DOMAIN="${IPFS_DOMAIN:-ipfs.honest.money}"
 EBS_GB="${EBS_GB:-2000}"
 INSTANCE_TYPE="${INSTANCE_TYPE:-t3.large}"
-PINATA_JWT="${PINATA_JWT:-}"
 VPC_ID="${VPC_ID:-}"
 PUBLIC_SUBNET="${PUBLIC_SUBNET:-}"
 PRIVATE_SUBNET="${PRIVATE_SUBNET:-}"
@@ -53,7 +50,6 @@ echo "Stack prefix:  $STACK"
 echo "Instance:      $INSTANCE_TYPE"
 echo "Storage:       ${EBS_GB}GB"
 echo "Gateway host:  $IPFS_DOMAIN"
-echo "Pinata backup: $([ -n "$PINATA_JWT" ] && echo enabled || echo disabled)"
 echo "Reuse VPC:     $([ -n "$VPC_ID" ] && echo "$VPC_ID" || echo "no (creating fresh)")"
 echo ""
 
@@ -348,7 +344,7 @@ Outputs:
 YAML
 
 # ───────────────────────────────────────────────────────────────
-# 03 Lambda + API Gateway (POST /pin, POST /pin-by-hash, GET /health)
+# 03 Lambda + API Gateway (POST /pin, POST /pin-cid, GET /health)
 # ───────────────────────────────────────────────────────────────
 cat > 03-lambda.yaml <<'YAML'
 AWSTemplateFormatVersion: "2010-09-09"
@@ -360,7 +356,6 @@ Parameters:
   IpfsPrivateIp: { Type: String }
   S3BucketName: { Type: String }
   BearerToken: { Type: String, NoEcho: true }
-  PinataJwt:   { Type: String, NoEcho: true, Default: "" }
 Resources:
   LambdaSg:
     Type: AWS::EC2::SecurityGroup
@@ -415,7 +410,6 @@ Resources:
         Variables:
           IPFS_API: !Sub "http://${IpfsPrivateIp}:5001"
           BEARER_TOKEN: !Ref BearerToken
-          PINATA_JWT: !Ref PinataJwt
       VpcConfig:
         SecurityGroupIds: [!Ref LambdaSg]
         SubnetIds: [!Ref PrivateSubnetId]
@@ -438,9 +432,6 @@ Resources:
   RouteAdd:
     Type: AWS::ApiGatewayV2::Route
     Properties: { ApiId: !Ref Api, RouteKey: "POST /add",         Target: !Sub "integrations/${Integration}" }
-  RoutePinByHash:
-    Type: AWS::ApiGatewayV2::Route
-    Properties: { ApiId: !Ref Api, RouteKey: "POST /pin-by-hash", Target: !Sub "integrations/${Integration}" }
   RouteHealth:
     Type: AWS::ApiGatewayV2::Route
     Properties: { ApiId: !Ref Api, RouteKey: "GET /health",       Target: !Sub "integrations/${Integration}" }
@@ -461,7 +452,7 @@ Outputs:
 YAML
 
 # ───────────────────────────────────────────────────────────────
-# Lambda code: S3 → IPFS streamer, /pin /pin-by-hash /health
+# Lambda code: S3 → IPFS streamer, /pin /pin-cid /health
 # ───────────────────────────────────────────────────────────────
 cat > lambda/index.js <<'LAMBDAEOF'
 const { Readable } = require("stream");
@@ -471,19 +462,17 @@ const { S3Client, GetObjectCommand, ListObjectsV2Command } = require("@aws-sdk/c
 const s3 = new S3Client({});
 const IPFS_API = process.env.IPFS_API;
 const BEARER = process.env.BEARER_TOKEN;
-const PINATA_JWT = process.env.PINATA_JWT || "";
 
 exports.handler = async (event) => {
   try {
     const route = event.routeKey || `${event.requestContext?.http?.method || "POST"} ${event.rawPath || "/pin"}`;
     if (route === "GET /health") {
-      return resp(200, { ok: true, ipfs: IPFS_API ? "configured" : "missing", pinata: PINATA_JWT ? "configured" : "disabled" });
+      return resp(200, { ok: true, ipfs: IPFS_API ? "configured" : "missing" });
     }
     const auth = event.headers?.authorization || event.headers?.Authorization || "";
     if (auth !== `Bearer ${BEARER}`) return resp(401, { error: "unauthorized" });
     if (route === "POST /add") return await addToNode(event);
     const body = JSON.parse(event.body || "{}");
-    if (route === "POST /pin-by-hash") return await pinByHash(body);
     if (route === "POST /pin-cid") return await pinCidOnNode(body);
     return await pinFromS3(body);
   } catch (err) {
@@ -628,20 +617,8 @@ async function pinFromS3(body) {
   });
 }
 
-async function pinByHash(body) {
-  if (!PINATA_JWT) return resp(400, { error: "PINATA_JWT not configured" });
-  if (!body.cid) return resp(400, { error: "cid required" });
-  const r = await fetch("https://api.pinata.cloud/pinning/pinByHash", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${PINATA_JWT}` },
-    body: JSON.stringify({ hashToPin: body.cid, pinataMetadata: body.metadata || undefined }),
-  });
-  const text = await r.text();
-  return resp(r.ok ? 200 : 502, { ok: r.ok, status: r.status, response: safeJson(text) });
-}
-
 // Pin an already-existing CID on our self-hosted IPFS node via Kubo RPC.
-// Used to mirror Pinata-pinned CIDs to honest.money.
+// Used to fetch and retain a CID discovered through the public IPFS network.
 async function pinCidOnNode(body) {
   if (!IPFS_API) return resp(503, { error: "IPFS_API not configured" });
   if (!body.cid) return resp(400, { error: "cid required" });
@@ -748,8 +725,7 @@ aws cloudformation deploy --region "$AWS_REGION" --stack-name "${STACK}-lambda" 
     IpfsSecurityGroupId="$IPFS_SG_ID" \
     IpfsPrivateIp="$IPFS_PRIVATE_IP" \
     S3BucketName="$S3_BUCKET" \
-    BearerToken="$BEARER_TOKEN" \
-    PinataJwt="$PINATA_JWT"
+    BearerToken="$BEARER_TOKEN"
 
 LAMBDA_NAME="$(aws cloudformation describe-stacks --region "$AWS_REGION" --stack-name "${STACK}-lambda" --query "Stacks[0].Outputs[?OutputKey=='LambdaName'].OutputValue" --output text)"
 API_URL="$(aws cloudformation describe-stacks --region "$AWS_REGION" --stack-name "${STACK}-lambda" --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text)"

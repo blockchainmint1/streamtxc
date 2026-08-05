@@ -4,7 +4,7 @@
 // player whose SSR HTML contains a signed CloudFront URL for the recording
 // mp4 — Policy/Signature/Key-Pair-Id baked in. We pull that URL straight
 // out of the HTML and hand it to the existing URL-import streamer, which
-// pipes the bytes into Pinata.
+// pipes the bytes into our self-hosted IPFS node.
 //
 // Passcode-protected shares: POST {id, passwd} to the share URL to set the
 // `_zm_ssid` cookie, then refetch the HTML with that cookie.

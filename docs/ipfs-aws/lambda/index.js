@@ -7,7 +7,6 @@ const { S3Client, GetObjectCommand, ListObjectsV2Command } = require("@aws-sdk/c
 const s3 = new S3Client({});
 const IPFS_API = process.env.IPFS_API;
 const BEARER = process.env.BEARER_TOKEN;
-const PINATA_JWT = process.env.PINATA_JWT || "";
 
 // Stream a request body into kubo with REAL backpressure. Node's global
 // fetch (undici) buffers the request body in memory when the receiver is
@@ -46,13 +45,12 @@ exports.handler = async (event) => {
   try {
     const route = event.routeKey || `${event.requestContext?.http?.method || "POST"} ${event.rawPath || "/pin"}`;
     if (route === "GET /health") {
-      return resp(200, { ok: true, ipfs: IPFS_API ? "configured" : "missing", pinata: PINATA_JWT ? "configured" : "disabled" });
+      return resp(200, { ok: true, ipfs: IPFS_API ? "configured" : "missing" });
     }
     const auth = event.headers?.authorization || event.headers?.Authorization || "";
     if (auth !== `Bearer ${BEARER}`) return resp(401, { error: "unauthorized" });
     if (route === "POST /add") return await addToNode(event);
     const body = JSON.parse(event.body || "{}");
-    if (route === "POST /pin-by-hash") return await pinByHash(body);
     if (route === "POST /pin-cid") return await pinCidOnNode(body);
     return await pinFromS3(body);
   } catch (err) {
@@ -133,7 +131,7 @@ async function pinFromS3(body) {
   }
 
   // IMPORTANT: keep default chunker (256 KiB). The browser-side hasher
-  // (ipfs-only-hash) and Pinata both use size-262144; any override here
+  // (ipfs-only-hash) and Kubo both use size-262144; any override here
   // makes Kubo return a different file CID for the same bytes, which
   // desyncs the S3 key (browser CID) from the DB `cid` column (Lambda CID)
   // and breaks MediaConvert lookups.
@@ -193,20 +191,8 @@ async function pinFromS3(body) {
   });
 }
 
-async function pinByHash(body) {
-  if (!PINATA_JWT) return resp(400, { error: "PINATA_JWT not configured" });
-  if (!body.cid) return resp(400, { error: "cid required" });
-  const r = await fetch("https://api.pinata.cloud/pinning/pinByHash", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${PINATA_JWT}` },
-    body: JSON.stringify({ hashToPin: body.cid, pinataMetadata: body.metadata || undefined }),
-  });
-  const text = await r.text();
-  return resp(r.ok ? 200 : 502, { ok: r.ok, status: r.status, response: safeJson(text) });
-}
-
 // Pin an already-existing CID on our self-hosted IPFS node via Kubo RPC.
-// Used to mirror Pinata-pinned CIDs to honest.money.
+// Used to fetch and retain a CID discovered through the public IPFS network.
 async function pinCidOnNode(body) {
   if (!IPFS_API) return resp(503, { error: "IPFS_API not configured" });
   if (!body.cid) return resp(400, { error: "cid required" });

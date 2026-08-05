@@ -74,7 +74,7 @@ function WalletPage() {
     try {
       const res = await restoreFn({ data: { wallet } });
       toast.success(
-        `Asked Pinata to re-fetch ${res.queued}/${res.total} CID${res.total === 1 ? "" : "s"} from IPFS. Restoration runs asynchronously — check back in a few minutes.`,
+        `Asked our node to re-fetch ${res.queued}/${res.total} CID${res.total === 1 ? "" : "s"} from IPFS. Restoration runs asynchronously — check back in a few minutes.`,
       );
     } catch (err) {
       toast.error(

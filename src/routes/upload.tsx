@@ -259,7 +259,7 @@ function CidTab({
               </div>
               <p className="text-sm text-muted-foreground">
                 {notFound} Make sure the file is pinned somewhere public
-                (Pinata, web3.storage, your own node) and try again.
+                (such as your own IPFS node) and try again.
               </p>
             </div>
           </div>

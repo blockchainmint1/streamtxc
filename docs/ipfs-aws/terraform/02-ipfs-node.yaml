@@ -13,7 +13,7 @@ Resources:
       GroupDescription: IPFS node
       VpcId: !Ref VpcId
       SecurityGroupIngress:
-        # libp2p swarm — needed for public DHT / pinata pinByHash
+        # libp2p swarm — needed for public DHT discovery
         - IpProtocol: tcp
           FromPort: 4001
           ToPort: 4001

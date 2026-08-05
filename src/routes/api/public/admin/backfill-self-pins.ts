@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 /**
- * Admin endpoint: mirror existing Pinata-pinned CIDs to our self-hosted
- * IPFS node (honest.money) via the IPFS lambda's pin-by-hash. Walks the
+ * Admin endpoint: mirror existing public CIDs to our self-hosted
+ * IPFS node (honest.money) via the IPFS lambda's pin-cid route. Walks the
  * videos table in popularity order (view_count DESC, then created_at DESC).
  *
  *   POST /api/public/admin/backfill-self-pins?limit=50&offset=0

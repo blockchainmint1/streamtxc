@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { useWallet } from "@/lib/wallet";
 import { formatBytes, formatDate, formatTxc, MAX_UPLOAD_BYTES } from "@/lib/fees";
 import {
-  getUploadUrl,
   registerUpload,
   addByCid,
   getQuote,
@@ -61,7 +60,7 @@ export const Route = createFileRoute("/upload-aws")({
 });
 
 /**
- * Pinata's TUS upload encodes the filename into a base64 metadata header
+ * Upload metadata encodes the filename into a base64 header
  * via `btoa`, which throws on any character outside Latin1 (emoji, smart
  * quotes, accented chars in some encodings, etc.). Strip the file name
  * down to ASCII before handing it to the SDK.
@@ -83,8 +82,8 @@ function sanitizeFilename(name: string): string {
 }
 
 /**
- * POST the file to our own Worker, which streams it to Pinata server-side.
- * Same-origin → no Pinata CORS allowlist to maintain. Capped at
+ * POST the file to our own Worker, which streams it to our IPFS node.
+ * Same-origin upload, capped at
  * MAX_UPLOAD_BYTES (~100 MB) by Cloudflare's request-body limit.
  * Uses XHR so we get real upload progress events (fetch can't stream
  * upload progress in any current browser).
@@ -367,7 +366,7 @@ function UploadPage() {
         return;
       }
 
-      // 3. Not on IPFS yet — stream the file through our Worker to Pinata.
+      // 3. Not on IPFS yet — stream the file through our Worker to our node.
       setStage("uploading");
       const safeName = sanitizeFilename(file.name);
       const pinResult = await uploadViaWorker(file, safeName, (pct) =>
@@ -645,16 +644,8 @@ function UploadPage() {
                 )}
               </label>
               <p className="font-mono text-[11px] text-muted-foreground">
-                Larger files? Pin to IPFS first (e.g.{" "}
-                <a
-                  href="https://pinata.cloud"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  pinata.cloud
-                </a>
-                ) and use the <span className="text-foreground">Add by CID</span> tab.
+                Larger files? Pin to a public IPFS node first and use the{" "}
+                <span className="text-foreground">Add by CID</span> tab.
               </p>
             </div>
 
@@ -669,16 +660,7 @@ function UploadPage() {
                     <p className="text-sm text-muted-foreground">
                       Pin your file to IPFS first, then paste its CID into{" "}
                       <span className="text-foreground">Add by CID</span> below.
-                      We recommend{" "}
-                      <a
-                        href="https://pinata.cloud"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        pinata.cloud
-                      </a>{" "}
-                      — their free tier covers most uploads.
+                      Any public IPFS node that keeps the CID available will work.
                     </p>
                     <Button
                       type="button"
@@ -901,7 +883,7 @@ function UploadPage() {
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {cidNotFound} Make sure the file is pinned somewhere
-                        public (Pinata, web3.storage, your own node) and try
+                        public (such as your own IPFS node) and try
                         again. Fresh CIDs can take a minute to propagate.
                       </p>
                     </div>
@@ -987,7 +969,7 @@ function UploadPage() {
                   <div className="flex items-center gap-2 font-mono text-xs text-primary">
                     <Loader2 className="h-3 w-3 animate-spin" />
                     {cidStage === "fetching"
-                      ? "Asking Pinata to fetch from IPFS…"
+                      ? "Asking our node to fetch from IPFS…"
                       : "Stamping on TXC…"}
                   </div>
                   <p className="text-xs text-muted-foreground">

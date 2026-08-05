@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { resolveGatewayUrl, fetchThroughGateways } from "@/lib/pinata.server";
+import { resolveGatewayUrl, fetchThroughGateways } from "@/lib/ipfs.server";
 import { recordView } from "@/lib/videos.functions";
 
 async function hashIp(ip: string): Promise<string> {
@@ -60,10 +60,10 @@ export const Route = createFileRoute("/api/stream/$cid/$")({
             console.error("view tracking (hls) failed", e);
           }
         }
-        // Same self-first / Pinata-fallback policy as /api/stream/$cid.
+        // Same self-hosted gateway policy as /api/stream/$cid.
         // We probe the directory CID (cheap, single request) and append
         // the splat path to whichever gateway answers. For HLS bundles
-        // this means a missing self-node pin still streams via Pinata.
+        // this keeps all bundle requests on ipfs.honest.money.
         const base = await resolveGatewayUrl(cid);
         const target = `${base}/${splat}`;
 

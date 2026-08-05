@@ -5,7 +5,7 @@
 //   2. resolveImportUrl returns { filename, sizeBytes, token }.
 //   3. User fills in title / description, clicks Pin to IPFS.
 //   4. POST /api/public/import-stream with the token; the server fetches
-//      the file from WT/Dropbox and pipes it into Pinata. Endpoint returns
+//      the file from WT/Dropbox and pipes it into our self-hosted IPFS node. Endpoint returns
 //      { id, cid }.
 //   5. While streaming, we poll getImportStatus(id) every 1s for the
 //      progress bar. (XHR onprogress only sees bytes the *browser* sends,
@@ -470,7 +470,7 @@ export function UrlImportTab({ ownerWallet, onDuplicate, mode = "url" }: Props) 
               ) : (
                 <div className="font-mono text-[11px] text-muted-foreground">
                   This can take a while for big files — the bytes flow{" "}
-                  source → our worker → Pinata. Don't close the tab.
+                  source → our worker → IPFS. Don't close the tab.
                 </div>
               )}
             </div>

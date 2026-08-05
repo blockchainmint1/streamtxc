@@ -5,13 +5,13 @@
 //
 // The Worker fetches the resolved direct URL (WeTransfer / Dropbox) and
 // pipes the body through a byte-counting TransformStream into a streamed
-// multipart upload to Pinata. Memory stays bounded; only one in-flight
+// multipart upload to our self-hosted IPFS node. Memory stays bounded; only one in-flight
 // chunk at a time. An `imports` row tracks progress for the UI's
 // polling progress bar.
 //
 // Token requirement: the streaming endpoint refuses to fetch arbitrary
 // URLs — only ones our resolver just blessed — to keep this from being
-// a generic "send any URL into our Pinata account" amplifier.
+// a generic "send any URL into our IPFS node" amplifier.
 
 import { createFileRoute } from "@tanstack/react-router";
 import {

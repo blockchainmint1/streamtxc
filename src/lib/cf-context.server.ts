@@ -1,5 +1,5 @@
 // Lets server routes opt into Cloudflare's `ctx.waitUntil` so background work
-// (e.g. streaming a multi-GB import to Pinata) can outlive the HTTP response.
+// (e.g. streaming a multi-GB import to IPFS) can outlive the HTTP response.
 // Without this, returning a Response cancels any in-flight promises.
 //
 // `src/server.ts` wraps every request in runWithCfCtx(ctx, ...). Anywhere in

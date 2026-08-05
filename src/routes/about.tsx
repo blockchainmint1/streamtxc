@@ -16,7 +16,7 @@ import {
 export const Route = createFileRoute("/about")({
   head: () => {
     const faqs = [
-      { q: "Who actually hosts my video?", a: "Pinata pins it on IPFS. Anyone else can pin the same CID too — that's the point. If we disappeared tomorrow, the CID still works on any IPFS gateway someone else is running." },
+      { q: "Who actually hosts my video?", a: "Our self-hosted node pins it on IPFS. Anyone else can pin the same CID too — that's the point. If we disappeared tomorrow, the CID still works wherever another IPFS node retains it." },
       { q: "What happens if I stop paying?", a: "After the prepaid window plus a 24h grace period, we unpin. The CID still resolves anywhere else it's pinned, and the on-chain record of it ever existing never goes away." },
       { q: "Can I delete a video?", a: "We can unpin from our infrastructure, but no one can un-publish a CID from IPFS as a whole, and the on-chain stamp is permanent. Treat upload as a permanent decision." },
       { q: "Is this censorship-resistant?", a: "More than a normal platform. We can refuse to serve content through our gateway, but we can't rewrite history, change the CID, or stop someone else from re-pinning and streaming the file." },
@@ -193,7 +193,7 @@ function AboutPage() {
           {[
             {
               q: "Who actually hosts my video?",
-              a: "Pinata pins it on IPFS. Anyone else can pin the same CID too — that's the point. If we disappeared tomorrow, the CID still works on any IPFS gateway someone else is running.",
+              a: "Our self-hosted node pins it on IPFS. Anyone else can pin the same CID too — that's the point. If we disappeared tomorrow, the CID still works wherever another IPFS node retains it.",
             },
             {
               q: "What happens if I stop paying?",

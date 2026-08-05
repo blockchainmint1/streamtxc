@@ -11,7 +11,7 @@
 //      - mark video.paid_at, status=active, payment_tx_hash, payment_received_txc
 // 3. Else if past 24h grace:
 //      - stamp an "X" (takedown) OP_RETURN
-//      - best-effort unpin from Pinata
+//      - best-effort unpin from the self-hosted IPFS node
 //      - mark video.unpinned_at, status=unpinned
 
 import { createFileRoute } from "@tanstack/react-router";
@@ -28,14 +28,14 @@ import {
   pinJsonToIPFS,
   pinByCid,
   headCidOnGateway,
-} from "@/lib/pinata.server";
+} from "@/lib/ipfs.server";
 import { PAYMENT_GRACE_HOURS } from "@/lib/fees";
 import { sweepCommentPayout } from "@/lib/videos.functions";
 import { recordSplitPayout } from "@/lib/chain-events.server";
 import { deliverAlert } from "@/lib/notifications.server";
 
 // How long after expires_at we keep the file pinned before actually
-// removing from Pinata. Metadata + DB row stay forever.
+// removing from IPFS storage. Metadata + DB row stay forever.
 const POST_EXPIRY_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 // How far in advance we warn the owner that a video is about to expire.
 const PRE_EXPIRY_WARNING_MS = 7 * 24 * 60 * 60 * 1000;
@@ -367,7 +367,7 @@ async function processVideos() {
       if (monthlyRate > 0 && delta >= monthlyRate - 0.00000001) {
         try {
           await pinByCid(v.cid, v.cid);
-          // Give Pinata a moment, then probe. Single attempt — cron retries.
+          // Give the node a moment, then probe. Single attempt — cron retries.
           const available = await headCidOnGateway(v.cid, 4000);
           if (!available) {
             results.push({
@@ -483,7 +483,7 @@ async function processVideos() {
       const expMs = new Date(v.expires_at).getTime();
       const title = v.title ?? v.cid.slice(0, 12);
 
-      // 3a. Past unpin_after → actually remove from Pinata.
+      // 3a. Past unpin_after → actually remove from the self-hosted node.
       if (
         v.unpin_after &&
         now > new Date(v.unpin_after as string).getTime()

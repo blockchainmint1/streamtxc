@@ -7,7 +7,7 @@
 //      the recording's suggested title.
 //   3. User confirms title/description, clicks Import. We POST the token
 //      to /api/public/import-stream, which streams the mp4 from Zoom's
-//      signed CloudFront URL into Pinata, returning a CID.
+//      signed CloudFront URL into our self-hosted IPFS node, returning a CID.
 //   4. Register the CID with source='zoom'. addByCid kicks off the
 //      standard ownership/metadata stamp.
 //   5. Kick off the HLS transcode (fetches the CID back from IPFS into S3,

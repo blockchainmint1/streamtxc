@@ -1,7 +1,7 @@
 // Server-only helpers for the URL importer:
 //   - HMAC-signed import tokens so the streaming endpoint won't accept
 //     arbitrary URLs (only ones our resolver just blessed).
-//   - Multipart streaming upload to Pinata that wraps the source body in
+//   - Multipart streaming upload to our self-hosted IPFS node that wraps the source body in
 //     a TransformStream counting bytes so we can keep an `imports` row in
 //     sync for the polling progress bar.
 
@@ -97,7 +97,7 @@ export async function markImportFailed(id: string, msg: string) {
 
 // --- Streaming pin via S3 → self-hosted IPFS Lambda ---------------------
 //
-// Strategy (matches the rest of the app: self-node primary, Pinata backup):
+// Strategy (matches the rest of the app: self-hosted IPFS only):
 //   1. Open an S3 multipart upload into AWS_S3_INPUT_BUCKET/imports/{uuid}.
 //   2. Stream the source body through the Worker, PUT-ing one part at a
 //      time. Each part is ~50 MB so memory stays bounded and retries are
@@ -106,11 +106,10 @@ export async function markImportFailed(id: string, msg: string) {
 //   3. Complete the multipart upload.
 //   4. Call the IPFS Lambda's POST /pin with that S3 key. Lambda streams
 //      the object into kubo and returns the CID.
-//   5. Fire-and-forget Pinata backup pin (pinByHash on the same CID).
-//   6. Delete the temp S3 object — the bytes now live in kubo, S3 was just
+//   5. Delete the temp S3 object — the bytes now live in kubo, S3 was just
 //      the conduit.
 //
-// Part size + retry tuned to S3, not Pinata. Same chunked-reader contract
+// Part size + retry tuned to S3. Same chunked-reader contract
 // as the previous TUS implementation, so the import-stream route is a
 // drop-in caller.
 
@@ -184,8 +183,8 @@ async function readChunk(
 }
 
 /**
- * Stream a remote file body into our self-hosted IPFS node, with Pinata
- * as a backup. Pipeline: source → Worker → S3 (multipart) → Lambda /pin →
+ * Stream a remote file body into our self-hosted IPFS node. Pipeline:
+ * source → Worker → S3 (multipart) → Lambda /pin →
  * kubo. Returns the file CID. Used by the URL and Zoom importers.
  */
 export async function pinStreamToIPFS(args: {
@@ -285,12 +284,6 @@ export async function pinStreamToIPFS(args: {
   if (!fileCid) {
     throw new Error("IPFS Lambda /pin returned no CID");
   }
-
-  // Backup: fire-and-forget Pinata pin. Never throws.
-  const { pinByCid } = await import("./pinata.server");
-  pinByCid(fileCid, args.filename).catch((e) =>
-    console.warn(`import backup pin failed for ${fileCid}:`, e),
-  );
 
   // Best-effort delete the temp S3 object. The bytes now live in kubo;
   // S3 was a conduit.

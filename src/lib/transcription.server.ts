@@ -8,7 +8,7 @@
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getObjectBlob } from "./aws-s3.server";
-import { pinFileToIPFS } from "./pinata.server";
+import { pinFileToIPFS } from "./ipfs.server";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1";
 const TRANSCRIBE_MODEL = "openai/gpt-4o-mini-transcribe";

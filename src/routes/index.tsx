@@ -109,7 +109,7 @@ function IndexPage() {
             {
               icon: Database,
               title: "Pinned to IPFS",
-              body: "Files pinned via Pinata. Your CID is the address — anyone can verify it, no one can rewrite it.",
+               body: "Files pinned on our self-hosted IPFS node. Your CID is the address — anyone can verify it, no one can rewrite it.",
             },
             {
               icon: Coins,
