@@ -42,7 +42,7 @@ export const listLiveChat = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows, error } = await supabaseAdmin
       .from("live_chat_messages")
-      .select("*")
+      .select("id,stream_id,display_name,body,created_at")
       .eq("stream_id", data.streamId)
       .order("created_at", { ascending: true })
       .limit(200);
