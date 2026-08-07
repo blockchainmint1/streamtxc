@@ -362,27 +362,58 @@ export const archiveLiveStream = createServerFn({ method: "POST" })
         ? allObjs
         : await listObjectsWithMeta(archiveBucket, "");
 
+    // MediaLive keeps writing into the SAME prefix for every run of a
+    // channel, so the bucket accumulates manifests/segments from previous
+    // streams. Without a time filter we'd always pick the first (oldest)
+    // master manifest and archive last week's stream again. Restrict to
+    // objects written during THIS stream's window (with slack on both
+    // ends for clock skew and MediaLive's final flush).
+    const SLACK_MS = 15 * 60 * 1000;
+    const startedAt = stream.started_at ? Date.parse(stream.started_at) : NaN;
+    const endedAt = stream.ended_at ? Date.parse(stream.ended_at) : NaN;
+    const windowStart = Number.isFinite(startedAt) ? startedAt - SLACK_MS : null;
+    const windowEnd = Number.isFinite(endedAt) ? endedAt + SLACK_MS : Date.now() + SLACK_MS;
+    const inWindow =
+      windowStart === null
+        ? scanned
+        : scanned.filter(
+            (o) =>
+              o.lastModified !== null &&
+              o.lastModified >= windowStart &&
+              o.lastModified <= windowEnd,
+          );
+    const candidates = inWindow.length > 0 ? inWindow : scanned;
+
     // Prefer the master HLS manifest: any *.m3u8 that isn't a variant
     // (variants are named `<base>_<rendition>.m3u8`, e.g. `index_720p.m3u8`).
-    const manifests = scanned.filter((o) => o.key.endsWith(".m3u8"));
-    const master = manifests.find((o) => {
-      const base = o.key.split("/").pop() ?? "";
-      // Master has no `_<something>` before `.m3u8`. `index.m3u8` → ok;
-      // `index_720p.m3u8` → variant.
-      return !/_[^/]+\.m3u8$/.test(base);
-    }) ?? manifests[0];
+    // Newest first, so a re-used prefix always resolves to the run we just
+    // finished rather than a stale one.
+    const manifests = candidates
+      .filter((o) => o.key.endsWith(".m3u8"))
+      .sort((a, b) => (b.lastModified ?? 0) - (a.lastModified ?? 0));
+    const master =
+      manifests.find((o) => {
+        const base = o.key.split("/").pop() ?? "";
+        // Master has no `_<something>` before `.m3u8`. `index.m3u8` → ok;
+        // `index_720p.m3u8` → variant.
+        return !/_[^/]+\.m3u8$/.test(base);
+      }) ?? manifests[0];
 
     let inputUris: string[];
     let segmentCount: number;
     if (master) {
       inputUris = [`s3://${archiveBucket}/${master.key}`];
-      segmentCount = scanned.filter((o) => o.key.endsWith(".ts")).length;
+      // Only count segments that sit alongside the chosen master.
+      const masterDir = master.key.slice(0, master.key.lastIndexOf("/") + 1);
+      segmentCount = candidates.filter(
+        (o) => o.key.endsWith(".ts") && o.key.startsWith(masterDir),
+      ).length;
     } else {
       // Legacy .ts-only archive. Filter zero-byte/tiny junk stubs
       // (MediaLive leaves .tmp.zero files that break MediaConvert with
       // error 1040 "Invalid frame rate: 0/1").
       const MIN_SEGMENT_BYTES = 1_000_000; // 1 MB
-      const tsKeys = scanned
+      const tsKeys = candidates
         .filter((o) => o.key.endsWith(".ts") && o.size >= MIN_SEGMENT_BYTES)
         .map((o) => o.key)
         .sort();
