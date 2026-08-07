@@ -102,13 +102,13 @@ export async function headObject(
   };
 }
 
-/** List objects under a prefix with sizes. Useful for filtering out junk/zero-byte files. */
+/** List objects under a prefix with sizes + last-modified. Useful for filtering out junk/zero-byte files and old runs. */
 export async function listObjectsWithMeta(
   bucket: string,
   prefix: string,
-): Promise<{ key: string; size: number }[]> {
+): Promise<{ key: string; size: number; lastModified: number | null }[]> {
   const client = s3Client();
-  const out: { key: string; size: number }[] = [];
+  const out: { key: string; size: number; lastModified: number | null }[] = [];
   let continuationToken: string | undefined;
   do {
     const url = new URL(s3Host(bucket));
@@ -123,7 +123,9 @@ export async function listObjectsWithMeta(
     for (const m of xml.matchAll(/<Contents>[\s\S]*?<\/Contents>/g)) {
       const key = m[0].match(/<Key>([^<]+)<\/Key>/)?.[1];
       const size = Number(m[0].match(/<Size>([^<]+)<\/Size>/)?.[1] ?? 0);
-      if (key) out.push({ key, size });
+      const lmRaw = m[0].match(/<LastModified>([^<]+)<\/LastModified>/)?.[1];
+      const lm = lmRaw ? Date.parse(lmRaw) : NaN;
+      if (key) out.push({ key, size, lastModified: Number.isFinite(lm) ? lm : null });
     }
     const tokenMatch = xml.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/);
     const truncated = /<IsTruncated>true<\/IsTruncated>/.test(xml);
