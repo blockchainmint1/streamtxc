@@ -173,7 +173,10 @@ Resources:
             # HLS output group writes `<basename>.m3u8` (master) + variant
             # manifests + .ts segments under this basename. The archive
             # flow reads `<basename>/index.m3u8` as MediaConvert input.
-            - Url: !Sub "s3://${ArchiveBucket}/${!AWS::StackName}/index"
+            # NOTE: do NOT escape AWS::StackName with `${!...}` — that writes the
+            # literal string `${AWS::StackName}` into the object key and dumps
+            # the archive at the bucket root instead of a per-stack folder.
+            - Url: !Sub "s3://${ArchiveBucket}/${AWS::StackName}/index"
       EncoderSettings:
         TimecodeConfig: { Source: EMBEDDED }
         AudioDescriptions:
