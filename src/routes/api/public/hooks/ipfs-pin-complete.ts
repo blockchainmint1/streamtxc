@@ -78,6 +78,33 @@ export const Route = createFileRoute("/api/public/hooks/ipfs-pin-complete")({
           const renditions = renditionsFromKeys(keys, prefix);
           const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
 
+          // Live archives are first-class videos: give them a per-video TXC
+          // wallet and stamp the claim (C) + metadata (T) anchors, exactly
+          // like a normal upload. Without this the on-chain proof panel
+          // spins on "pending — in mempool" forever.
+          const { assignVideoWallet } = await import("@/lib/txc-wallets.server");
+          const { recordChainEvent, recordMetadataAnchor } = await import(
+            "@/lib/chain-events.server"
+          );
+          const uploaderWallet = stream.owner_wallet ?? "anon";
+          const videoWallet = await assignVideoWallet();
+          const stamp = await recordChainEvent({
+            cid: event.cid,
+            videoWallet: videoWallet.address,
+            eventType: "C",
+            uploaderWallet,
+          });
+          const meta = await recordMetadataAnchor({
+            videoCid: event.cid,
+            videoWallet: videoWallet.address,
+            uploaderWallet,
+            title: stream.title ?? "",
+            description: "",
+            thumbnailCid: stream.thumbnail_cid ?? null,
+            hlsCid: event.cid,
+            renditions,
+          });
+
           const { error: videoError } = await supabaseAdmin.from("videos").insert({
             cid: event.cid,
             owner_wallet: stream.owner_wallet,
@@ -95,7 +122,13 @@ export const Route = createFileRoute("/api/public/hooks/ipfs-pin-complete")({
             thumbnail_cid: stream.thumbnail_cid ?? null,
             source: "live-archive",
             live_stream_id: liveStreamId,
+            video_wallet: videoWallet.address,
+            derivation_index: videoWallet.derivationIndex,
+            tx_hash: stamp.real ? stamp.txid : null,
+            op_return_payload: stamp.payload,
+            metadata_cid: meta?.metaCid ?? null,
           });
+
           if (videoError && videoError.code !== "23505") {
             throw new Error(`videos insert failed: ${videoError.message}`);
           }
