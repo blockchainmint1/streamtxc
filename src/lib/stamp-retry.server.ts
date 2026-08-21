@@ -42,7 +42,22 @@ export async function retryStuckStampForVideo(cid: string): Promise<RetryResult>
     videoStatus: video.status,
   };
 
-  const videoWallet = video.video_wallet as string;
+  // Older live-archive rows were inserted without a per-video wallet at all,
+  // so they can never be stamped. Mint one on the fly and persist it.
+  let videoWallet = video.video_wallet as string | null;
+  if (!videoWallet) {
+    const { assignVideoWallet } = await import("./txc-wallets.server");
+    const assigned = await assignVideoWallet();
+    videoWallet = assigned.address;
+    await supabaseAdmin
+      .from("videos")
+      .update({
+        video_wallet: assigned.address,
+        derivation_index: assigned.derivationIndex,
+      })
+      .eq("cid", cid);
+  }
+
 
   // --- C event ---------------------------------------------------------
   if (!video.tx_hash || video.status === "stamp_failed") {
@@ -191,11 +206,15 @@ export async function retryStuckStampForVideo(cid: string): Promise<RetryResult>
 }
 
 export async function retryAllStuckStamps(): Promise<RetryResult[]> {
+  // Two kinds of stuck rows: explicit stamp_failed, and rows that never got
+  // stamped at all (no tx_hash) — e.g. live archives created before the
+  // archive finalizer minted per-video wallets.
   const { data: stuck, error } = await supabaseAdmin
     .from("videos")
     .select("cid")
-    .eq("status", "stamp_failed");
+    .or("status.eq.stamp_failed,tx_hash.is.null");
   if (error) throw new Error(error.message);
+
   const out: RetryResult[] = [];
   for (const row of stuck ?? []) {
     try {
