@@ -206,11 +206,15 @@ export async function retryStuckStampForVideo(cid: string): Promise<RetryResult>
 }
 
 export async function retryAllStuckStamps(): Promise<RetryResult[]> {
+  // Two kinds of stuck rows: explicit stamp_failed, and rows that never got
+  // stamped at all (no tx_hash) — e.g. live archives created before the
+  // archive finalizer minted per-video wallets.
   const { data: stuck, error } = await supabaseAdmin
     .from("videos")
     .select("cid")
-    .eq("status", "stamp_failed");
+    .or("status.eq.stamp_failed,tx_hash.is.null");
   if (error) throw new Error(error.message);
+
   const out: RetryResult[] = [];
   for (const row of stuck ?? []) {
     try {
