@@ -78,6 +78,33 @@ export const Route = createFileRoute("/api/public/hooks/ipfs-pin-complete")({
           const renditions = renditionsFromKeys(keys, prefix);
           const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
 
+          // Live archives had no poster image: MediaConvert now writes a
+          // frame capture next to the HLS bundle (thumbs/…). Pin the first
+          // JPEG so archived streams show a thumbnail like normal uploads.
+          let thumbnailCid = stream.thumbnail_cid ?? null;
+          if (!thumbnailCid) {
+            try {
+              const thumbPrefix = prefix.replace(/^hls\//, "thumbs/");
+              const thumbKeys = (await listObjects(outputBucket, thumbPrefix))
+                .filter((k) => /\.jpe?g$/i.test(k))
+                .sort();
+              const pick = thumbKeys[Math.min(1, thumbKeys.length - 1)];
+              if (pick) {
+                const { getObjectBlob } = await import("@/lib/aws-s3.server");
+                const { pinFileToIPFS } = await import("@/lib/ipfs.server");
+                const blob = await getObjectBlob(outputBucket, pick);
+                const pinnedThumb = await pinFileToIPFS(blob, "thumb.jpg");
+                thumbnailCid = pinnedThumb.cid;
+                await supabaseAdmin
+                  .from("live_streams")
+                  .update({ thumbnail_cid: thumbnailCid })
+                  .eq("id", liveStreamId);
+              }
+            } catch (err) {
+              console.warn(`[ipfs-pin-complete ${liveStreamId}] thumbnail capture failed`, err);
+            }
+          }
+
           // Live archives are first-class videos: give them a per-video TXC
           // wallet and stamp the claim (C) + metadata (T) anchors, exactly
           // like a normal upload. Without this the on-chain proof panel
