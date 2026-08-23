@@ -1956,7 +1956,7 @@ export const editVideoMetadata = createServerFn({ method: "POST" })
 
     const meta = await recordMetadataAnchor({
       videoCid: video.cid,
-      videoWallet: video.video_wallet,
+      videoWallet: videoWalletAddress,
       uploaderWallet: video.owner_wallet ?? wallet,
       title: data.title,
       description: data.description ?? "",
