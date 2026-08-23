@@ -1926,8 +1926,27 @@ export const editVideoMetadata = createServerFn({ method: "POST" })
     if (!ownerMatches(video.owner_wallet, wallet)) {
       throw new Error("Only the owner can edit this video");
     }
-    if (!video.video_wallet) {
-      throw new Error("Video has no on-chain wallet — re-stamp first");
+    // Older rows (notably live-stream archives) never got a per-video wallet.
+    // Mint one lazily + stamp the claim so editing works instead of dead-ending.
+    let videoWalletAddress = video.video_wallet;
+    if (!videoWalletAddress) {
+      const assigned = await assignVideoWallet();
+      const claim = await recordChainEvent({
+        cid: video.cid,
+        videoWallet: assigned.address,
+        eventType: "C",
+        uploaderWallet: video.owner_wallet ?? wallet,
+      });
+      await supabaseAdmin
+        .from("videos")
+        .update({
+          video_wallet: assigned.address,
+          derivation_index: assigned.derivationIndex,
+          op_return_payload: claim.payload,
+          ...(claim.real ? { tx_hash: claim.txid } : {}),
+        })
+        .eq("cid", video.cid);
+      videoWalletAddress = assigned.address;
     }
 
     // null in input means "keep existing", explicit string means "replace",
