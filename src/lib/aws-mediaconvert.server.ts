@@ -180,6 +180,42 @@ export async function startHlsTranscodeFromInputs(
   return { jobId: json.job.id };
 }
 
+/**
+ * Grab a single JPEG frame from the archive so live-stream recordings get an
+ * automatic poster image. Written next to the HLS output under
+ * `thumbs/<id>/` (e.g. s3://bucket/thumbs/live-<streamId>/thumb.0000000.jpg).
+ */
+function frameCaptureGroup(hlsPrefix: string) {
+  const thumbPrefix = hlsPrefix.replace(/\/hls\//, "/thumbs/");
+  return {
+    Name: "Frame Capture",
+    OutputGroupSettings: {
+      Type: "FILE_GROUP_SETTINGS",
+      FileGroupSettings: { Destination: thumbPrefix },
+    },
+    Outputs: [
+      {
+        NameModifier: "thumb",
+        ContainerSettings: { Container: "RAW" },
+        VideoDescription: {
+          Width: 1280,
+          Height: 720,
+          CodecSettings: {
+            Codec: "FRAME_CAPTURE",
+            FrameCaptureSettings: {
+              // one frame every ~30s of content, keep at most 3
+              FramerateNumerator: 1,
+              FramerateDenominator: 30,
+              MaxCaptures: 3,
+              Quality: 80,
+            },
+          },
+        },
+      },
+    ],
+  };
+}
+
 function rendition(
   name: string,
   width: number,
