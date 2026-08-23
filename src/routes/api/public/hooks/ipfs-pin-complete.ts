@@ -127,7 +127,7 @@ export const Route = createFileRoute("/api/public/hooks/ipfs-pin-complete")({
             uploaderWallet,
             title: stream.title ?? "",
             description: "",
-            thumbnailCid: stream.thumbnail_cid ?? null,
+            thumbnailCid: thumbnailCid,
             hlsCid: event.cid,
             renditions,
           });
@@ -146,7 +146,7 @@ export const Route = createFileRoute("/api/public/hooks/ipfs-pin-complete")({
             transcode_status: "ready",
             transcode_job_id: jobId,
             transcode_completed_at: new Date().toISOString(),
-            thumbnail_cid: stream.thumbnail_cid ?? null,
+            thumbnail_cid: thumbnailCid,
             source: "live-archive",
             live_stream_id: liveStreamId,
             video_wallet: videoWallet.address,
