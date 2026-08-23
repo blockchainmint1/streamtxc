@@ -160,6 +160,7 @@ export async function startHlsTranscodeFromInputs(
             rendition("360p", 640, 360, 600_000, 64_000),
           ],
         },
+        frameCaptureGroup(opts.outputPrefix),
       ],
     },
   };
