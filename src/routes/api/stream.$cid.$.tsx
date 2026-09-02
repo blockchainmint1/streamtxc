@@ -85,20 +85,31 @@ export const Route = createFileRoute("/api/stream/$cid/$")({
             status: 200,
             headers: {
               "content-type": "application/vnd.apple.mpegurl",
-              "cache-control": "public, max-age=60",
+              // Playlists inside a directory CID are immutable (the CID
+              // pins the whole bundle), so let the edge hold them. This
+              // removes the ~3s cold proxy fetch at the start of playback
+              // for everyone after the first viewer.
+              "cache-control":
+                "public, max-age=300, s-maxage=86400, stale-while-revalidate=86400",
               "access-control-allow-origin": "*",
             },
           });
         }
 
+        // Media segments are content-addressed and immutable, so the
+        // redirect can be cached. Without this every single .ts segment
+        // paid an extra round trip through the Worker (~0.4-0.7s TTFB vs
+        // 0.26s straight to the gateway), which is what made playback
+        // feel sluggish. Bounded at 1h so a gateway change still
+        // propagates quickly.
+        const isSegment = /\.(ts|m4s|mp4|aac|vtt|jpg|jpeg|png|webp)$/i.test(splat);
         return new Response(null, {
           status: 302,
           headers: {
             location: target,
-            // Cache the bytes at the gateway/browser, not this operational
-            // redirect. Otherwise a gateway change leaves browsers pinned to
-            // the former host for a year.
-            "cache-control": "no-store",
+            "cache-control": isSegment
+              ? "public, max-age=3600"
+              : "no-store",
             "access-control-allow-origin": "*",
           },
         });

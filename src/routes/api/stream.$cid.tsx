@@ -34,9 +34,11 @@ export const Route = createFileRoute("/api/stream/$cid")({
             status: 302,
             headers: {
               location: target,
-              // Never cache the redirect itself: gateway configuration can
-              // change even though the content addressed bytes cannot.
-              "cache-control": "no-store",
+              // Thumbnails are immutable content-addressed bytes. Caching
+              // the redirect for an hour removes a Worker round trip per
+              // card on the home page, while still letting a gateway
+              // change propagate quickly.
+              "cache-control": "public, max-age=3600",
               "access-control-allow-origin": "*",
             },
           });
