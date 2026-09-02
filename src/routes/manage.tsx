@@ -1,3 +1,4 @@
+import { publicOrigin } from "@/lib/site-origin";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -981,8 +982,7 @@ function LiveEligibilityAdminSection({ wallet }: { wallet: string }) {
 }
 
 function PermanentEmbedRow({ wallet }: { wallet: string }) {
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "https://stream.texitcoin.org";
+  const origin = publicOrigin();
   const link = `${origin}/embed/live/by-wallet/${wallet}?autoplay=1&mute=1`;
   const iframe = `<iframe src="${link}" width="100%" height="480" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen frameborder="0"></iframe>`;
   return (
