@@ -21,6 +21,7 @@ import { ReportButton } from "@/components/ReportButton";
 import { Comments } from "@/components/Comments";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
 import {
+import { publicOrigin } from "@/lib/site-origin";
   CheckCircle2,
   Loader2,
   AlertTriangle,
@@ -224,7 +225,7 @@ function WatchPage() {
   const confirmed = chainStatus === "active" && !!blockNumber;
   const stampFailed = chainStatus === "stamp_failed";
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const origin = publicOrigin();
   const shareUrl = origin ? `${origin}/v/${video.cid}` : `/v/${video.cid}`;
 
   return (

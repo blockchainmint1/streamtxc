@@ -9,6 +9,7 @@ import { Youtube, Twitter, Facebook, Eye, ChevronLeft, Code2 } from "lucide-reac
 import { useLiveViewerCount } from "@/hooks/useLiveViewerCount";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { copyToClipboard } from "@/lib/copy-to-clipboard";
+import { publicOrigin } from "@/lib/site-origin";
 
 export const Route = createFileRoute("/live/$streamId")({
   head: () => ({
@@ -178,7 +179,7 @@ function LiveHeader({ stream }: { stream: Stream }) {
 }
 
 function EmbedRow({ streamId }: { streamId: string }) {
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const origin = publicOrigin();
   const shareUrl = `${origin}/live/${streamId}`;
   const embedSrc = `${origin}/embed/live/${streamId}?autoplay=1&mute=1`;
   const embedCode = `<iframe src="${embedSrc}" width="640" height="360" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen frameborder="0"></iframe>`;
