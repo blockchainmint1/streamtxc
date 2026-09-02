@@ -624,6 +624,13 @@ function ManagePageInner() {
               </Link>
             </div>
           )
+        ) : !isAuthenticated ? (
+          <div className="border border-dashed border-border rounded-sm p-12 text-center">
+            <p className="font-mono text-sm text-muted-foreground mb-4">
+              Your wallet session has expired. Sign in again with{" "}
+              {shortenHash(address)} to manage your videos.
+            </p>
+          </div>
         ) : isLoading ? (
           <div className="font-mono text-muted-foreground">Loading…</div>
         ) : !videos || videos.length === 0 ? (
