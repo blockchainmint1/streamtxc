@@ -405,7 +405,7 @@ function ForceCaptionsButton({
 }
 
 function ManagePageInner() {
-  const { address } = useWallet();
+  const { address, isAuthenticated } = useWallet();
   const fetchMine = useServerFn(listMyVideos);
   const fetchByCids = useServerFn(listVideosByCids);
 
