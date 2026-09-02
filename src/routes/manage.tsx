@@ -405,7 +405,7 @@ function ForceCaptionsButton({
 }
 
 function ManagePageInner() {
-  const { address } = useWallet();
+  const { address, isAuthenticated } = useWallet();
   const fetchMine = useServerFn(listMyVideos);
   const fetchByCids = useServerFn(listVideosByCids);
 
@@ -421,10 +421,16 @@ function ManagePageInner() {
 
   // No auto-connect — show a "connect wallet" prompt below if missing.
 
+  // Only call the gated server fn once we hold a *valid signed session*, not
+  // merely a remembered address — otherwise it throws "You must connect a
+  // wallet to do that." and takes the page down with it.
   const { data: videos, isLoading } = useQuery({
     queryKey: ["my-videos", address],
-    queryFn: () => (address ? fetchMine({ data: { wallet: address } }) : []),
-    enabled: !!address,
+    queryFn: () =>
+      address && isAuthenticated ? fetchMine({ data: { wallet: address } }) : [],
+    enabled: !!address && isAuthenticated,
+    retry: false,
+    throwOnError: false,
   });
 
   const { data: anonVideos } = useQuery({
@@ -618,6 +624,13 @@ function ManagePageInner() {
               </Link>
             </div>
           )
+        ) : !isAuthenticated ? (
+          <div className="border border-dashed border-border rounded-sm p-12 text-center">
+            <p className="font-mono text-sm text-muted-foreground mb-4">
+              Your wallet session has expired. Sign in again with{" "}
+              {shortenHash(address)} to manage your videos.
+            </p>
+          </div>
         ) : isLoading ? (
           <div className="font-mono text-muted-foreground">Loading…</div>
         ) : !videos || videos.length === 0 ? (
