@@ -421,10 +421,16 @@ function ManagePageInner() {
 
   // No auto-connect — show a "connect wallet" prompt below if missing.
 
+  // Only call the gated server fn once we hold a *valid signed session*, not
+  // merely a remembered address — otherwise it throws "You must connect a
+  // wallet to do that." and takes the page down with it.
   const { data: videos, isLoading } = useQuery({
     queryKey: ["my-videos", address],
-    queryFn: () => (address ? fetchMine({ data: { wallet: address } }) : []),
-    enabled: !!address,
+    queryFn: () =>
+      address && isAuthenticated ? fetchMine({ data: { wallet: address } }) : [],
+    enabled: !!address && isAuthenticated,
+    retry: false,
+    throwOnError: false,
   });
 
   const { data: anonVideos } = useQuery({
