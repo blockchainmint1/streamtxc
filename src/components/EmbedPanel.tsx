@@ -16,7 +16,7 @@ export function EmbedPanel({
   const [startAt, setStartAt] = useState(0);
   const [copied, setCopied] = useState(false);
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const origin = publicOrigin();
   const embedSrc = `${origin}/embed/${cid}?${new URLSearchParams({
     ...(autoplay ? { autoplay: "1" } : {}),
     ...(muted ? { mute: "1" } : {}),
