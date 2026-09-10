@@ -1,42 +1,19 @@
 import { Link } from "@tanstack/react-router";
-import { Play, Coins, ExternalLink, Wallet, Copy } from "lucide-react";
+import { Play, Coins, ExternalLink, Wallet } from "lucide-react";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { useWallet, shortWalletId, isSignableOwnershipTxcAddress } from "@/lib/wallet";
-import {
-  requestWalletLogin,
-  completeWalletLogin,
-} from "@/lib/wallet-auth.functions";
+import { useWallet, shortWalletId } from "@/lib/wallet";
 import { getWalletBalance } from "@/lib/wallet-balance.functions";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
+import { WalletSignInDialog } from "@/components/WalletSignInDialog";
 import { toast } from "sonner";
 import { LiveBadge } from "@/components/LiveBadge";
 
 export function Header() {
-  const { address, completeLogin, disconnect } = useWallet();
+  const { address, disconnect } = useWallet();
   const [open, setOpen] = useState(false);
-  const [addr, setAddr] = useState("");
-  const [step, setStep] = useState<"address" | "sign">("address");
-  const [challengeToken, setChallengeToken] = useState("");
-  const [message, setMessage] = useState("");
-  const [signature, setSignature] = useState("");
-  const [busy, setBusy] = useState(false);
 
-  const requestLogin = useServerFn(requestWalletLogin);
-  const completeLoginFn = useServerFn(completeWalletLogin);
   const fetchBalance = useServerFn(getWalletBalance);
 
   const balanceQuery = useQuery({
