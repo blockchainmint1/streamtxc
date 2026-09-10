@@ -1,42 +1,19 @@
 import { Link } from "@tanstack/react-router";
-import { Play, Coins, ExternalLink, Wallet, Copy } from "lucide-react";
+import { Play, Coins, ExternalLink, Wallet } from "lucide-react";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { useWallet, shortWalletId, isSignableOwnershipTxcAddress } from "@/lib/wallet";
-import {
-  requestWalletLogin,
-  completeWalletLogin,
-} from "@/lib/wallet-auth.functions";
+import { useWallet, shortWalletId } from "@/lib/wallet";
 import { getWalletBalance } from "@/lib/wallet-balance.functions";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
+import { WalletSignInDialog } from "@/components/WalletSignInDialog";
 import { toast } from "sonner";
 import { LiveBadge } from "@/components/LiveBadge";
 
 export function Header() {
-  const { address, completeLogin, disconnect } = useWallet();
+  const { address, disconnect } = useWallet();
   const [open, setOpen] = useState(false);
-  const [addr, setAddr] = useState("");
-  const [step, setStep] = useState<"address" | "sign">("address");
-  const [challengeToken, setChallengeToken] = useState("");
-  const [message, setMessage] = useState("");
-  const [signature, setSignature] = useState("");
-  const [busy, setBusy] = useState(false);
 
-  const requestLogin = useServerFn(requestWalletLogin);
-  const completeLoginFn = useServerFn(completeWalletLogin);
   const fetchBalance = useServerFn(getWalletBalance);
 
   const balanceQuery = useQuery({
@@ -54,59 +31,10 @@ export function Header() {
         ? "…"
         : null;
 
-  function normalizeSignatureInput(value: string) {
-    return value.replace(/\s+/g, "");
-  }
-
   function resetDialog() {
-    setAddr("");
-    setStep("address");
-    setChallengeToken("");
-    setMessage("");
-    setSignature("");
-    setBusy(false);
+    // The sign-in dialog owns its own state; remount it on close.
   }
 
-  async function handleRequestChallenge() {
-    const trimmed = addr.trim();
-    if (!isSignableOwnershipTxcAddress(trimmed)) {
-      toast.error("Use a legacy TXC address starting with T (segwit txc1… can't sign messages yet)");
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await requestLogin({ data: { wallet: trimmed } });
-      setMessage(res.message);
-      setChallengeToken(res.challengeToken);
-      setStep("sign");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to start login");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleCompleteLogin() {
-    const normalizedSignature = normalizeSignatureInput(signature);
-    if (!normalizedSignature) {
-      toast.error("Paste the signature your wallet produced");
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await completeLoginFn({
-        data: { challengeToken, signature: normalizedSignature },
-      });
-      completeLogin({ address: res.wallet, token: res.token, expiresAt: res.expiresAt });
-      toast.success("Signed in");
-      setOpen(false);
-      resetDialog();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not verify signature");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
@@ -196,100 +124,12 @@ export function Header() {
                   sign in
                 </button>
               </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle className="font-mono text-sm">[ SIGN IN WITH TXC WALLET ]</DialogTitle>
-                  <DialogDescription>
-                    Prove you control your wallet by signing a one-time challenge.
-                    No transaction, no fees — your wallet's "Sign Message" feature
-                    is enough.
-                  </DialogDescription>
-                </DialogHeader>
-                {step === "address" ? (
-                  <div className="space-y-2">
-                    <Label className="font-mono text-xs">TXC ADDRESS</Label>
-                    <Input
-                      value={addr}
-                      onChange={(e) => setAddr(e.target.value)}
-                      placeholder="T…"
-                      className="font-mono"
-                      autoFocus
-                    />
-                    <p className="text-xs text-muted-foreground font-mono">
-                      Must be a legacy T… address. Segwit txc1… can't sign
-                      messages yet.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <Label className="font-mono text-xs">1. SIGN THIS MESSAGE</Label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(message);
-                            toast.success("Message copied");
-                          }}
-                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
-                        >
-                          <Copy className="h-3 w-3" />
-                          copy
-                        </button>
-                      </div>
-                      <pre className="mt-1 max-h-32 overflow-auto rounded-sm border border-border bg-muted/40 p-2 text-[11px] font-mono whitespace-pre-wrap break-all">
-                        {message}
-                      </pre>
-                      <p className="mt-1 text-xs text-muted-foreground font-mono">
-                        In TXC Core: <em>File → Sign Message</em>, choose{" "}
-                        <span className="text-primary">{addr}</span>, paste the
-                        text above, click Sign.
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="font-mono text-xs">2. PASTE SIGNATURE</Label>
-                      <Textarea
-                        value={signature}
-                        onChange={(e) => setSignature(normalizeSignatureInput(e.target.value))}
-                        placeholder="H… (base64)"
-                        className="font-mono text-xs h-20"
-                      />
-                    </div>
-                  </div>
-                )}
-                <DialogFooter>
-                  {step === "sign" && (
-                    <Button
-                      variant="ghost"
-                      onClick={() => setStep("address")}
-                      className="font-mono"
-                      disabled={busy}
-                    >
-                      back
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setOpen(false);
-                      resetDialog();
-                    }}
-                    className="font-mono"
-                    disabled={busy}
-                  >
-                    cancel
-                  </Button>
-                  {step === "address" ? (
-                    <Button onClick={handleRequestChallenge} className="font-mono" disabled={busy}>
-                      {busy ? "…" : "next"}
-                    </Button>
-                  ) : (
-                    <Button onClick={handleCompleteLogin} className="font-mono" disabled={busy}>
-                      {busy ? "verifying…" : "sign in"}
-                    </Button>
-                  )}
-                </DialogFooter>
-              </DialogContent>
+              <WalletSignInDialog
+                onClose={() => {
+                  setOpen(false);
+                  resetDialog();
+                }}
+              />
             </Dialog>
           )}
           <a

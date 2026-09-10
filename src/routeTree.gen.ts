@@ -42,6 +42,10 @@ import { Route as ApiPublicHooksLiveBillingTickRouteImport } from './routes/api/
 import { Route as ApiPublicHooksIpfsPinCompleteRouteImport } from './routes/api/public/hooks/ipfs-pin-complete'
 import { Route as ApiPublicHooksFinalizeStuckHlsRouteImport } from './routes/api/public/hooks/finalize-stuck-hls'
 import { Route as ApiPublicHooksFinalizeLiveArchiveRouteImport } from './routes/api/public/hooks/finalize-live-archive'
+import { Route as ApiPublicAuthWalletStatusRouteImport } from './routes/api/public/auth/wallet-status'
+import { Route as ApiPublicAuthWalletExchangeRouteImport } from './routes/api/public/auth/wallet-exchange'
+import { Route as ApiPublicAuthWalletChallengeRouteImport } from './routes/api/public/auth/wallet-challenge'
+import { Route as ApiPublicAuthWalletCallbackRouteImport } from './routes/api/public/auth/wallet-callback'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
 import { Route as ApiPublicAdminImpersonateWalletRouteImport } from './routes/api/public/admin/impersonate-wallet'
 import { Route as ApiPublicAdminFinalizeHlsRouteImport } from './routes/api/public/admin/finalize-hls'
@@ -222,6 +226,30 @@ const ApiPublicHooksFinalizeLiveArchiveRoute =
     path: '/public/hooks/finalize-live-archive',
     getParentRoute: () => ApiRoute,
   } as any)
+const ApiPublicAuthWalletStatusRoute =
+  ApiPublicAuthWalletStatusRouteImport.update({
+    id: '/public/auth/wallet-status',
+    path: '/public/auth/wallet-status',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicAuthWalletExchangeRoute =
+  ApiPublicAuthWalletExchangeRouteImport.update({
+    id: '/public/auth/wallet-exchange',
+    path: '/public/auth/wallet-exchange',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicAuthWalletChallengeRoute =
+  ApiPublicAuthWalletChallengeRouteImport.update({
+    id: '/public/auth/wallet-challenge',
+    path: '/public/auth/wallet-challenge',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicAuthWalletCallbackRoute =
+  ApiPublicAuthWalletCallbackRouteImport.update({
+    id: '/public/auth/wallet-callback',
+    path: '/public/auth/wallet-callback',
+    getParentRoute: () => ApiRoute,
+  } as any)
 const ApiPublicAdminRetryStampsRoute =
   ApiPublicAdminRetryStampsRouteImport.update({
     id: '/public/admin/retry-stamps',
@@ -289,6 +317,10 @@ export interface FileRoutesByFullPath {
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/impersonate-wallet': typeof ApiPublicAdminImpersonateWalletRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/auth/wallet-callback': typeof ApiPublicAuthWalletCallbackRoute
+  '/api/public/auth/wallet-challenge': typeof ApiPublicAuthWalletChallengeRoute
+  '/api/public/auth/wallet-exchange': typeof ApiPublicAuthWalletExchangeRoute
+  '/api/public/auth/wallet-status': typeof ApiPublicAuthWalletStatusRoute
   '/api/public/hooks/finalize-live-archive': typeof ApiPublicHooksFinalizeLiveArchiveRoute
   '/api/public/hooks/finalize-stuck-hls': typeof ApiPublicHooksFinalizeStuckHlsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
@@ -330,6 +362,10 @@ export interface FileRoutesByTo {
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/impersonate-wallet': typeof ApiPublicAdminImpersonateWalletRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/auth/wallet-callback': typeof ApiPublicAuthWalletCallbackRoute
+  '/api/public/auth/wallet-challenge': typeof ApiPublicAuthWalletChallengeRoute
+  '/api/public/auth/wallet-exchange': typeof ApiPublicAuthWalletExchangeRoute
+  '/api/public/auth/wallet-status': typeof ApiPublicAuthWalletStatusRoute
   '/api/public/hooks/finalize-live-archive': typeof ApiPublicHooksFinalizeLiveArchiveRoute
   '/api/public/hooks/finalize-stuck-hls': typeof ApiPublicHooksFinalizeStuckHlsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
@@ -372,6 +408,10 @@ export interface FileRoutesById {
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/impersonate-wallet': typeof ApiPublicAdminImpersonateWalletRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/auth/wallet-callback': typeof ApiPublicAuthWalletCallbackRoute
+  '/api/public/auth/wallet-challenge': typeof ApiPublicAuthWalletChallengeRoute
+  '/api/public/auth/wallet-exchange': typeof ApiPublicAuthWalletExchangeRoute
+  '/api/public/auth/wallet-status': typeof ApiPublicAuthWalletStatusRoute
   '/api/public/hooks/finalize-live-archive': typeof ApiPublicHooksFinalizeLiveArchiveRoute
   '/api/public/hooks/finalize-stuck-hls': typeof ApiPublicHooksFinalizeStuckHlsRoute
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
@@ -415,6 +455,10 @@ export interface FileRouteTypes {
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/impersonate-wallet'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/auth/wallet-callback'
+    | '/api/public/auth/wallet-challenge'
+    | '/api/public/auth/wallet-exchange'
+    | '/api/public/auth/wallet-status'
     | '/api/public/hooks/finalize-live-archive'
     | '/api/public/hooks/finalize-stuck-hls'
     | '/api/public/hooks/ipfs-pin-complete'
@@ -456,6 +500,10 @@ export interface FileRouteTypes {
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/impersonate-wallet'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/auth/wallet-callback'
+    | '/api/public/auth/wallet-challenge'
+    | '/api/public/auth/wallet-exchange'
+    | '/api/public/auth/wallet-status'
     | '/api/public/hooks/finalize-live-archive'
     | '/api/public/hooks/finalize-stuck-hls'
     | '/api/public/hooks/ipfs-pin-complete'
@@ -497,6 +545,10 @@ export interface FileRouteTypes {
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/impersonate-wallet'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/auth/wallet-callback'
+    | '/api/public/auth/wallet-challenge'
+    | '/api/public/auth/wallet-exchange'
+    | '/api/public/auth/wallet-status'
     | '/api/public/hooks/finalize-live-archive'
     | '/api/public/hooks/finalize-stuck-hls'
     | '/api/public/hooks/ipfs-pin-complete'
@@ -763,6 +815,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksFinalizeLiveArchiveRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/public/auth/wallet-status': {
+      id: '/api/public/auth/wallet-status'
+      path: '/public/auth/wallet-status'
+      fullPath: '/api/public/auth/wallet-status'
+      preLoaderRoute: typeof ApiPublicAuthWalletStatusRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/auth/wallet-exchange': {
+      id: '/api/public/auth/wallet-exchange'
+      path: '/public/auth/wallet-exchange'
+      fullPath: '/api/public/auth/wallet-exchange'
+      preLoaderRoute: typeof ApiPublicAuthWalletExchangeRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/auth/wallet-challenge': {
+      id: '/api/public/auth/wallet-challenge'
+      path: '/public/auth/wallet-challenge'
+      fullPath: '/api/public/auth/wallet-challenge'
+      preLoaderRoute: typeof ApiPublicAuthWalletChallengeRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/auth/wallet-callback': {
+      id: '/api/public/auth/wallet-callback'
+      path: '/public/auth/wallet-callback'
+      fullPath: '/api/public/auth/wallet-callback'
+      preLoaderRoute: typeof ApiPublicAuthWalletCallbackRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/public/admin/retry-stamps': {
       id: '/api/public/admin/retry-stamps'
       path: '/public/admin/retry-stamps'
@@ -832,6 +912,10 @@ interface ApiRouteChildren {
   ApiPublicAdminFinalizeHlsRoute: typeof ApiPublicAdminFinalizeHlsRoute
   ApiPublicAdminImpersonateWalletRoute: typeof ApiPublicAdminImpersonateWalletRoute
   ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
+  ApiPublicAuthWalletCallbackRoute: typeof ApiPublicAuthWalletCallbackRoute
+  ApiPublicAuthWalletChallengeRoute: typeof ApiPublicAuthWalletChallengeRoute
+  ApiPublicAuthWalletExchangeRoute: typeof ApiPublicAuthWalletExchangeRoute
+  ApiPublicAuthWalletStatusRoute: typeof ApiPublicAuthWalletStatusRoute
   ApiPublicHooksFinalizeLiveArchiveRoute: typeof ApiPublicHooksFinalizeLiveArchiveRoute
   ApiPublicHooksFinalizeStuckHlsRoute: typeof ApiPublicHooksFinalizeStuckHlsRoute
   ApiPublicHooksIpfsPinCompleteRoute: typeof ApiPublicHooksIpfsPinCompleteRoute
@@ -855,6 +939,10 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiPublicAdminFinalizeHlsRoute: ApiPublicAdminFinalizeHlsRoute,
   ApiPublicAdminImpersonateWalletRoute: ApiPublicAdminImpersonateWalletRoute,
   ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
+  ApiPublicAuthWalletCallbackRoute: ApiPublicAuthWalletCallbackRoute,
+  ApiPublicAuthWalletChallengeRoute: ApiPublicAuthWalletChallengeRoute,
+  ApiPublicAuthWalletExchangeRoute: ApiPublicAuthWalletExchangeRoute,
+  ApiPublicAuthWalletStatusRoute: ApiPublicAuthWalletStatusRoute,
   ApiPublicHooksFinalizeLiveArchiveRoute:
     ApiPublicHooksFinalizeLiveArchiveRoute,
   ApiPublicHooksFinalizeStuckHlsRoute: ApiPublicHooksFinalizeStuckHlsRoute,

@@ -874,6 +874,51 @@ export type Database = {
           },
         ]
       }
+      wallet_login_challenges: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          ip_address: string | null
+          nonce: string
+          one_time_token: string | null
+          signature: string | null
+          signed_at: string | null
+          status: Database["public"]["Enums"]["wallet_challenge_status"]
+          user_agent: string | null
+          wallet_address: string | null
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          nonce: string
+          one_time_token?: string | null
+          signature?: string | null
+          signed_at?: string | null
+          status?: Database["public"]["Enums"]["wallet_challenge_status"]
+          user_agent?: string | null
+          wallet_address?: string | null
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          nonce?: string
+          one_time_token?: string | null
+          signature?: string | null
+          signed_at?: string | null
+          status?: Database["public"]["Enums"]["wallet_challenge_status"]
+          user_agent?: string | null
+          wallet_address?: string | null
+        }
+        Relationships: []
+      }
       wallet_notification_prefs: {
         Row: {
           created_at: string
@@ -943,6 +988,7 @@ export type Database = {
     }
     Functions: {
       next_video_wallet_index: { Args: never; Returns: number }
+      purge_expired_wallet_challenges: { Args: never; Returns: undefined }
     }
     Enums: {
       live_stream_status:
@@ -952,6 +998,7 @@ export type Database = {
         | "ending"
         | "ended"
         | "archived"
+      wallet_challenge_status: "pending" | "signed" | "consumed" | "expired"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1087,6 +1134,7 @@ export const Constants = {
         "ended",
         "archived",
       ],
+      wallet_challenge_status: ["pending", "signed", "consumed", "expired"],
     },
   },
 } as const
