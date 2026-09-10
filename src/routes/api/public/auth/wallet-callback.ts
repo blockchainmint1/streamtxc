@@ -1,0 +1,204 @@
+// Step 2: the HME Wallet posts the signed challenge back here.
+import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+import { authDomainFromRequest } from "@/lib/wallet-auth-shared";
+
+const CORS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
+  "access-control-allow-headers": "content-type",
+} as const;
+
+const deepLinkBodySchema = z.object({
+  id: z.string().uuid(),
+  address: z.string().min(26).max(64),
+  signature: z.string().min(40).max(200),
+  message: z.string().max(2000).optional(),
+});
+
+const envelopeBodySchema = z.object({
+  chain: z.string().min(1).max(32),
+  address: z.string().min(26).max(64),
+  signature: z.string().min(40).max(200),
+  message: z.string().min(1).max(2000),
+  nonce: z.string().min(16).max(128),
+});
+
+const bodySchema = z.union([deepLinkBodySchema, envelopeBodySchema]);
+
+function randomToken(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export const Route = createFileRoute("/api/public/auth/wallet-callback")({
+  server: {
+    handlers: {
+      OPTIONS: async () => new Response(null, { status: 204, headers: CORS }),
+
+      // The wallet may GET first to fetch the exact bytes it should sign.
+      GET: async ({ request }) => {
+        const url = new URL(request.url);
+        const id = url.searchParams.get("id");
+        if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
+          return Response.json(
+            { error: "invalid id" },
+            { status: 400, headers: CORS },
+          );
+        }
+        const { supabaseAdmin } = await import(
+          "@/integrations/supabase/client.server"
+        );
+        const { data: ch, error } = await supabaseAdmin
+          .from("wallet_login_challenges")
+          .select("id, nonce, status, expires_at, created_at")
+          .eq("id", id)
+          .single();
+        if (error || !ch) {
+          return Response.json(
+            { error: "unknown challenge" },
+            { status: 404, headers: CORS },
+          );
+        }
+        const { buildSignableMessage } = await import("@/lib/wallet-auth-shared");
+        const domain = authDomainFromRequest(request);
+        return Response.json(
+          {
+            id: ch.id,
+            nonce: ch.nonce,
+            domain,
+            issued_at: ch.created_at,
+            expires_at: ch.expires_at,
+            status: ch.status,
+            message: buildSignableMessage({
+              nonce: ch.nonce,
+              domain,
+              issuedAt: ch.created_at,
+            }),
+          },
+          { headers: { ...CORS, "cache-control": "no-store" } },
+        );
+      },
+
+      POST: async ({ request }) => {
+        let body: unknown;
+        try {
+          body = await request.json();
+        } catch {
+          return Response.json(
+            { error: "invalid json" },
+            { status: 400, headers: CORS },
+          );
+        }
+
+        const parsed = bodySchema.safeParse(body);
+        if (!parsed.success) {
+          return Response.json(
+            { error: "invalid payload" },
+            { status: 400, headers: CORS },
+          );
+        }
+        const payload = parsed.data;
+        const address = payload.address.trim();
+        const signature = payload.signature.replace(/\s+/g, "");
+
+        const { supabaseAdmin } = await import(
+          "@/integrations/supabase/client.server"
+        );
+        const { buildSignableMessage, verifyTxcSignature, looksLikeTxcAddress } =
+          await import("@/lib/wallet-signature.server");
+
+        if (!looksLikeTxcAddress(address)) {
+          return Response.json(
+            { error: "invalid address" },
+            { status: 400, headers: CORS },
+          );
+        }
+
+        let query = supabaseAdmin
+          .from("wallet_login_challenges")
+          .select("id, nonce, status, expires_at, created_at");
+        query =
+          "id" in payload
+            ? query.eq("id", payload.id)
+            : query.eq("nonce", payload.nonce).eq("status", "pending");
+
+        const { data: ch, error: chErr } = await query.single();
+        if (chErr || !ch) {
+          return Response.json(
+            { error: "unknown challenge" },
+            { status: 404, headers: CORS },
+          );
+        }
+        if (ch.status !== "pending") {
+          return Response.json(
+            { error: "challenge already used" },
+            { status: 409, headers: CORS },
+          );
+        }
+        if (new Date(ch.expires_at).getTime() < Date.now()) {
+          await supabaseAdmin
+            .from("wallet_login_challenges")
+            .update({ status: "expired" })
+            .eq("id", ch.id);
+          return Response.json(
+            { error: "challenge expired" },
+            { status: 410, headers: CORS },
+          );
+        }
+
+        const message =
+          "message" in payload && payload.message
+            ? payload.message
+            : buildSignableMessage({
+                nonce: ch.nonce,
+                domain: authDomainFromRequest(request),
+                issuedAt: ch.created_at,
+              });
+
+        if (!message.includes(`Nonce: ${ch.nonce}`)) {
+          return Response.json(
+            { error: "nonce mismatch" },
+            { status: 400, headers: CORS },
+          );
+        }
+
+        if (!verifyTxcSignature({ address, message, signature })) {
+          console.error("[wallet-callback] bad signature", {
+            address,
+            messageLen: message.length,
+            signaturePrefix: signature.slice(0, 10),
+          });
+          return Response.json(
+            { error: "bad signature" },
+            { status: 401, headers: CORS },
+          );
+        }
+
+        const oneTimeToken = randomToken();
+        const { error: upErr } = await supabaseAdmin
+          .from("wallet_login_challenges")
+          .update({
+            status: "signed",
+            wallet_address: address,
+            signature,
+            one_time_token: oneTimeToken,
+            signed_at: new Date().toISOString(),
+          })
+          .eq("id", ch.id)
+          .eq("status", "pending");
+
+        if (upErr) {
+          console.error("[wallet-callback] update failed:", upErr);
+          return Response.json(
+            { error: "could not record signature" },
+            { status: 500, headers: CORS },
+          );
+        }
+
+        return Response.json({ ok: true }, { headers: CORS });
+      },
+    },
+  },
+});
