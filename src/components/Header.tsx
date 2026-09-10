@@ -196,100 +196,12 @@ export function Header() {
                   sign in
                 </button>
               </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle className="font-mono text-sm">[ SIGN IN WITH TXC WALLET ]</DialogTitle>
-                  <DialogDescription>
-                    Prove you control your wallet by signing a one-time challenge.
-                    No transaction, no fees — your wallet's "Sign Message" feature
-                    is enough.
-                  </DialogDescription>
-                </DialogHeader>
-                {step === "address" ? (
-                  <div className="space-y-2">
-                    <Label className="font-mono text-xs">TXC ADDRESS</Label>
-                    <Input
-                      value={addr}
-                      onChange={(e) => setAddr(e.target.value)}
-                      placeholder="T…"
-                      className="font-mono"
-                      autoFocus
-                    />
-                    <p className="text-xs text-muted-foreground font-mono">
-                      Must be a legacy T… address. Segwit txc1… can't sign
-                      messages yet.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <Label className="font-mono text-xs">1. SIGN THIS MESSAGE</Label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(message);
-                            toast.success("Message copied");
-                          }}
-                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
-                        >
-                          <Copy className="h-3 w-3" />
-                          copy
-                        </button>
-                      </div>
-                      <pre className="mt-1 max-h-32 overflow-auto rounded-sm border border-border bg-muted/40 p-2 text-[11px] font-mono whitespace-pre-wrap break-all">
-                        {message}
-                      </pre>
-                      <p className="mt-1 text-xs text-muted-foreground font-mono">
-                        In TXC Core: <em>File → Sign Message</em>, choose{" "}
-                        <span className="text-primary">{addr}</span>, paste the
-                        text above, click Sign.
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="font-mono text-xs">2. PASTE SIGNATURE</Label>
-                      <Textarea
-                        value={signature}
-                        onChange={(e) => setSignature(normalizeSignatureInput(e.target.value))}
-                        placeholder="H… (base64)"
-                        className="font-mono text-xs h-20"
-                      />
-                    </div>
-                  </div>
-                )}
-                <DialogFooter>
-                  {step === "sign" && (
-                    <Button
-                      variant="ghost"
-                      onClick={() => setStep("address")}
-                      className="font-mono"
-                      disabled={busy}
-                    >
-                      back
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setOpen(false);
-                      resetDialog();
-                    }}
-                    className="font-mono"
-                    disabled={busy}
-                  >
-                    cancel
-                  </Button>
-                  {step === "address" ? (
-                    <Button onClick={handleRequestChallenge} className="font-mono" disabled={busy}>
-                      {busy ? "…" : "next"}
-                    </Button>
-                  ) : (
-                    <Button onClick={handleCompleteLogin} className="font-mono" disabled={busy}>
-                      {busy ? "verifying…" : "sign in"}
-                    </Button>
-                  )}
-                </DialogFooter>
-              </DialogContent>
+              <WalletSignInDialog
+                onClose={() => {
+                  setOpen(false);
+                  resetDialog();
+                }}
+              />
             </Dialog>
           )}
           <a
