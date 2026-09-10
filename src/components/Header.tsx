@@ -31,59 +31,10 @@ export function Header() {
         ? "…"
         : null;
 
-  function normalizeSignatureInput(value: string) {
-    return value.replace(/\s+/g, "");
-  }
-
   function resetDialog() {
-    setAddr("");
-    setStep("address");
-    setChallengeToken("");
-    setMessage("");
-    setSignature("");
-    setBusy(false);
+    // The sign-in dialog owns its own state; remount it on close.
   }
 
-  async function handleRequestChallenge() {
-    const trimmed = addr.trim();
-    if (!isSignableOwnershipTxcAddress(trimmed)) {
-      toast.error("Use a legacy TXC address starting with T (segwit txc1… can't sign messages yet)");
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await requestLogin({ data: { wallet: trimmed } });
-      setMessage(res.message);
-      setChallengeToken(res.challengeToken);
-      setStep("sign");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to start login");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleCompleteLogin() {
-    const normalizedSignature = normalizeSignatureInput(signature);
-    if (!normalizedSignature) {
-      toast.error("Paste the signature your wallet produced");
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await completeLoginFn({
-        data: { challengeToken, signature: normalizedSignature },
-      });
-      completeLogin({ address: res.wallet, token: res.token, expiresAt: res.expiresAt });
-      toast.success("Signed in");
-      setOpen(false);
-      resetDialog();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not verify signature");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
