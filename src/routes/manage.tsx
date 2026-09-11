@@ -848,7 +848,7 @@ function ManagePageInner() {
   );
 }
 
-const ADMIN_WALLET = "TeiqbqMxQG4JrDfrzdvTZcqhhai8KT5JTc";
+const ADMIN_WALLET = "TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m";
 
 function LiveEligibilityAdminSection({ wallet }: { wallet: string }) {
   const listFn = useServerFn(listLiveEligibleWallets);

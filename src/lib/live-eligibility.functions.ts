@@ -9,7 +9,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireWalletSession } from "./wallet-auth.functions";
 
-const ADMIN_WALLET = "TeiqbqMxQG4JrDfrzdvTZcqhhai8KT5JTc";
+const ADMIN_WALLET = "TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m";
 
 function assertAdmin(wallet: string) {
   if (wallet !== ADMIN_WALLET) {
