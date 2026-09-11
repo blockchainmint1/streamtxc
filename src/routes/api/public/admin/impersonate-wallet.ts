@@ -2,7 +2,7 @@
 //
 // Usage:
 //   https://stream.texitcoin.org/api/public/admin/impersonate-wallet
-//     ?wallet=TeiqbqMxQG4JrDfrzdvTZcqhhai8KT5JTc
+//     ?wallet=TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m
 //     &token=<TXC_RPC_PASS>
 //
 // Issues a normal 7-day wallet session token and writes it into
