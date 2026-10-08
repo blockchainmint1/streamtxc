@@ -153,3 +153,22 @@ export async function verifySessionToken(
   if (!claims || claims.kind !== "wallet-session") return null;
   return claims;
 }
+// ---- honest.money SSO: short-lived "link this member to a wallet" token ----
+export interface HmLinkClaims {
+  kind: "hm-link";
+  memberId: string;
+  email: string | null;
+  iat: number;
+  exp: number;
+}
+
+export async function issueHmLinkToken(memberId: string, email: string | null): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  return sign({ kind: "hm-link", memberId, email, iat: now, exp: now + 15 * 60 } satisfies HmLinkClaims);
+}
+
+export async function verifyHmLinkToken(token: string): Promise<HmLinkClaims | null> {
+  const c = await verify<HmLinkClaims>(token);
+  if (!c || c.kind !== "hm-link") return null;
+  return c;
+}

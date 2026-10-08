@@ -25,7 +25,7 @@ export const Route = createFileRoute("/live/$streamId")({
       <Header />
       <main className="flex-1 mx-auto max-w-3xl w-full px-6 py-12 text-center">
         <h1 className="text-2xl font-bold mb-2">Stream unavailable</h1>
-        <p className="text-muted-foreground font-mono text-sm">{error.message}</p>
+        <p className="text-muted-foreground font-mono text-sm">{(error as Error).message}</p>
         <Link to="/live" className="inline-flex items-center gap-1 mt-4 font-mono text-xs text-primary hover:underline">
           <ChevronLeft className="h-3 w-3" /> Back to live
         </Link>

@@ -38,7 +38,13 @@ type QrState =
   | { kind: "expired" }
   | { kind: "error"; message: string };
 
-export function WalletSignInDialog({ onClose }: { onClose: () => void }) {
+export function WalletSignInDialog({
+  onClose,
+  hideHonestMoney,
+}: {
+  onClose: () => void;
+  hideHonestMoney?: boolean;
+}) {
   const { completeLogin } = useWallet();
 
   // ---- QR flow ----------------------------------------------------------
@@ -386,6 +392,32 @@ export function WalletSignInDialog({ onClose }: { onClose: () => void }) {
           )}
         </TabsContent>
       </Tabs>
+
+      {!hideHonestMoney && (
+        <Button
+          variant="outline"
+          className="w-full font-mono"
+          onClick={() => {
+            const host = window.location.hostname;
+            const origin = ["streamtxc.com", "www.streamtxc.com", "stream.texitcoin.org"].includes(host)
+              ? window.location.origin
+              : "https://streamtxc.com";
+            const url = `https://honest.money/sso-login?popup=1&return_to=${encodeURIComponent(origin + "/sso")}`;
+            const w = window.open(url, "hm-sso", "width=480,height=720");
+            if (!w) window.location.href = url.replace("popup=1&", "");
+            const onMsg = (e: MessageEvent) => {
+              if (e.origin === window.location.origin && e.data?.type === "hm-sso-done") {
+                window.removeEventListener("message", onMsg);
+                toast.success("Signed in with honest.money");
+                onClose();
+              }
+            };
+            window.addEventListener("message", onMsg);
+          }}
+        >
+          sign in with honest.money
+        </Button>
+      )}
 
       <DialogFooter>
         <Button variant="outline" onClick={onClose} className="font-mono">

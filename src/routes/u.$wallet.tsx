@@ -35,7 +35,7 @@ export const Route = createFileRoute("/u/$wallet")({
     <div className="min-h-screen bg-background text-foreground">
       <Header />
       <div className="mx-auto max-w-3xl px-6 py-16 font-mono text-sm text-destructive">
-        Failed to load videos: {error.message}
+        Failed to load videos: {(error as Error).message}
       </div>
     </div>
   ),
