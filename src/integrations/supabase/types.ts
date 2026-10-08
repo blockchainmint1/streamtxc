@@ -289,6 +289,45 @@ export type Database = {
         }
         Relationships: []
       }
+      hm_sso_links: {
+        Row: {
+          created_at: string
+          email: string | null
+          last_login_at: string | null
+          member_id: string
+          wallet: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          last_login_at?: string | null
+          member_id: string
+          wallet: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          last_login_at?: string | null
+          member_id?: string
+          wallet?: string
+        }
+        Relationships: []
+      }
+      hm_sso_nonces: {
+        Row: {
+          expires_at: string
+          nonce: string
+        }
+        Insert: {
+          expires_at: string
+          nonce: string
+        }
+        Update: {
+          expires_at?: string
+          nonce?: string
+        }
+        Relationships: []
+      }
       imports: {
         Row: {
           bytes_total: number | null
