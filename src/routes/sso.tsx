@@ -102,7 +102,7 @@ function SsoPage() {
           ) : (
             <Dialog open={dialog} onOpenChange={setDialog}>
               <Button onClick={() => setDialog(true)}>sign in with my TXC wallet</Button>
-              <WalletSignInDialog onClose={() => setDialog(false)} />
+              <WalletSignInDialog hideHonestMoney onClose={() => setDialog(false)} />
             </Dialog>
           )}
         </>
