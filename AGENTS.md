@@ -1,0 +1,1 @@
+- honest.money SSO: /sso verifies HME_HMAC_SECRET tickets; members link a TXC wallet once (hm_sso_links) because streamTXC accounts are wallets.
