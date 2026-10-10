@@ -332,7 +332,7 @@ async function processVideos() {
   const { data: pending, error } = await supabaseAdmin
     .from("videos")
     .select(
-      "cid, title, owner_wallet, video_wallet, payment_required_txc, months_prepaid, created_at, paid_at, expires_at, payment_received_txc, unpinned_at, status, expiring_at, unpin_after, notified_pre_expiry_at, notified_expiring_at, notified_unpinned_at",
+      "cid, title, owner_wallet, video_wallet, payment_required_txc, months_prepaid, created_at, paid_at, expires_at, payment_received_txc, unpinned_at, status, expiring_at, unpin_after, notified_pre_expiry_at, notified_expiring_at, notified_unpinned_at, notified_3d_at, notified_1d_at",
     )
     .not("video_wallet", "is", null)
     .limit(1000);
@@ -399,6 +399,8 @@ async function processVideos() {
               notified_pre_expiry_at: null,
               notified_expiring_at: null,
               notified_unpinned_at: null,
+              notified_3d_at: null,
+              notified_1d_at: null,
             })
             .eq("cid", v.cid);
           results.push({
@@ -468,6 +470,8 @@ async function processVideos() {
             status: "active",
             notified_pre_expiry_at: null,
             notified_expiring_at: null,
+            notified_3d_at: null,
+            notified_1d_at: null,
           })
           .eq("cid", v.cid);
         results.push({
