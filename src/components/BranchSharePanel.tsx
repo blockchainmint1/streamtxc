@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   createBranchShareRequest,
   getMyBranchShare,
+  moveVideosToOwnerBranch,
   unshareBranch,
 } from "@/lib/wallet-branch.functions";
 import { Button } from "@/components/ui/button";
@@ -14,8 +15,11 @@ export function BranchSharePanel() {
   const start = useServerFn(createBranchShareRequest);
   const status = useServerFn(getMyBranchShare);
   const unshare = useServerFn(unshareBranch);
+  const move = useServerFn(moveVideosToOwnerBranch);
   const qc = useQueryClient();
   const [pairing, setPairing] = useState<{ qrPayload: string; manifestUrl: string; token: string } | null>(null);
+  const [moving, setMoving] = useState(false);
+  const [moveProgress, setMoveProgress] = useState<{ filed: number; remaining: number } | null>(null);
 
   const { data } = useQuery({
     queryKey: ["branch-share", pairing?.token ?? null],
