@@ -64,9 +64,20 @@ export function BranchSharePanel() {
             Wallet: <code className="break-all">{data?.identityAddress}</code> · branch{" "}
             <code>{data?.path}</code>
           </p>
-          <Button variant="outline" size="sm" onClick={() => drop.mutate()} disabled={drop.isPending}>
-            stop sharing
-          </Button>
+          {moving ? (
+            <p className="text-xs text-muted-foreground">
+              filing your older videos… {moveProgress ? `${moveProgress.filed} done, ${moveProgress.remaining} left` : "starting…"}
+            </p>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => void runMove()}>
+              file my older videos in my branch
+            </Button>
+          )}
+          <div>
+            <Button variant="ghost" size="sm" onClick={() => drop.mutate()} disabled={drop.isPending || moving}>
+              stop sharing
+            </Button>
+          </div>
         </div>
       ) : pairing ? (
         <div className="mt-4 space-y-3">
