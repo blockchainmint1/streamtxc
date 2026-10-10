@@ -39,6 +39,7 @@ import { deliverAlert } from "@/lib/notifications.server";
 const POST_EXPIRY_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 // How far in advance we warn the owner that a video is about to expire.
 const PRE_EXPIRY_WARNING_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function explorerVideoUrl(cid: string) {
   const base = process.env.APP_PUBLIC_URL ?? "https://streamtxc.com";
