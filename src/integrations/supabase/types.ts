@@ -725,6 +725,8 @@ export type Database = {
           metadata_cid: string | null
           mime_type: string | null
           months_prepaid: number
+          notified_1d_at: string | null
+          notified_3d_at: string | null
           notified_expiring_at: string | null
           notified_pre_expiry_at: string | null
           notified_unpinned_at: string | null
@@ -784,6 +786,8 @@ export type Database = {
           metadata_cid?: string | null
           mime_type?: string | null
           months_prepaid?: number
+          notified_1d_at?: string | null
+          notified_3d_at?: string | null
           notified_expiring_at?: string | null
           notified_pre_expiry_at?: string | null
           notified_unpinned_at?: string | null
@@ -843,6 +847,8 @@ export type Database = {
           metadata_cid?: string | null
           mime_type?: string | null
           months_prepaid?: number
+          notified_1d_at?: string | null
+          notified_3d_at?: string | null
           notified_expiring_at?: string | null
           notified_pre_expiry_at?: string | null
           notified_unpinned_at?: string | null
