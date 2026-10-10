@@ -644,6 +644,8 @@ async function processVideos() {
         now < expMs &&
         expMs - now < PRE_EXPIRY_WARNING_MS &&
         !v.notified_pre_expiry_at &&
+        !v.notified_3d_at &&
+        !v.notified_1d_at &&
         v.owner_wallet
       ) {
         const daysLeft = Math.max(1, Math.ceil((expMs - now) / (24 * 3600 * 1000)));
