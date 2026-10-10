@@ -66,8 +66,16 @@ export function BranchSharePanel() {
         </div>
       ) : pairing ? (
         <div className="mt-4 space-y-3">
-          <div className="inline-block rounded-lg bg-background p-3">
-            <QRCodeSVG value={pairing.qrPayload} size={192} />
+          <div className="inline-block max-w-full rounded-lg border border-border bg-qr-background p-3">
+            <QRCodeSVG
+              value={pairing.qrPayload}
+              size={256}
+              marginSize={4}
+              bgColor="var(--qr-background)"
+              fgColor="var(--qr-foreground)"
+              className="block h-auto max-w-full"
+              title="Share your streamTXC branch with HME Wallet"
+            />
           </div>
           <p className="text-xs text-muted-foreground">
             Scan with HME Wallet and approve. This code expires in 10 minutes.

@@ -52,6 +52,8 @@ html {
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
+  --color-qr-background: var(--qr-background);
+  --color-qr-foreground: var(--qr-foreground);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -69,6 +71,9 @@ html {
 
 :root {
   --radius: 0.25rem;
+  /* Scannable codes keep normal polarity regardless of the page theme. */
+  --qr-background: oklch(1 0 0);
+  --qr-foreground: oklch(0 0 0);
   /* Dark, bold, techy — terminal-meets-broadcast */
   --background: oklch(0.14 0.015 260);
   --foreground: oklch(0.97 0.005 100);
