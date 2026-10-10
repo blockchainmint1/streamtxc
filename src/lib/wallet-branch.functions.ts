@@ -65,3 +65,35 @@ export const unshareBranch = createServerFn({ method: "POST" })
     await supabaseAdmin.from("wallet_branch_links").delete().eq("wallet", context.wallet);
     return { ok: true };
   });
+
+// Step 5: file videos that were posted BEFORE the owner shared their branch.
+// Runs a small batch per call (each video gets a real on-chain claim stamp,
+// so batches stay short); the client loops until `remaining` hits zero.
+export const moveVideosToOwnerBranch = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
+  .inputValidator((input) =>
+    z.object({ batch: z.number().int().min(1).max(8).optional() }).parse(input ?? {}),
+  )
+  .handler(async ({ context, data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { fileVideoInOwnerBranch } = await import("./owner-branch.server");
+    const batch = data?.batch ?? 4;
+    const { data: vids } = await supabaseAdmin
+      .from("videos")
+      .select("cid")
+      .eq("owner_wallet", context.wallet)
+      .is("owner_branch_address", null)
+      .order("created_at", { ascending: true })
+      .limit(batch);
+    let filed = 0;
+    for (const v of vids ?? []) {
+      const addr = await fileVideoInOwnerBranch({ cid: v.cid, ownerWallet: context.wallet });
+      if (addr) filed++;
+    }
+    const { count } = await supabaseAdmin
+      .from("videos")
+      .select("cid", { count: "exact", head: true })
+      .eq("owner_wallet", context.wallet)
+      .is("owner_branch_address", null);
+    return { filed, remaining: count ?? 0 };
+  });

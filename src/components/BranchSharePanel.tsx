@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   createBranchShareRequest,
   getMyBranchShare,
+  moveVideosToOwnerBranch,
   unshareBranch,
 } from "@/lib/wallet-branch.functions";
 import { Button } from "@/components/ui/button";
@@ -14,8 +15,11 @@ export function BranchSharePanel() {
   const start = useServerFn(createBranchShareRequest);
   const status = useServerFn(getMyBranchShare);
   const unshare = useServerFn(unshareBranch);
+  const move = useServerFn(moveVideosToOwnerBranch);
   const qc = useQueryClient();
   const [pairing, setPairing] = useState<{ qrPayload: string; manifestUrl: string; token: string } | null>(null);
+  const [moving, setMoving] = useState(false);
+  const [moveProgress, setMoveProgress] = useState<{ filed: number; remaining: number } | null>(null);
 
   const { data } = useQuery({
     queryKey: ["branch-share", pairing?.token ?? null],
@@ -43,6 +47,36 @@ export function BranchSharePanel() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // File every video that predates the branch share, oldest first. Each call
+  // stamps a small batch on-chain, so we loop until the server reports zero
+  // left. Bails out if a batch files nothing (stamps failing) to avoid spinning.
+  async function runMove() {
+    setMoving(true);
+    setMoveProgress(null);
+    let filed = 0;
+    try {
+      for (;;) {
+        const r = await move({ data: { batch: 4 } });
+        if (r.filed === 0) {
+          if (r.remaining > 0) toast.error(`Some videos could not be filed — ${r.remaining} left. Try again in a minute.`);
+          break;
+        }
+        filed += r.filed;
+        setMoveProgress({ filed, remaining: r.remaining });
+        if (r.remaining <= 0) break;
+      }
+      if (filed > 0) {
+        toast.success(`${filed} older video${filed === 1 ? "" : "s"} are now filed in your wallet branch.`);
+        qc.invalidateQueries({ queryKey: ["branch-share"] });
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Filing older videos failed");
+    } finally {
+      setMoving(false);
+      setMoveProgress(null);
+    }
+  }
+
   return (
     <section className="mt-6 rounded-lg border border-border bg-card p-5">
       <h2 className="text-lg font-semibold uppercase tracking-wide">Your streamTXC branch</h2>
@@ -60,9 +94,20 @@ export function BranchSharePanel() {
             Wallet: <code className="break-all">{data?.identityAddress}</code> · branch{" "}
             <code>{data?.path}</code>
           </p>
-          <Button variant="outline" size="sm" onClick={() => drop.mutate()} disabled={drop.isPending}>
-            stop sharing
-          </Button>
+          {moving ? (
+            <p className="text-xs text-muted-foreground">
+              filing your older videos… {moveProgress ? `${moveProgress.filed} done, ${moveProgress.remaining} left` : "starting…"}
+            </p>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => void runMove()}>
+              file my older videos in my branch
+            </Button>
+          )}
+          <div>
+            <Button variant="ghost" size="sm" onClick={() => drop.mutate()} disabled={drop.isPending || moving}>
+              stop sharing
+            </Button>
+          </div>
         </div>
       ) : pairing ? (
         <div className="mt-4 space-y-3">
