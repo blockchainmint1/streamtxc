@@ -36,7 +36,7 @@ import { deliverAlert } from "@/lib/notifications.server";
 
 // How long after expires_at we keep the file pinned before actually
 // removing from IPFS storage. Metadata + DB row stay forever.
-const POST_EXPIRY_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
+const POST_EXPIRY_GRACE_MS = 30 * 24 * 60 * 60 * 1000;
 // How far in advance we warn the owner that a video is about to expire.
 const PRE_EXPIRY_WARNING_MS = 7 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -512,7 +512,7 @@ async function processVideos() {
           if (!v.notified_unpinned_at && v.owner_wallet) {
             await deliverAlert({
               wallet: v.owner_wallet,
-              telegramText: `🗑️ <b>Video unpinned</b>\n<b>${title}</b> has been removed from IPFS storage because no renewal payment arrived during the 7-day grace.\n\nThe video's page and chain proofs are preserved. Pay any time to re-pin and restore it:\n${explorerVideoUrl(v.cid)}`,
+              telegramText: `🗑️ <b>Video unpinned</b>\n<b>${title}</b> has been removed from IPFS storage because no renewal payment arrived during the 30-day grace.\n\nThe video's page and chain proofs are preserved. Pay any time to re-pin and restore it:\n${explorerVideoUrl(v.cid)}`,
               email: {
                 templateName: "video-unpinned",
                 templateData: {
@@ -554,7 +554,7 @@ async function processVideos() {
         if (!v.notified_expiring_at && v.owner_wallet) {
           await deliverAlert({
             wallet: v.owner_wallet,
-            telegramText: `⚠️ <b>Video expiring in 7 days</b>\n<b>${title}</b> has reached its paid-through date. We'll keep it pinned for 7 more days, then remove the file from IPFS storage.\n\nRenew now to keep it online:\n${manageUrl()}`,
+            telegramText: `⚠️ <b>Video expiring in 7 days</b>\n<b>${title}</b> has reached its paid-through date. We'll keep it pinned for 30 more days, then remove the file from IPFS storage.\n\nRenew now to keep it online:\n${manageUrl()}`,
             email: {
               templateName: "video-expiring",
               templateData: {
@@ -585,7 +585,7 @@ async function processVideos() {
       ) {
         await deliverAlert({
           wallet: v.owner_wallet,
-          telegramText: `🚨 <b>Last chance:</b> <b>${title}</b> expires <b>tomorrow</b>. After that it enters a 7-day grace period, then the file is removed from storage.\n\nRenew now in Manage:\n${manageUrl()}`,
+          telegramText: `🚨 <b>Last chance:</b> <b>${title}</b> expires <b>tomorrow</b>. After that it enters a 30-day grace period, then the file is removed from storage.\n\nRenew now in Manage:\n${manageUrl()}`,
           email: {
             templateName: "video-expiry-warning",
             templateData: {
