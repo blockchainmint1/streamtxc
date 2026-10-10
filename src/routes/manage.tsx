@@ -58,6 +58,7 @@ import { CheckCircle2, Film, Clock, ArrowUp, ArrowDown, ChevronsUpDown } from "l
 import { Captions } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationPrefs } from "@/components/NotificationPrefs";
+import { BranchSharePanel } from "@/components/BranchSharePanel";
 import { listBugReports } from "@/lib/bug-reports.functions";
 import {
   listLiveEligibleWallets,
@@ -561,6 +562,8 @@ function ManagePageInner() {
             <BulkExtendDialog wallet={address} />
           )}
         </div>
+
+        {address && isAuthenticated && <BranchSharePanel />}
 
         {address && <NotificationPrefs wallet={address} />}
 
