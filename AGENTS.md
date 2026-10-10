@@ -1,1 +1,2 @@
 - honest.money SSO: /sso verifies HME_HMAC_SECRET tickets; members link a TXC wallet once (hm_sso_links) because streamTXC accounts are wallets.
+- Owner ownership records go to the member's HME Wallet branch 1105 (xpub in wallet_branch_links, hm-link-xpubs protocol at /api/public/v1/wallet-link); payments stay on server-held video_wallet so the 90/5/5 split keeps working.
