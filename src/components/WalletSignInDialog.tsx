@@ -1,14 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { useServerFn } from "@tanstack/react-start";
-import { Copy, RefreshCw, Smartphone } from "lucide-react";
+import { RefreshCw, Smartphone } from "lucide-react";
 import { toast } from "sonner";
-import {
-  requestWalletLogin,
-  completeWalletLogin,
-} from "@/lib/wallet-auth.functions";
-import { useWallet, isSignableOwnershipTxcAddress } from "@/lib/wallet";
+import { useWallet } from "@/lib/wallet";
 import { WALLET_POLL_INTERVAL_MS } from "@/lib/wallet-auth-shared";
+import { publicOrigin } from "@/lib/site-origin";
 import {
   DialogContent,
   DialogDescription,
@@ -16,10 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
 interface Challenge {
@@ -38,6 +30,20 @@ type QrState =
   | { kind: "expired" }
   | { kind: "error"; message: string };
 
+function openHonestMoneyPopup() {
+  const returnTo = `${publicOrigin()}/sso`;
+  const url = `https://honest.money/sso-login?popup=1&return_to=${encodeURIComponent(returnTo)}`;
+  const w = 480;
+  const h = 720;
+  const left = window.screenX + (window.outerWidth - w) / 2;
+  const top = window.screenY + (window.outerHeight - h) / 2;
+  window.open(
+    url,
+    "hm-sso",
+    `width=${w},height=${h},left=${left},top=${top},popup=1`,
+  );
+}
+
 export function WalletSignInDialog({
   onClose,
   hideHonestMoney,
@@ -45,9 +51,51 @@ export function WalletSignInDialog({
   onClose: () => void;
   hideHonestMoney?: boolean;
 }) {
-  const { completeLogin } = useWallet();
+  // Default: honest.money SSO only. hideHonestMoney is set on /sso's link
+  // step, where the one-time wallet QR sign-in is still needed.
+  if (!hideHonestMoney) {
+    return (
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="font-mono text-sm">
+            [ SIGN IN ]
+          </DialogTitle>
+          <DialogDescription>
+            Sign in with your honest.money account — one click, no passwords
+            here.
+          </DialogDescription>
+        </DialogHeader>
 
-  // ---- QR flow ----------------------------------------------------------
+        <div className="flex flex-col items-center gap-3 py-4">
+          <Button
+            className="font-mono"
+            onClick={() => {
+              openHonestMoneyPopup();
+              onClose();
+            }}
+          >
+            sign in with honest.money
+          </Button>
+          <p className="max-w-xs text-center font-mono text-xs text-muted-foreground">
+            The first time, you'll link your HME Wallet once — after that,
+            honest.money alone signs you in.
+          </p>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} className="font-mono">
+            cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    );
+  }
+
+  return <WalletQrSignIn onClose={onClose} />;
+}
+
+function WalletQrSignIn({ onClose }: { onClose: () => void }) {
+  const { completeLogin } = useWallet();
   const [qr, setQr] = useState<QrState>({ kind: "loading" });
   const [remaining, setRemaining] = useState(0);
   const cancelled = useRef(false);
@@ -167,68 +215,6 @@ export function WalletSignInDialog({
     };
   }, [waitingId, exchange]);
 
-  // ---- Manual (paste-signature) flow ------------------------------------
-  const requestLogin = useServerFn(requestWalletLogin);
-  const completeLoginFn = useServerFn(completeWalletLogin);
-  const [addr, setAddr] = useState("");
-  const [step, setStep] = useState<"address" | "sign">("address");
-  const [challengeToken, setChallengeToken] = useState("");
-  const [message, setMessage] = useState("");
-  const [signature, setSignature] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  function normalizeSignatureInput(value: string) {
-    return value.replace(/\s+/g, "");
-  }
-
-  async function handleRequestChallenge() {
-    const trimmed = addr.trim();
-    if (!isSignableOwnershipTxcAddress(trimmed)) {
-      toast.error(
-        "Use a legacy TXC address starting with T (segwit txc1… can't sign messages yet)",
-      );
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await requestLogin({ data: { wallet: trimmed } });
-      setMessage(res.message);
-      setChallengeToken(res.challengeToken);
-      setStep("sign");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to start login");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleCompleteLogin() {
-    const normalizedSignature = normalizeSignatureInput(signature);
-    if (!normalizedSignature) {
-      toast.error("Paste the signature your wallet produced");
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await completeLoginFn({
-        data: { challengeToken, signature: normalizedSignature },
-      });
-      completeLogin({
-        address: res.wallet,
-        token: res.token,
-        expiresAt: res.expiresAt,
-      });
-      toast.success("Signed in");
-      onClose();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Could not verify signature",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const mmss = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}`;
 
   return (
@@ -243,60 +229,58 @@ export function WalletSignInDialog({
       </DialogHeader>
 
       <div className="pt-2">
-          <div className="flex flex-col items-center gap-3">
-            {(qr.kind === "waiting" || qr.kind === "signing") && (
-              <>
-                <div className="rounded-sm bg-white p-3">
-                  <QRCodeSVG
-                    value={qr.challenge.qr_data}
-                    size={216}
-                    level="M"
-                    marginSize={1}
-                  />
-                </div>
-                <p className="text-center text-xs font-mono text-muted-foreground">
-                  Open <span className="text-primary">HME Wallet</span> → scan
-                  this code → approve the sign-in.
-                </p>
-                <p className="font-mono text-xs text-muted-foreground">
-                  {qr.kind === "signing"
-                    ? "signing you in…"
-                    : `waiting for your phone · expires in ${mmss}`}
-                </p>
-                <a
-                  href={qr.challenge.deep_link}
-                  className="inline-flex items-center gap-1.5 rounded-sm border border-border px-3 py-1.5 font-mono text-xs hover:border-primary hover:text-primary sm:hidden"
-                >
-                  <Smartphone className="h-3.5 w-3.5" />
-                  open HME Wallet on this phone
-                </a>
-              </>
-            )}
-
-            {qr.kind === "loading" && (
-              <div className="flex h-[240px] items-center justify-center font-mono text-xs text-muted-foreground">
-                generating code…
+        <div className="flex flex-col items-center gap-3">
+          {(qr.kind === "waiting" || qr.kind === "signing") && (
+            <>
+              <div className="rounded-sm bg-white p-3">
+                <QRCodeSVG
+                  value={qr.challenge.qr_data}
+                  size={216}
+                  level="M"
+                  marginSize={1}
+                />
               </div>
-            )}
+              <p className="text-center text-xs font-mono text-muted-foreground">
+                Open <span className="text-primary">HME Wallet</span> → scan
+                this code → approve the sign-in.
+              </p>
+              <p className="font-mono text-xs text-muted-foreground">
+                {qr.kind === "signing"
+                  ? "signing you in…"
+                  : `waiting for your phone · expires in ${mmss}`}
+              </p>
+              <a
+                href={qr.challenge.deep_link}
+                className="inline-flex items-center gap-1.5 rounded-sm border border-border px-3 py-1.5 font-mono text-xs hover:border-primary hover:text-primary sm:hidden"
+              >
+                <Smartphone className="h-3.5 w-3.5" />
+                open HME Wallet on this phone
+              </a>
+            </>
+          )}
 
-            {(qr.kind === "expired" || qr.kind === "error") && (
-              <div className="flex h-[240px] flex-col items-center justify-center gap-3">
-                <p className="text-center font-mono text-xs text-muted-foreground">
-                  {qr.kind === "expired"
-                    ? "This code expired."
-                    : qr.message}
-                </p>
-                <Button
-                  variant="outline"
-                  className="font-mono"
-                  onClick={() => void createChallenge()}
-                >
-                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-                  new code
-                </Button>
-              </div>
-            )}
-          </div>
+          {qr.kind === "loading" && (
+            <div className="flex h-[240px] items-center justify-center font-mono text-xs text-muted-foreground">
+              generating code…
+            </div>
+          )}
+
+          {(qr.kind === "expired" || qr.kind === "error") && (
+            <div className="flex h-[240px] flex-col items-center justify-center gap-3">
+              <p className="text-center font-mono text-xs text-muted-foreground">
+                {qr.kind === "expired" ? "This code expired." : qr.message}
+              </p>
+              <Button
+                variant="outline"
+                className="font-mono"
+                onClick={() => void createChallenge()}
+              >
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                new code
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       <DialogFooter>
