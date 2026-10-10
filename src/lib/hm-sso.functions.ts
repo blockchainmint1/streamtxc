@@ -62,6 +62,22 @@ export const completeHmSso = createServerFn({ method: "POST" })
     void supabaseAdmin.from("hm_sso_nonces").delete().lt("expires_at", new Date().toISOString());
 
     const memberId = String(t.minerId).toLowerCase();
+    // One-time bootstrap: known owners get their wallet linked automatically
+    // the first time they sign in with honest.money (no manual link step).
+    const BOOTSTRAP_LINKS: Record<string, string> = {
+      "bobby@honest.money": "TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m",
+    };
+    const bootstrapWallet = t.email ? BOOTSTRAP_LINKS[t.email.toLowerCase()] : undefined;
+    if (bootstrapWallet) {
+      await supabaseAdmin.from("hm_sso_links").upsert({
+        member_id: memberId,
+        wallet: bootstrapWallet,
+        email: t.email ?? null,
+        last_login_at: new Date().toISOString(),
+      });
+      const s = await issueSessionToken(bootstrapWallet);
+      return { kind: "signed-in" as const, wallet: bootstrapWallet, token: s.token, expiresAt: s.expiresAt };
+    }
     const { data: link } = await supabaseAdmin
       .from("hm_sso_links")
       .select("wallet")
