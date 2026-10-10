@@ -612,6 +612,7 @@ async function processVideos() {
         now < expMs &&
         expMs - now < 3 * DAY_MS &&
         !v.notified_3d_at &&
+        !v.notified_1d_at &&
         v.owner_wallet
       ) {
         await deliverAlert({
