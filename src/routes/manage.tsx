@@ -2365,7 +2365,8 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
                       )}
                       {verifyResult.unmatched.length > 0 && (
                         <p className="text-muted-foreground">
-                          {verifyResult.unmatched.length} output(s) didn't match any video wallet.
+                          {verifyResult.unmatched.length} output(s) returned to the sender as
+                          change — that's normal, nothing went wrong.
                         </p>
                       )}
                     </>
