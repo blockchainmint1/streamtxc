@@ -159,6 +159,10 @@ export const Route = createFileRoute("/api/public/hooks/ipfs-pin-complete")({
           if (videoError && videoError.code !== "23505") {
             throw new Error(`videos insert failed: ${videoError.message}`);
           }
+          if (!videoError) {
+            const { fileVideoInOwnerBranch } = await import("@/lib/owner-branch.server");
+            await fileVideoInOwnerBranch({ cid: event.cid, ownerWallet: stream.owner_wallet });
+          }
 
           const { error: archiveError } = await supabaseAdmin
             .from("live_streams")

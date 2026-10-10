@@ -729,6 +729,8 @@ export type Database = {
           notified_pre_expiry_at: string | null
           notified_unpinned_at: string | null
           op_return_payload: string | null
+          owner_branch_address: string | null
+          owner_branch_index: number | null
           owner_nonce: string | null
           owner_proof_status: string
           owner_signature: string | null
@@ -786,6 +788,8 @@ export type Database = {
           notified_pre_expiry_at?: string | null
           notified_unpinned_at?: string | null
           op_return_payload?: string | null
+          owner_branch_address?: string | null
+          owner_branch_index?: number | null
           owner_nonce?: string | null
           owner_proof_status?: string
           owner_signature?: string | null
@@ -843,6 +847,8 @@ export type Database = {
           notified_pre_expiry_at?: string | null
           notified_unpinned_at?: string | null
           op_return_payload?: string | null
+          owner_branch_address?: string | null
+          owner_branch_index?: number | null
           owner_nonce?: string | null
           owner_proof_status?: string
           owner_signature?: string | null
@@ -912,6 +918,69 @@ export type Database = {
             referencedColumns: ["cid"]
           },
         ]
+      }
+      wallet_branch_links: {
+        Row: {
+          identity_address: string
+          linked_at: string
+          next_index: number
+          wallet: string
+          xpub: string
+          xpub_path: string
+        }
+        Insert: {
+          identity_address: string
+          linked_at?: string
+          next_index?: number
+          wallet: string
+          xpub: string
+          xpub_path: string
+        }
+        Update: {
+          identity_address?: string
+          linked_at?: string
+          next_index?: number
+          wallet?: string
+          xpub?: string
+          xpub_path?: string
+        }
+        Relationships: []
+      }
+      wallet_branch_requests: {
+        Row: {
+          challenge: string
+          consumed_at: string | null
+          created_at: string
+          error: string | null
+          expires_at: string
+          id: string
+          status: string
+          token: string
+          wallet: string
+        }
+        Insert: {
+          challenge: string
+          consumed_at?: string | null
+          created_at?: string
+          error?: string | null
+          expires_at: string
+          id?: string
+          status?: string
+          token: string
+          wallet: string
+        }
+        Update: {
+          challenge?: string
+          consumed_at?: string | null
+          created_at?: string
+          error?: string | null
+          expires_at?: string
+          id?: string
+          status?: string
+          token?: string
+          wallet?: string
+        }
+        Relationships: []
       }
       wallet_login_challenges: {
         Row: {
@@ -1026,6 +1095,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_branch_index: { Args: { _wallet: string }; Returns: number }
       next_video_wallet_index: { Args: never; Returns: number }
       purge_expired_wallet_challenges: { Args: never; Returns: undefined }
     }

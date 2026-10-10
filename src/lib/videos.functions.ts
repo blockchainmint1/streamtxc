@@ -1,3 +1,4 @@
+import { fileVideoInOwnerBranch } from "./owner-branch.server";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestIP, getRequestHeader } from "@tanstack/react-start/server";
 import { createHash } from "crypto";
@@ -231,6 +232,7 @@ export const registerUpload = createServerFn({ method: "POST" })
       if (vErr.code === "23505") await assertCidUnclaimed(data.cid);
       throw new Error(`Failed to save video: ${vErr.message}`);
     }
+    await fileVideoInOwnerBranch({ cid: data.cid, ownerWallet });
 
     if (ownerWallet) {
       const { error: pErr } = await supabaseAdmin.from("payments").insert({
@@ -341,6 +343,7 @@ export const finalizeUpload = createServerFn({ method: "POST" })
       if (vErr.code === "23505") await assertCidUnclaimed(pin.cid);
       throw new Error(`Failed to save video: ${vErr.message}`);
     }
+    await fileVideoInOwnerBranch({ cid: pin.cid, ownerWallet });
 
     if (ownerWallet) {
       const { error: pErr } = await supabaseAdmin.from("payments").insert({
@@ -549,6 +552,7 @@ export const addByCid = createServerFn({ method: "POST" })
       if (vErr.code === "23505") await assertCidUnclaimed(data.cid);
       throw new Error(`Failed to save video: ${vErr.message}`);
     }
+    await fileVideoInOwnerBranch({ cid: data.cid, ownerWallet });
 
     if (ownerWallet) {
       const { error: pErr } = await supabaseAdmin.from("payments").insert({

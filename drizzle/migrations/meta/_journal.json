@@ -8,6 +8,13 @@
       "when": 1791487818674,
       "tag": "0000_hm_sso_links",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791618115061,
+      "tag": "0001_wallet_branch_1105",
+      "breakpoints": true
     }
   ]
 }

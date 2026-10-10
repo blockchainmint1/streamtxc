@@ -35,6 +35,7 @@ import { Route as ApiPublicTxcHealthRouteImport } from './routes/api/public/txc-
 import { Route as ApiPublicImportStreamRouteImport } from './routes/api/public/import-stream'
 import { Route as EmbedLiveByWalletWalletRouteImport } from './routes/embed.live.by-wallet.$wallet'
 import { Route as ApiStreamCidSplatRouteImport } from './routes/api/stream.$cid.$'
+import { Route as ApiPublicV1WalletLinkRouteImport } from './routes/api/public/v1/wallet-link'
 import { Route as ApiPublicNotifyVerifyEmailRouteImport } from './routes/api/public/notify/verify-email'
 import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/hooks/telegram'
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
@@ -184,6 +185,11 @@ const ApiStreamCidSplatRoute = ApiStreamCidSplatRouteImport.update({
   id: '/$',
   path: '/$',
   getParentRoute: () => ApiStreamCidRoute,
+} as any)
+const ApiPublicV1WalletLinkRoute = ApiPublicV1WalletLinkRouteImport.update({
+  id: '/public/v1/wallet-link',
+  path: '/public/v1/wallet-link',
+  getParentRoute: () => ApiRoute,
 } as any)
 const ApiPublicNotifyVerifyEmailRoute =
   ApiPublicNotifyVerifyEmailRouteImport.update({
@@ -336,6 +342,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
   '/api/public/notify/verify-email': typeof ApiPublicNotifyVerifyEmailRoute
+  '/api/public/v1/wallet-link': typeof ApiPublicV1WalletLinkRoute
   '/api/stream/$cid/$': typeof ApiStreamCidSplatRoute
   '/embed/live/by-wallet/$wallet': typeof EmbedLiveByWalletWalletRoute
 }
@@ -382,6 +389,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
   '/api/public/notify/verify-email': typeof ApiPublicNotifyVerifyEmailRoute
+  '/api/public/v1/wallet-link': typeof ApiPublicV1WalletLinkRoute
   '/api/stream/$cid/$': typeof ApiStreamCidSplatRoute
   '/embed/live/by-wallet/$wallet': typeof EmbedLiveByWalletWalletRoute
 }
@@ -429,6 +437,7 @@ export interface FileRoutesById {
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
   '/api/public/notify/verify-email': typeof ApiPublicNotifyVerifyEmailRoute
+  '/api/public/v1/wallet-link': typeof ApiPublicV1WalletLinkRoute
   '/api/stream/$cid/$': typeof ApiStreamCidSplatRoute
   '/embed/live/by-wallet/$wallet': typeof EmbedLiveByWalletWalletRoute
 }
@@ -477,6 +486,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
     | '/api/public/notify/verify-email'
+    | '/api/public/v1/wallet-link'
     | '/api/stream/$cid/$'
     | '/embed/live/by-wallet/$wallet'
   fileRoutesByTo: FileRoutesByTo
@@ -523,6 +533,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
     | '/api/public/notify/verify-email'
+    | '/api/public/v1/wallet-link'
     | '/api/stream/$cid/$'
     | '/embed/live/by-wallet/$wallet'
   id:
@@ -569,6 +580,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
     | '/api/public/notify/verify-email'
+    | '/api/public/v1/wallet-link'
     | '/api/stream/$cid/$'
     | '/embed/live/by-wallet/$wallet'
   fileRoutesById: FileRoutesById
@@ -779,6 +791,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStreamCidSplatRouteImport
       parentRoute: typeof ApiStreamCidRoute
     }
+    '/api/public/v1/wallet-link': {
+      id: '/api/public/v1/wallet-link'
+      path: '/public/v1/wallet-link'
+      fullPath: '/api/public/v1/wallet-link'
+      preLoaderRoute: typeof ApiPublicV1WalletLinkRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/public/notify/verify-email': {
       id: '/api/public/notify/verify-email'
       path: '/public/notify/verify-email'
@@ -944,6 +963,7 @@ interface ApiRouteChildren {
   ApiPublicHooksPaymentWatcherRoute: typeof ApiPublicHooksPaymentWatcherRoute
   ApiPublicHooksTelegramRoute: typeof ApiPublicHooksTelegramRoute
   ApiPublicNotifyVerifyEmailRoute: typeof ApiPublicNotifyVerifyEmailRoute
+  ApiPublicV1WalletLinkRoute: typeof ApiPublicV1WalletLinkRoute
 }
 
 const ApiRouteChildren: ApiRouteChildren = {
@@ -972,6 +992,7 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiPublicHooksPaymentWatcherRoute: ApiPublicHooksPaymentWatcherRoute,
   ApiPublicHooksTelegramRoute: ApiPublicHooksTelegramRoute,
   ApiPublicNotifyVerifyEmailRoute: ApiPublicNotifyVerifyEmailRoute,
+  ApiPublicV1WalletLinkRoute: ApiPublicV1WalletLinkRoute,
 }
 
 const ApiRouteWithChildren = ApiRoute._addFileChildren(ApiRouteChildren)
