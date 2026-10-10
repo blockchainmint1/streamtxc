@@ -576,6 +576,68 @@ async function processVideos() {
         continue;
       }
 
+      // 3b-ii. 1-day final reminder.
+      if (
+        now < expMs &&
+        expMs - now < DAY_MS &&
+        !v.notified_1d_at &&
+        v.owner_wallet
+      ) {
+        await deliverAlert({
+          wallet: v.owner_wallet,
+          telegramText: `🚨 <b>Last chance:</b> <b>${title}</b> expires <b>tomorrow</b>. After that it enters a 7-day grace period, then the file is removed from storage.\n\nRenew now in Manage:\n${manageUrl()}`,
+          email: {
+            templateName: "video-expiry-warning",
+            templateData: {
+              title,
+              cid: v.cid,
+              daysLeft: 1,
+              expiresAt: v.expires_at,
+              videoUrl: explorerVideoUrl(v.cid),
+              manageUrl: manageUrl(),
+            },
+            idempotencyKey: `expiry-1d-${v.cid}`,
+          },
+        });
+        await supabaseAdmin
+          .from("videos")
+          .update({ notified_1d_at: new Date().toISOString() })
+          .eq("cid", v.cid);
+        results.push({ cid: v.cid, action: "expiry_1d_warned" });
+        continue;
+      }
+
+      // 3b-i. 3-day reminder.
+      if (
+        now < expMs &&
+        expMs - now < 3 * DAY_MS &&
+        !v.notified_3d_at &&
+        v.owner_wallet
+      ) {
+        await deliverAlert({
+          wallet: v.owner_wallet,
+          telegramText: `⚠️ <b>Reminder:</b> <b>${title}</b> expires in 3 days. Renew anytime in Manage:\n${manageUrl()}`,
+          email: {
+            templateName: "video-expiry-warning",
+            templateData: {
+              title,
+              cid: v.cid,
+              daysLeft: 3,
+              expiresAt: v.expires_at,
+              videoUrl: explorerVideoUrl(v.cid),
+              manageUrl: manageUrl(),
+            },
+            idempotencyKey: `expiry-3d-${v.cid}`,
+          },
+        });
+        await supabaseAdmin
+          .from("videos")
+          .update({ notified_3d_at: new Date().toISOString() })
+          .eq("cid", v.cid);
+        results.push({ cid: v.cid, action: "expiry_3d_warned" });
+        continue;
+      }
+
       // 3c. Approaching expiry → 7-day heads-up.
       if (
         now < expMs &&
