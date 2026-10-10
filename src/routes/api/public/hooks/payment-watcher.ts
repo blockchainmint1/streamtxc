@@ -39,6 +39,7 @@ import { deliverAlert } from "@/lib/notifications.server";
 const POST_EXPIRY_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 // How far in advance we warn the owner that a video is about to expire.
 const PRE_EXPIRY_WARNING_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function explorerVideoUrl(cid: string) {
   const base = process.env.APP_PUBLIC_URL ?? "https://streamtxc.com";
@@ -332,7 +333,7 @@ async function processVideos() {
   const { data: pending, error } = await supabaseAdmin
     .from("videos")
     .select(
-      "cid, title, owner_wallet, video_wallet, payment_required_txc, months_prepaid, created_at, paid_at, expires_at, payment_received_txc, unpinned_at, status, expiring_at, unpin_after, notified_pre_expiry_at, notified_expiring_at, notified_unpinned_at",
+      "cid, title, owner_wallet, video_wallet, payment_required_txc, months_prepaid, created_at, paid_at, expires_at, payment_received_txc, unpinned_at, status, expiring_at, unpin_after, notified_pre_expiry_at, notified_expiring_at, notified_unpinned_at, notified_3d_at, notified_1d_at",
     )
     .not("video_wallet", "is", null)
     .limit(1000);
@@ -399,6 +400,8 @@ async function processVideos() {
               notified_pre_expiry_at: null,
               notified_expiring_at: null,
               notified_unpinned_at: null,
+              notified_3d_at: null,
+              notified_1d_at: null,
             })
             .eq("cid", v.cid);
           results.push({
@@ -468,6 +471,8 @@ async function processVideos() {
             status: "active",
             notified_pre_expiry_at: null,
             notified_expiring_at: null,
+            notified_3d_at: null,
+            notified_1d_at: null,
           })
           .eq("cid", v.cid);
         results.push({
@@ -571,11 +576,76 @@ async function processVideos() {
         continue;
       }
 
+      // 3b-ii. 1-day final reminder.
+      if (
+        now < expMs &&
+        expMs - now < DAY_MS &&
+        !v.notified_1d_at &&
+        v.owner_wallet
+      ) {
+        await deliverAlert({
+          wallet: v.owner_wallet,
+          telegramText: `🚨 <b>Last chance:</b> <b>${title}</b> expires <b>tomorrow</b>. After that it enters a 7-day grace period, then the file is removed from storage.\n\nRenew now in Manage:\n${manageUrl()}`,
+          email: {
+            templateName: "video-expiry-warning",
+            templateData: {
+              title,
+              cid: v.cid,
+              daysLeft: 1,
+              expiresAt: v.expires_at,
+              videoUrl: explorerVideoUrl(v.cid),
+              manageUrl: manageUrl(),
+            },
+            idempotencyKey: `expiry-1d-${v.cid}`,
+          },
+        });
+        await supabaseAdmin
+          .from("videos")
+          .update({ notified_1d_at: new Date().toISOString() })
+          .eq("cid", v.cid);
+        results.push({ cid: v.cid, action: "expiry_1d_warned" });
+        continue;
+      }
+
+      // 3b-i. 3-day reminder.
+      if (
+        now < expMs &&
+        expMs - now < 3 * DAY_MS &&
+        !v.notified_3d_at &&
+        !v.notified_1d_at &&
+        v.owner_wallet
+      ) {
+        await deliverAlert({
+          wallet: v.owner_wallet,
+          telegramText: `⚠️ <b>Reminder:</b> <b>${title}</b> expires in 3 days. Renew anytime in Manage:\n${manageUrl()}`,
+          email: {
+            templateName: "video-expiry-warning",
+            templateData: {
+              title,
+              cid: v.cid,
+              daysLeft: 3,
+              expiresAt: v.expires_at,
+              videoUrl: explorerVideoUrl(v.cid),
+              manageUrl: manageUrl(),
+            },
+            idempotencyKey: `expiry-3d-${v.cid}`,
+          },
+        });
+        await supabaseAdmin
+          .from("videos")
+          .update({ notified_3d_at: new Date().toISOString() })
+          .eq("cid", v.cid);
+        results.push({ cid: v.cid, action: "expiry_3d_warned" });
+        continue;
+      }
+
       // 3c. Approaching expiry → 7-day heads-up.
       if (
         now < expMs &&
         expMs - now < PRE_EXPIRY_WARNING_MS &&
         !v.notified_pre_expiry_at &&
+        !v.notified_3d_at &&
+        !v.notified_1d_at &&
         v.owner_wallet
       ) {
         const daysLeft = Math.max(1, Math.ceil((expMs - now) / (24 * 3600 * 1000)));
