@@ -42,13 +42,13 @@ function SsoPage() {
   const [dialog, setDialog] = useState(false);
   const started = useRef(false);
 
-  function finish() {
+  function finish(redirect?: string | null) {
     setState({ kind: "done" });
     if (popup === "1" && window.opener) {
       try { window.opener.postMessage({ type: "hm-sso-done" }, window.location.origin); } catch { /* ignore */ }
       setTimeout(() => window.close(), 600);
     } else {
-      setTimeout(() => window.location.replace("/manage"), 600);
+      setTimeout(() => window.location.replace(redirect ?? "/manage"), 600);
     }
   }
 
@@ -56,11 +56,16 @@ function SsoPage() {
     if (started.current) return;
     started.current = true;
     if (!token) { setState({ kind: "error", message: "Missing sign-in ticket." }); return; }
-    complete({ data: { token } })
+    let ref: string | undefined;
+    try {
+      ref = (window as unknown as { honestMoney?: { ref?: () => string | null } }).honestMoney?.ref?.() ?? undefined;
+    } catch { /* ignore */ }
+    try { localStorage.removeItem("hm:signed-out"); } catch { /* ignore */ }
+    complete({ data: { token, ref: ref || undefined } })
       .then((r) => {
         if (r.kind === "signed-in") {
           completeLogin({ address: r.wallet, token: r.token, expiresAt: r.expiresAt });
-          finish();
+          finish(r.redirect);
         } else {
           setState({ kind: "link", linkToken: r.linkToken, email: r.email });
         }

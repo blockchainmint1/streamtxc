@@ -32,7 +32,11 @@ type QrState =
 
 function openHonestMoneyPopup() {
   const returnTo = `${publicOrigin()}/sso`;
-  const url = `https://honest.money/sso-login?popup=1&return_to=${encodeURIComponent(returnTo)}`;
+  let prompt = "";
+  try {
+    if (localStorage.getItem("hm:signed-out")) prompt = "&prompt=login";
+  } catch { /* ignore */ }
+  const url = `https://honest.money/sso-login?popup=1${prompt}&return_to=${encodeURIComponent(returnTo)}`;
   const w = 480;
   const h = 720;
   const left = window.screenX + (window.outerWidth - w) / 2;

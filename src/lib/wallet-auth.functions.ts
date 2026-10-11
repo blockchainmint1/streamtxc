@@ -156,5 +156,16 @@ export const requireWalletSession = createMiddleware({ type: "function" })
     if (!claims) {
       throw new Error("Your wallet session has expired. Reconnect and sign in again.");
     }
+    // honest.money can block/ban a member — cut access immediately.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: blocked } = await supabaseAdmin
+      .from("hm_sso_links")
+      .select("member_id")
+      .eq("wallet", claims.wallet)
+      .in("status", ["blocked", "ban"])
+      .limit(1);
+    if (blocked && blocked.length) {
+      throw new Error("This account can't sign in. Contact support@honest.money.");
+    }
     return next({ context: { wallet: claims.wallet } });
   });
