@@ -103,7 +103,9 @@ export function Header() {
             <button
               onClick={() => {
                 disconnect();
-                toast("Wallet disconnected");
+                toast("Signed out");
+                try { localStorage.setItem("hm:signed-out", "1"); } catch { /* ignore */ }
+                window.location.href = `https://honest.money/logout?return_to=${encodeURIComponent(window.location.origin + "/")}`;
               }}
               className="px-2 py-1.5 text-muted-foreground hover:text-destructive transition-colors text-xs"
               title="Disconnect wallet"

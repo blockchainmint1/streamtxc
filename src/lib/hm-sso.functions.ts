@@ -4,6 +4,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireWalletSession } from "./wallet-auth.functions";
+import { BLOCKED_STATUSES, sendHubEvent } from "./hm-hub.server";
 import {
   issueHmLinkToken,
   issueSessionToken,
@@ -36,7 +37,7 @@ function safeEqual(a: string, b: string) {
 }
 
 export const completeHmSso = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({ token: z.string().min(10).max(4000) }).parse(d))
+  .inputValidator((d) => z.object({ token: z.string().min(10).max(4000), ref: z.string().max(64).optional() }).parse(d))
   .handler(async ({ data }) => {
     const secret = process.env.HME_HMAC_SECRET;
     if (!secret) throw new Error("Honest.money sign-in isn't configured yet.");
@@ -44,7 +45,7 @@ export const completeHmSso = createServerFn({ method: "POST" })
     if (!body || !sig) throw new Error("Invalid sign-in ticket.");
     const mac = await hmacHex(secret, body);
     if (!safeEqual(mac, sig.toLowerCase())) throw new Error("Invalid sign-in ticket.");
-    let t: { minerId?: string; email?: string; exp?: number; nonce?: string };
+    let t: { minerId?: string; email?: string; exp?: number; nonce?: string; redirect?: string };
     try {
       t = JSON.parse(b64urlToString(body));
     } catch {
@@ -62,6 +63,19 @@ export const completeHmSso = createServerFn({ method: "POST" })
     void supabaseAdmin.from("hm_sso_nonces").delete().lt("expires_at", new Date().toISOString());
 
     const memberId = String(t.minerId).toLowerCase();
+    const redirect =
+      typeof t.redirect === "string" && t.redirect.startsWith("/") && !t.redirect.startsWith("//")
+        ? t.redirect
+        : null;
+    const { data: existing } = await supabaseAdmin
+      .from("hm_sso_links")
+      .select("status")
+      .eq("member_id", memberId)
+      .maybeSingle();
+    if (existing && BLOCKED_STATUSES.includes(existing.status)) {
+      throw new Error("This account can't sign in. Contact support@honest.money.");
+    }
+    void sendHubEvent({ event: "service_used", memberId, ref: data.ref, metadata: { action: "sign_in" } });
     // One-time bootstrap: known owners get their wallet linked automatically
     // the first time they sign in with honest.money (no manual link step).
     const BOOTSTRAP_LINKS: Record<string, string> = {
@@ -76,7 +90,7 @@ export const completeHmSso = createServerFn({ method: "POST" })
         last_login_at: new Date().toISOString(),
       });
       const s = await issueSessionToken(bootstrapWallet);
-      return { kind: "signed-in" as const, wallet: bootstrapWallet, token: s.token, expiresAt: s.expiresAt };
+      return { kind: "signed-in" as const, wallet: bootstrapWallet, token: s.token, expiresAt: s.expiresAt, redirect };
     }
     const { data: link } = await supabaseAdmin
       .from("hm_sso_links")
@@ -89,7 +103,7 @@ export const completeHmSso = createServerFn({ method: "POST" })
         .update({ last_login_at: new Date().toISOString(), email: t.email ?? null })
         .eq("member_id", memberId);
       const s = await issueSessionToken(link.wallet);
-      return { kind: "signed-in" as const, wallet: link.wallet, token: s.token, expiresAt: s.expiresAt };
+      return { kind: "signed-in" as const, wallet: link.wallet, token: s.token, expiresAt: s.expiresAt, redirect };
     }
     return {
       kind: "needs-link" as const,
@@ -112,5 +126,6 @@ export const linkHmMember = createServerFn({ method: "POST" })
       last_login_at: new Date().toISOString(),
     });
     if (error) throw new Error(error.message);
+    void sendHubEvent({ event: "signup", memberId: c.memberId, metadata: { action: "wallet_linked" } });
     return { ok: true };
   });

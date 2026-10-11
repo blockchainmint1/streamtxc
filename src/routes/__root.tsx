@@ -93,6 +93,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
     ],
     scripts: [
+      { src: "https://honest.money/hm.js", async: true },
       {
         type: "application/ld+json",
         children: JSON.stringify({
