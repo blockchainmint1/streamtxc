@@ -33,7 +33,7 @@ export const Route = createFileRoute("/api/public/minehme/profile-update")({
         if (typeof b.minerId !== "string" || !b.minerId) {
           return Response.json({ error: "minerId required" }, { status: 400 });
         }
-        const updated: Record<string, string> = {};
+        const updated: { status?: string; full_name?: string; email?: string } = {};
         if (b.status !== undefined) {
           if (typeof b.status !== "string" || !STATUSES.includes(b.status)) {
             return Response.json({ error: "invalid status" }, { status: 400 });
