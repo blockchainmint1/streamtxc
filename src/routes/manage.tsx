@@ -1431,7 +1431,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
         const r = await describe();
         if (!cancelled) setChannelState(r.state);
       } catch {}
-    }, 15_000);
+    }, 5_000);
     return () => {
       cancelled = true;
       clearInterval(iv);
@@ -1483,6 +1483,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
           simulcast_youtube_url: ytUrl.trim() || null,
           simulcast_twitter_url: xUrl.trim() || null,
           simulcast_facebook_url: fbUrl.trim() || null,
+          scheduled_for: showtime ? new Date(showtime).toISOString() : null,
         },
       });
       setTitle("");
@@ -1490,7 +1491,12 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
       setYtUrl("");
       setXUrl("");
       setFbUrl("");
-      toast.success("Stream created — click Go Live when StreamYard is ready");
+      setShowtime("");
+      toast.success(
+        showtime
+          ? "Stream created — AWS will warm up automatically 15 minutes before showtime"
+          : "Stream created — click Warm up at least 5 minutes before the show",
+      );
       refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create");
@@ -1503,10 +1509,29 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
     setBusy(true);
     try {
       await start({ data: { id } });
-      toast.success("Channel starting — StreamYard should push RTMP now");
+      toast.success(
+        channelState === "RUNNING"
+          ? "Live! AWS is ready — start StreamYard now"
+          : "AWS is warming up — wait for the green READY light before starting StreamYard",
+      );
+      setChannelState((s) => (s === "RUNNING" ? s : "STARTING"));
       refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Start failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleWarm(id: string) {
+    setBusy(true);
+    try {
+      await warmUp({ data: { id } });
+      toast.success("Warming up AWS — nothing is announced yet. Click Go Live once it's READY.");
+      setChannelState((s) => (s === "RUNNING" ? s : "STARTING"));
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Warm-up failed");
     } finally {
       setBusy(false);
     }
