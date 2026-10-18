@@ -533,6 +533,7 @@ export type Database = {
           title: string
           total_views: number
           updated_at: string
+          warmup_started_at: string | null
         }
         Insert: {
           archive_error?: string | null
@@ -560,6 +561,7 @@ export type Database = {
           title: string
           total_views?: number
           updated_at?: string
+          warmup_started_at?: string | null
         }
         Update: {
           archive_error?: string | null
@@ -587,6 +589,7 @@ export type Database = {
           title?: string
           total_views?: number
           updated_at?: string
+          warmup_started_at?: string | null
         }
         Relationships: [
           {
