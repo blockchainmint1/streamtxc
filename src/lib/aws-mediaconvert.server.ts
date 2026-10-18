@@ -31,6 +31,16 @@ export interface MultiInputJobOpts {
   outputPrefix: string;
   /** Opaque tag round-tripped via userMetadata. For live archives we use `live-archive:<streamId>`. */
   videoId: string;
+  /** Skip this many seconds at the start of the first input (warm-up dead air). */
+  trimStartSeconds?: number;
+}
+
+export function secondsToTimecode(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const hh = String(Math.floor(s / 3600)).padStart(2, "0");
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${hh}:${mm}:${ss}:00`;
 }
 
 /**
@@ -125,11 +135,15 @@ export async function startHlsTranscodeFromInputs(
     Role: roleArn,
     UserMetadata: { videoId: opts.videoId },
     Settings: {
-      Inputs: opts.inputUris.map((uri) => ({
+      Inputs: opts.inputUris.map((uri, i) => ({
         FileInput: uri,
         AudioSelectors: { "Audio Selector 1": { DefaultSelection: "DEFAULT" } },
         VideoSelector: {},
         TimecodeSource: "ZEROBASED",
+        // Cut warm-up dead air off the front of the recording.
+        ...(i === 0 && opts.trimStartSeconds && opts.trimStartSeconds > 0
+          ? { InputClippings: [{ StartTimecode: secondsToTimecode(opts.trimStartSeconds) }] }
+          : {}),
         // MediaLive-archived .ts segments often lack framerate metadata in
         // the container PMT, producing MediaConvert error 1040
         // ("Invalid frame rate: 0/1"). AdvancedInputFilter re-probes the
