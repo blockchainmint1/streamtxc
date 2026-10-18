@@ -1605,6 +1605,50 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
         <Radio className="h-5 w-5" /> Livestream
       </h2>
 
+      {(() => {
+        // Big traffic light: tells the operator exactly when StreamYard may start.
+        const warmTimes = (data ?? [])
+          .flatMap((s: any) => [
+            s.status === "starting" ? s.started_at : null,
+            s.status === "scheduled" ? s.warmup_started_at : null,
+          ])
+          .filter(Boolean)
+          .map((t: string) => new Date(t).getTime());
+        const since = warmTimes.length ? Math.max(...warmTimes) : null;
+        const elapsed = since ? Math.max(0, Math.floor((nowMs - since) / 1000)) : null;
+        const mmss =
+          elapsed !== null
+            ? `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`
+            : null;
+        let tone = "border-border bg-card text-muted-foreground";
+        let headline = "AWS IS OFF";
+        let detail =
+          "Click Warm up AWS (or set a showtime) at least 5 minutes before the show. Nothing is announced until you click Go Live.";
+        if (channelState === "STARTING") {
+          tone = "border-yellow-500 bg-yellow-500/10 text-yellow-500";
+          headline = `WARMING UP — DON'T START STREAMYARD YET${mmss ? ` · ${mmss}` : ""}`;
+          detail = "AWS usually takes 2–5 minutes. This light turns green the moment it's ready.";
+        } else if (channelState === "RUNNING" && signal?.receiving) {
+          tone = "border-red-500 bg-red-500/10 text-red-500";
+          headline = "ON AIR — RECEIVING VIDEO";
+          detail = "AWS is getting your StreamYard feed and recording it.";
+        } else if (channelState === "RUNNING") {
+          tone = "border-green-500 bg-green-500/10 text-green-500";
+          headline = "READY — START STREAMYARD NOW";
+          detail = "AWS is accepting video. Everything from here on is broadcast and recorded.";
+        } else if (channelState === "STOPPING") {
+          headline = "SHUTTING DOWN";
+          detail = "AWS is stopping the channel. Wait for it to turn off before warming up again.";
+        }
+        return (
+          <div className={`border-2 rounded-sm p-4 mb-6 font-mono ${tone}`}>
+            <div className="text-lg font-bold">{headline}</div>
+            <div className="text-xs mt-1 opacity-90">{detail}</div>
+          </div>
+        );
+      })()}
+
+
       <div className="border border-border rounded-sm p-4 bg-card mb-6 font-mono text-xs space-y-2">
         <div>
           <span className="text-muted-foreground">MediaLive channel: </span>
@@ -1723,6 +1767,15 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
             className="font-mono text-xs"
           />
         </div>
+        <label className="block font-mono text-xs text-muted-foreground">
+          Showtime (optional) — AWS warms up automatically 15 minutes before
+          <Input
+            type="datetime-local"
+            value={showtime}
+            onChange={(e) => setShowtime(e.target.value)}
+            className="font-mono text-xs mt-1"
+          />
+        </label>
         <Button onClick={handleCreate} disabled={busy} className="font-mono">
           Create stream
         </Button>
@@ -1763,9 +1816,28 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
                     {s.started_at && (
                       <> · started {new Date(s.started_at).toLocaleString()}</>
                     )}
+                    {s.status === "scheduled" && s.scheduled_for && (
+                      <> · showtime {new Date(s.scheduled_for).toLocaleString()} (auto warm-up 15 min before)</>
+                    )}
+                    {s.status === "scheduled" && s.warmup_started_at && (
+                      <> · warmed {new Date(s.warmup_started_at).toLocaleTimeString()}</>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {s.status === "scheduled" &&
+                    channelState !== "RUNNING" &&
+                    channelState !== "STARTING" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleWarm(s.id)}
+                        disabled={busy}
+                        className="font-mono"
+                      >
+                        Warm up AWS
+                      </Button>
+                    )}
                   {s.status === "scheduled" && (
                     <Button
                       size="sm"
