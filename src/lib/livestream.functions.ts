@@ -185,6 +185,22 @@ export const startLiveStream = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Start the AWS channel ahead of showtime without announcing the stream.
+export const warmUpLiveStream = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
+  .inputValidator((input: unknown) => IdSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    assertAdmin(context.wallet);
+    const { warmSharedChannel } = await import("./live-warmup.server");
+    try {
+      return await warmSharedChannel(data.id);
+    } catch (err) {
+      throw new Error(
+        `Could not warm up the AWS channel: ${err instanceof Error ? err.message : "unknown error"}`,
+      );
+    }
+  });
+
 export const markLiveStreamRunning = createServerFn({ method: "POST" })
   .middleware([requireWalletSession])
   .inputValidator((input: unknown) => IdSchema.parse(input))

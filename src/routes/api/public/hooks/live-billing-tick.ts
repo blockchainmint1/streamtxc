@@ -131,7 +131,15 @@ export const Route = createFileRoute("/api/public/hooks/live-billing-tick")({
             });
           }
         }
-        return Response.json({ ok: true, considered: channels?.length ?? 0, results });
+        // Pre-show warm-up / auto-cool for the shared admin channel.
+        let warmup: Record<string, unknown> = {};
+        try {
+          const { runWarmupTick } = await import("@/lib/live-warmup.server");
+          warmup = await runWarmupTick();
+        } catch (err) {
+          warmup = { error: err instanceof Error ? err.message : String(err) };
+        }
+        return Response.json({ ok: true, considered: channels?.length ?? 0, results, warmup });
       },
     },
   },
