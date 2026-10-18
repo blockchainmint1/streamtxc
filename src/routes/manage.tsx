@@ -84,6 +84,7 @@ import {
   listRecentLiveStreams,
   createLiveStream,
   startLiveStream,
+  warmUpLiveStream,
   stopLiveStream,
   markLiveStreamRunning,
   updateLiveStream,
@@ -1368,6 +1369,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const list = useServerFn(listRecentLiveStreams);
   const create = useServerFn(createLiveStream);
   const start = useServerFn(startLiveStream);
+  const warmUp = useServerFn(warmUpLiveStream);
   const stop = useServerFn(stopLiveStream);
   const markRunning = useServerFn(markLiveStreamRunning);
   const update = useServerFn(updateLiveStream);
@@ -1389,8 +1391,14 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const [ytUrl, setYtUrl] = useState("");
   const [xUrl, setXUrl] = useState("");
   const [fbUrl, setFbUrl] = useState("");
+  const [showtime, setShowtime] = useState("");
   const [busy, setBusy] = useState(false);
   const [channelState, setChannelState] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const iv = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, []);
   const [signal, setSignal] = useState<{
     receiving: boolean;
     lastSequence: number;
@@ -1423,7 +1431,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
         const r = await describe();
         if (!cancelled) setChannelState(r.state);
       } catch {}
-    }, 15_000);
+    }, 5_000);
     return () => {
       cancelled = true;
       clearInterval(iv);
@@ -1475,6 +1483,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
           simulcast_youtube_url: ytUrl.trim() || null,
           simulcast_twitter_url: xUrl.trim() || null,
           simulcast_facebook_url: fbUrl.trim() || null,
+          scheduled_for: showtime ? new Date(showtime).toISOString() : null,
         },
       });
       setTitle("");
@@ -1482,7 +1491,12 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
       setYtUrl("");
       setXUrl("");
       setFbUrl("");
-      toast.success("Stream created — click Go Live when StreamYard is ready");
+      setShowtime("");
+      toast.success(
+        showtime
+          ? "Stream created — AWS will warm up automatically 15 minutes before showtime"
+          : "Stream created — click Warm up at least 5 minutes before the show",
+      );
       refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create");
@@ -1495,10 +1509,29 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
     setBusy(true);
     try {
       await start({ data: { id } });
-      toast.success("Channel starting — StreamYard should push RTMP now");
+      toast.success(
+        channelState === "RUNNING"
+          ? "Live! AWS is ready — start StreamYard now"
+          : "AWS is warming up — wait for the green READY light before starting StreamYard",
+      );
+      setChannelState((s) => (s === "RUNNING" ? s : "STARTING"));
       refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Start failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleWarm(id: string) {
+    setBusy(true);
+    try {
+      await warmUp({ data: { id } });
+      toast.success("Warming up AWS — nothing is announced yet. Click Go Live once it's READY.");
+      setChannelState((s) => (s === "RUNNING" ? s : "STARTING"));
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Warm-up failed");
     } finally {
       setBusy(false);
     }
@@ -1571,6 +1604,50 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
       <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
         <Radio className="h-5 w-5" /> Livestream
       </h2>
+
+      {(() => {
+        // Big traffic light: tells the operator exactly when StreamYard may start.
+        const warmTimes = (data ?? [])
+          .flatMap((s: any) => [
+            s.status === "starting" ? s.started_at : null,
+            s.status === "scheduled" ? s.warmup_started_at : null,
+          ])
+          .filter(Boolean)
+          .map((t: string) => new Date(t).getTime());
+        const since = warmTimes.length ? Math.max(...warmTimes) : null;
+        const elapsed = since ? Math.max(0, Math.floor((nowMs - since) / 1000)) : null;
+        const mmss =
+          elapsed !== null
+            ? `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`
+            : null;
+        let tone = "border-border bg-card text-muted-foreground";
+        let headline = "AWS IS OFF";
+        let detail =
+          "Click Warm up AWS (or set a showtime) at least 5 minutes before the show. Nothing is announced until you click Go Live.";
+        if (channelState === "STARTING") {
+          tone = "border-yellow-500 bg-yellow-500/10 text-yellow-500";
+          headline = `WARMING UP — DON'T START STREAMYARD YET${mmss ? ` · ${mmss}` : ""}`;
+          detail = "AWS usually takes 2–5 minutes. This light turns green the moment it's ready.";
+        } else if (channelState === "RUNNING" && signal?.receiving) {
+          tone = "border-red-500 bg-red-500/10 text-red-500";
+          headline = "ON AIR — RECEIVING VIDEO";
+          detail = "AWS is getting your StreamYard feed and recording it.";
+        } else if (channelState === "RUNNING") {
+          tone = "border-green-500 bg-green-500/10 text-green-500";
+          headline = "READY — START STREAMYARD NOW";
+          detail = "AWS is accepting video. Everything from here on is broadcast and recorded.";
+        } else if (channelState === "STOPPING") {
+          headline = "SHUTTING DOWN";
+          detail = "AWS is stopping the channel. Wait for it to turn off before warming up again.";
+        }
+        return (
+          <div className={`border-2 rounded-sm p-4 mb-6 font-mono ${tone}`}>
+            <div className="text-lg font-bold">{headline}</div>
+            <div className="text-xs mt-1 opacity-90">{detail}</div>
+          </div>
+        );
+      })()}
+
 
       <div className="border border-border rounded-sm p-4 bg-card mb-6 font-mono text-xs space-y-2">
         <div>
@@ -1650,7 +1727,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
             <div className="text-muted-foreground pt-1">
               In StreamYard: Destinations → Custom RTMP → Server URL + Stream key
               go into their two separate fields. Channel must be <b>RUNNING</b>{" "}
-              before StreamYard can connect — click <b>Go Live</b> and wait ~60s.
+              before StreamYard can connect — warm up ahead of time and wait for the green READY light (usually 2–5 min).
             </div>
           </div>
         )}
@@ -1690,6 +1767,15 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
             className="font-mono text-xs"
           />
         </div>
+        <label className="block font-mono text-xs text-muted-foreground">
+          Showtime (optional) — AWS warms up automatically 15 minutes before
+          <Input
+            type="datetime-local"
+            value={showtime}
+            onChange={(e) => setShowtime(e.target.value)}
+            className="font-mono text-xs mt-1"
+          />
+        </label>
         <Button onClick={handleCreate} disabled={busy} className="font-mono">
           Create stream
         </Button>
@@ -1730,9 +1816,28 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
                     {s.started_at && (
                       <> · started {new Date(s.started_at).toLocaleString()}</>
                     )}
+                    {s.status === "scheduled" && s.scheduled_for && (
+                      <> · showtime {new Date(s.scheduled_for).toLocaleString()} (auto warm-up 15 min before)</>
+                    )}
+                    {s.status === "scheduled" && s.warmup_started_at && (
+                      <> · warmed {new Date(s.warmup_started_at).toLocaleTimeString()}</>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {s.status === "scheduled" &&
+                    channelState !== "RUNNING" &&
+                    channelState !== "STARTING" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleWarm(s.id)}
+                        disabled={busy}
+                        className="font-mono"
+                      >
+                        Warm up AWS
+                      </Button>
+                    )}
                   {s.status === "scheduled" && (
                     <Button
                       size="sm"
@@ -2489,7 +2594,7 @@ function MyGoLiveSection({ wallet }: { wallet: string }) {
     setBusy(true);
     try {
       await startFn({ data: { title, description: desc || null } });
-      toast.success("Starting channel — give it up to 60s, then paste RTMP into StreamYard.");
+      toast.success("Starting channel — AWS usually takes 2–5 minutes. Wait for RUNNING before starting StreamYard.");
       setTitle("");
       setDesc("");
       qc.invalidateQueries({ queryKey: ["my-live-streams", wallet] });

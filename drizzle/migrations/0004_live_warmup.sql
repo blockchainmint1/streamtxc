@@ -1,0 +1,1 @@
+ALTER TABLE public.live_streams ADD COLUMN IF NOT EXISTS warmup_started_at timestamptz;
