@@ -1,3 +1,4 @@
+import { useLiveFeedFresh } from "@/lib/use-live-fresh";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -97,6 +98,7 @@ function LiveStreamPage() {
 
   if (loaded && !stream) throw notFound();
 
+  const feedFresh = useLiveFeedFresh(stream?.id, stream?.status === "live");
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -111,7 +113,7 @@ function LiveStreamPage() {
           <div className="grid lg:grid-cols-[1fr_360px] gap-6">
             <div>
               <div className="aspect-video bg-black border border-border rounded-sm overflow-hidden">
-                {stream.hls_url && stream.status === "live" ? (
+                {stream.hls_url && stream.status === "live" && feedFresh ? (
                   <VideoPlayerV2
                     src={stream.hls_url}
                     autoPlay
@@ -125,7 +127,7 @@ function LiveStreamPage() {
                   <div className="w-full h-full flex items-center justify-center text-muted-foreground font-mono text-sm">
                     {stream.status === "ended"
                       ? "Stream ended."
-                      : stream.status === "starting"
+                      : stream.status === "starting" || stream.status === "live"
                         ? "Starting soon — waiting for the broadcaster…"
                         : "Waiting for stream URL…"}
                   </div>

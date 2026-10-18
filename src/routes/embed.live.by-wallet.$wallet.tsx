@@ -1,3 +1,4 @@
+import { useLiveFeedFresh } from "@/lib/use-live-fresh";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -25,13 +26,14 @@ function EmbedByWallet() {
   });
 
   const stream = q.data?.stream ?? null;
+  const feedFresh = useLiveFeedFresh((stream as any)?.id, !!stream);
 
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center">
       {q.isLoading && (
         <div className="text-white/60 font-mono text-sm">loading…</div>
       )}
-      {!q.isLoading && stream && stream.hls_url ? (
+      {!q.isLoading && stream && stream.hls_url && feedFresh ? (
         <VideoPlayerV2
           src={stream.hls_url}
           autoPlay={autoplay}

@@ -548,3 +548,35 @@ function escapeHtml(s: string) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 }
+// ---------- Public: is the live feed actually showing THIS stream yet? ----------
+// When a channel restarts, MediaPackage keeps serving the previous broadcast's
+// last minutes until new video arrives, so viewers saw a "ghost" of the old
+// show. Players only mount once the manifest has been updated after this
+// stream's Go Live and within the last ~30 seconds.
+export const getLiveFeedFreshness = createServerFn({ method: "GET" })
+  .inputValidator((input: { streamId: string }) =>
+    z.object({ streamId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: s } = await supabaseAdmin
+      .from("live_streams")
+      .select("hls_url, status, started_at")
+      .eq("id", data.streamId)
+      .maybeSingle();
+    if (!s?.hls_url || (s.status !== "live" && s.status !== "starting")) {
+      return { fresh: false };
+    }
+    try {
+      const res = await fetch(s.hls_url, { cache: "no-store" });
+      if (!res.ok) return { fresh: false };
+      const updatedRaw = res.headers.get("x-mediapackage-manifest-last-updated");
+      if (!updatedRaw) return { fresh: true }; // not MediaPackage — trust it
+      const updatedMs = Number(updatedRaw) * 1000;
+      const startedMs = s.started_at ? Date.parse(s.started_at) : 0;
+      const fresh = updatedMs >= startedMs && Date.now() - updatedMs < 30_000;
+      return { fresh };
+    } catch {
+      return { fresh: false };
+    }
+  });

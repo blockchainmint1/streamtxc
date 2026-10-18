@@ -1,3 +1,4 @@
+import { useLiveFeedFresh } from "@/lib/use-live-fresh";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,13 +52,14 @@ function LiveEmbedPage() {
     };
   }, [streamId]);
 
+  const feedFresh = useLiveFeedFresh(stream?.id, stream?.status === "live");
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center">
       {!loaded && <div className="text-white/60 font-mono text-sm">loading…</div>}
       {loaded && !stream && (
         <div className="text-white/60 font-mono text-sm">Stream not found</div>
       )}
-      {stream && stream.hls_url && stream.status === "live" ? (
+      {stream && stream.hls_url && stream.status === "live" && feedFresh ? (
         <VideoPlayerV2
           src={stream.hls_url}
           autoPlay={autoplay}

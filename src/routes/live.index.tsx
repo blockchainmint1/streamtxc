@@ -1,3 +1,4 @@
+import { useLiveFeedFresh } from "@/lib/use-live-fresh";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
@@ -122,6 +123,7 @@ function LivePage() {
 
 function LiveCard({ stream }: { stream: Stream }) {
   const viewers = useLiveViewerCount(stream.id);
+  const feedFresh = useLiveFeedFresh(stream.id, stream.status === "live");
   const thumb = stream.thumbnail_cid ? `/api/stream/${stream.thumbnail_cid}` : null;
   return (
     <Link
@@ -130,7 +132,7 @@ function LiveCard({ stream }: { stream: Stream }) {
       className="group border border-border rounded-sm bg-card overflow-hidden hover:border-primary transition-colors"
     >
       <div className="aspect-video bg-black relative">
-        {stream.hls_url && stream.status === "live" ? (
+        {stream.hls_url && stream.status === "live" && feedFresh ? (
           <LivePreview src={stream.hls_url} poster={thumb ?? undefined} />
         ) : thumb ? (
           <img src={thumb} alt="" className="w-full h-full object-cover" loading="lazy" />
