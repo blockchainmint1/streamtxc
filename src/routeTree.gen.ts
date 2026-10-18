@@ -9,101 +9,56 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as UploadAwsRouteImport } from './routes/upload-aws'
-import { Route as UploadRouteImport } from './routes/upload'
-import { Route as TermsRouteImport } from './routes/terms'
-import { Route as SsoRouteImport } from './routes/sso'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as ManifestoRouteImport } from './routes/manifesto'
-import { Route as ManageRouteImport } from './routes/manage'
-import { Route as BrandRouteImport } from './routes/brand'
-import { Route as ApiRouteImport } from './routes/api'
-import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as LiveIndexRouteImport } from './routes/live.index'
-import { Route as VCidRouteImport } from './routes/v.$cid'
-import { Route as UWalletRouteImport } from './routes/u.$wallet'
-import { Route as LiveStreamIdRouteImport } from './routes/live.$streamId'
+import { Route as AboutRouteImport } from './routes/about'
+import { Route as ApiRouteImport } from './routes/api'
+import { Route as BrandRouteImport } from './routes/brand'
+import { Route as ManageRouteImport } from './routes/manage'
+import { Route as ManifestoRouteImport } from './routes/manifesto'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as SsoRouteImport } from './routes/sso'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as UploadRouteImport } from './routes/upload'
+import { Route as UploadAwsRouteImport } from './routes/upload-aws'
 import { Route as EmbedCidRouteImport } from './routes/embed.$cid'
-import { Route as VCidRestoreRouteImport } from './routes/v.$cid.restore'
-import { Route as EmbedLiveStreamIdRouteImport } from './routes/embed.live.$streamId'
-import { Route as ApiStreamCidRouteImport } from './routes/api/stream.$cid'
-import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
-import { Route as ApiPublicTxcVerifyMessageRouteImport } from './routes/api/public/txc-verify-message'
-import { Route as ApiPublicTxcHealthRouteImport } from './routes/api/public/txc-health'
+import { Route as LiveIndexRouteImport } from './routes/live.index'
+import { Route as LiveStreamIdRouteImport } from './routes/live.$streamId'
+import { Route as UWalletRouteImport } from './routes/u.$wallet'
+import { Route as VCidRouteImport } from './routes/v.$cid'
 import { Route as ApiPublicImportStreamRouteImport } from './routes/api/public/import-stream'
-import { Route as EmbedLiveByWalletWalletRouteImport } from './routes/embed.live.by-wallet.$wallet'
-import { Route as ApiStreamCidSplatRouteImport } from './routes/api/stream.$cid.$'
-import { Route as ApiPublicV1WalletLinkRouteImport } from './routes/api/public/v1/wallet-link'
-import { Route as ApiPublicNotifyVerifyEmailRouteImport } from './routes/api/public/notify/verify-email'
-import { Route as ApiPublicMinehmeProfileUpdateRouteImport } from './routes/api/public/minehme/profile-update'
-import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/hooks/telegram'
-import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
-import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
-import { Route as ApiPublicHooksLiveBillingTickRouteImport } from './routes/api/public/hooks/live-billing-tick'
-import { Route as ApiPublicHooksIpfsPinCompleteRouteImport } from './routes/api/public/hooks/ipfs-pin-complete'
-import { Route as ApiPublicHooksFinalizeStuckHlsRouteImport } from './routes/api/public/hooks/finalize-stuck-hls'
-import { Route as ApiPublicHooksFinalizeLiveArchiveRouteImport } from './routes/api/public/hooks/finalize-live-archive'
-import { Route as ApiPublicAuthWalletStatusRouteImport } from './routes/api/public/auth/wallet-status'
-import { Route as ApiPublicAuthWalletExchangeRouteImport } from './routes/api/public/auth/wallet-exchange'
-import { Route as ApiPublicAuthWalletChallengeRouteImport } from './routes/api/public/auth/wallet-challenge'
-import { Route as ApiPublicAuthWalletCallbackRouteImport } from './routes/api/public/auth/wallet-callback'
-import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
-import { Route as ApiPublicAdminImpersonateWalletRouteImport } from './routes/api/public/admin/impersonate-wallet'
-import { Route as ApiPublicAdminFinalizeHlsRouteImport } from './routes/api/public/admin/finalize-hls'
-import { Route as ApiPublicAdminBackfillTranscriptsRouteImport } from './routes/api/public/admin/backfill-transcripts'
-import { Route as ApiPublicAdminBackfillSelfPinsRouteImport } from './routes/api/public/admin/backfill-self-pins'
+import { Route as ApiPublicTxcHealthRouteImport } from './routes/api/public/txc-health'
+import { Route as ApiPublicTxcVerifyMessageRouteImport } from './routes/api/public/txc-verify-message'
+import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
+import { Route as ApiStreamCidRouteImport } from './routes/api/stream.$cid'
+import { Route as EmbedLiveStreamIdRouteImport } from './routes/embed.live.$streamId'
+import { Route as VCidRestoreRouteImport } from './routes/v.$cid.restore'
 import { Route as ApiPublicAdminBackfillHlsRouteImport } from './routes/api/public/admin/backfill-hls'
+import { Route as ApiPublicAdminBackfillSelfPinsRouteImport } from './routes/api/public/admin/backfill-self-pins'
+import { Route as ApiPublicAdminBackfillTranscriptsRouteImport } from './routes/api/public/admin/backfill-transcripts'
+import { Route as ApiPublicAdminFinalizeHlsRouteImport } from './routes/api/public/admin/finalize-hls'
+import { Route as ApiPublicAdminImpersonateWalletRouteImport } from './routes/api/public/admin/impersonate-wallet'
+import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
+import { Route as ApiPublicAuthWalletCallbackRouteImport } from './routes/api/public/auth/wallet-callback'
+import { Route as ApiPublicAuthWalletChallengeRouteImport } from './routes/api/public/auth/wallet-challenge'
+import { Route as ApiPublicAuthWalletExchangeRouteImport } from './routes/api/public/auth/wallet-exchange'
+import { Route as ApiPublicAuthWalletStatusRouteImport } from './routes/api/public/auth/wallet-status'
+import { Route as ApiPublicHooksFinalizeLiveArchiveRouteImport } from './routes/api/public/hooks/finalize-live-archive'
+import { Route as ApiPublicHooksFinalizeStuckHlsRouteImport } from './routes/api/public/hooks/finalize-stuck-hls'
+import { Route as ApiPublicHooksIpfsPinCompleteRouteImport } from './routes/api/public/hooks/ipfs-pin-complete'
+import { Route as ApiPublicHooksLiveBillingTickRouteImport } from './routes/api/public/hooks/live-billing-tick'
+import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
+import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
+import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/hooks/telegram'
+import { Route as ApiPublicMinehmeProfileUpdateRouteImport } from './routes/api/public/minehme/profile-update'
+import { Route as ApiPublicNotifyVerifyEmailRouteImport } from './routes/api/public/notify/verify-email'
+import { Route as ApiPublicV1WalletLinkRouteImport } from './routes/api/public/v1/wallet-link'
+import { Route as ApiStreamCidSplatRouteImport } from './routes/api/stream.$cid.$'
+import { Route as EmbedLiveByWalletWalletRouteImport } from './routes/embed.live.by-wallet.$wallet'
 
-const UploadAwsRoute = UploadAwsRouteImport.update({
-  id: '/upload-aws',
-  path: '/upload-aws',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const UploadRoute = UploadRouteImport.update({
-  id: '/upload',
-  path: '/upload',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TermsRoute = TermsRouteImport.update({
-  id: '/terms',
-  path: '/terms',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SsoRoute = SsoRouteImport.update({
-  id: '/sso',
-  path: '/sso',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ManifestoRoute = ManifestoRouteImport.update({
-  id: '/manifesto',
-  path: '/manifesto',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ManageRoute = ManageRouteImport.update({
-  id: '/manage',
-  path: '/manage',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BrandRoute = BrandRouteImport.update({
-  id: '/brand',
-  path: '/brand',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiRoute = ApiRouteImport.update({
-  id: '/api',
-  path: '/api',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AboutRoute = AboutRouteImport.update({
@@ -111,29 +66,54 @@ const AboutRoute = AboutRouteImport.update({
   path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const ApiRoute = ApiRouteImport.update({
+  id: '/api',
+  path: '/api',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LiveIndexRoute = LiveIndexRouteImport.update({
-  id: '/live/',
-  path: '/live/',
+const BrandRoute = BrandRouteImport.update({
+  id: '/brand',
+  path: '/brand',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VCidRoute = VCidRouteImport.update({
-  id: '/v/$cid',
-  path: '/v/$cid',
+const ManageRoute = ManageRouteImport.update({
+  id: '/manage',
+  path: '/manage',
   getParentRoute: () => rootRouteImport,
 } as any)
-const UWalletRoute = UWalletRouteImport.update({
-  id: '/u/$wallet',
-  path: '/u/$wallet',
+const ManifestoRoute = ManifestoRouteImport.update({
+  id: '/manifesto',
+  path: '/manifesto',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LiveStreamIdRoute = LiveStreamIdRouteImport.update({
-  id: '/live/$streamId',
-  path: '/live/$streamId',
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SsoRoute = SsoRouteImport.update({
+  id: '/sso',
+  path: '/sso',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UploadRoute = UploadRouteImport.update({
+  id: '/upload',
+  path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UploadAwsRoute = UploadAwsRouteImport.update({
+  id: '/upload-aws',
+  path: '/upload-aws',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmbedCidRoute = EmbedCidRouteImport.update({
@@ -141,24 +121,34 @@ const EmbedCidRoute = EmbedCidRouteImport.update({
   path: '/embed/$cid',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VCidRestoreRoute = VCidRestoreRouteImport.update({
-  id: '/restore',
-  path: '/restore',
-  getParentRoute: () => VCidRoute,
-} as any)
-const EmbedLiveStreamIdRoute = EmbedLiveStreamIdRouteImport.update({
-  id: '/embed/live/$streamId',
-  path: '/embed/live/$streamId',
+const LiveIndexRoute = LiveIndexRouteImport.update({
+  id: '/live/',
+  path: '/live/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiStreamCidRoute = ApiStreamCidRouteImport.update({
-  id: '/stream/$cid',
-  path: '/stream/$cid',
+const LiveStreamIdRoute = LiveStreamIdRouteImport.update({
+  id: '/live/$streamId',
+  path: '/live/$streamId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UWalletRoute = UWalletRouteImport.update({
+  id: '/u/$wallet',
+  path: '/u/$wallet',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VCidRoute = VCidRouteImport.update({
+  id: '/v/$cid',
+  path: '/v/$cid',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicImportStreamRoute = ApiPublicImportStreamRouteImport.update({
+  id: '/public/import-stream',
+  path: '/public/import-stream',
   getParentRoute: () => ApiRoute,
 } as any)
-const ApiPublicUploadRoute = ApiPublicUploadRouteImport.update({
-  id: '/public/upload',
-  path: '/public/upload',
+const ApiPublicTxcHealthRoute = ApiPublicTxcHealthRouteImport.update({
+  id: '/public/txc-health',
+  path: '/public/txc-health',
   getParentRoute: () => ApiRoute,
 } as any)
 const ApiPublicTxcVerifyMessageRoute =
@@ -167,130 +157,30 @@ const ApiPublicTxcVerifyMessageRoute =
     path: '/public/txc-verify-message',
     getParentRoute: () => ApiRoute,
   } as any)
-const ApiPublicTxcHealthRoute = ApiPublicTxcHealthRouteImport.update({
-  id: '/public/txc-health',
-  path: '/public/txc-health',
+const ApiPublicUploadRoute = ApiPublicUploadRouteImport.update({
+  id: '/public/upload',
+  path: '/public/upload',
   getParentRoute: () => ApiRoute,
 } as any)
-const ApiPublicImportStreamRoute = ApiPublicImportStreamRouteImport.update({
-  id: '/public/import-stream',
-  path: '/public/import-stream',
+const ApiStreamCidRoute = ApiStreamCidRouteImport.update({
+  id: '/stream/$cid',
+  path: '/stream/$cid',
   getParentRoute: () => ApiRoute,
 } as any)
-const EmbedLiveByWalletWalletRoute = EmbedLiveByWalletWalletRouteImport.update({
-  id: '/embed/live/by-wallet/$wallet',
-  path: '/embed/live/by-wallet/$wallet',
+const EmbedLiveStreamIdRoute = EmbedLiveStreamIdRouteImport.update({
+  id: '/embed/live/$streamId',
+  path: '/embed/live/$streamId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiStreamCidSplatRoute = ApiStreamCidSplatRouteImport.update({
-  id: '/$',
-  path: '/$',
-  getParentRoute: () => ApiStreamCidRoute,
+const VCidRestoreRoute = VCidRestoreRouteImport.update({
+  id: '/restore',
+  path: '/restore',
+  getParentRoute: () => VCidRoute,
 } as any)
-const ApiPublicV1WalletLinkRoute = ApiPublicV1WalletLinkRouteImport.update({
-  id: '/public/v1/wallet-link',
-  path: '/public/v1/wallet-link',
-  getParentRoute: () => ApiRoute,
-} as any)
-const ApiPublicNotifyVerifyEmailRoute =
-  ApiPublicNotifyVerifyEmailRouteImport.update({
-    id: '/public/notify/verify-email',
-    path: '/public/notify/verify-email',
-    getParentRoute: () => ApiRoute,
-  } as any)
-const ApiPublicMinehmeProfileUpdateRoute =
-  ApiPublicMinehmeProfileUpdateRouteImport.update({
-    id: '/public/minehme/profile-update',
-    path: '/public/minehme/profile-update',
-    getParentRoute: () => ApiRoute,
-  } as any)
-const ApiPublicHooksTelegramRoute = ApiPublicHooksTelegramRouteImport.update({
-  id: '/public/hooks/telegram',
-  path: '/public/hooks/telegram',
-  getParentRoute: () => ApiRoute,
-} as any)
-const ApiPublicHooksPaymentWatcherRoute =
-  ApiPublicHooksPaymentWatcherRouteImport.update({
-    id: '/public/hooks/payment-watcher',
-    path: '/public/hooks/payment-watcher',
-    getParentRoute: () => ApiRoute,
-  } as any)
-const ApiPublicHooksMediaconvertRoute =
-  ApiPublicHooksMediaconvertRouteImport.update({
-    id: '/public/hooks/mediaconvert',
-    path: '/public/hooks/mediaconvert',
-    getParentRoute: () => ApiRoute,
-  } as any)
-const ApiPublicHooksLiveBillingTickRoute =
-  ApiPublicHooksLiveBillingTickRouteImport.update({
-    id: '/public/hooks/live-billing-tick',
-    path: '/public/hooks/live-billing-tick',
-    getParentRoute: () => ApiRoute,
-  } as any)
-const ApiPublicHooksIpfsPinCompleteRoute =
-  ApiPublicHooksIpfsPinCompleteRouteImport.update({
-    id: '/public/hooks/ipfs-pin-complete',
-    path: '/public/hooks/ipfs-pin-complete',
-    getParentRoute: () => ApiRoute,
-  } as any)
-const ApiPublicHooksFinalizeStuckHlsRoute =
-  ApiPublicHooksFinalizeStuckHlsRouteImport.update({
-    id: '/public/hooks/finalize-stuck-hls',
-    path: '/public/hooks/finalize-stuck-hls',
-    getParentRoute: () => ApiRoute,
-  } as any)
-const ApiPublicHooksFinalizeLiveArchiveRoute =
-  ApiPublicHooksFinalizeLiveArchiveRouteImport.update({
-    id: '/public/hooks/finalize-live-archive',
-    path: '/public/hooks/finalize-live-archive',
-    getParentRoute: () => ApiRoute,
-  } as any)
-const ApiPublicAuthWalletStatusRoute =
-  ApiPublicAuthWalletStatusRouteImport.update({
-    id: '/public/auth/wallet-status',
-    path: '/public/auth/wallet-status',
-    getParentRoute: () => ApiRoute,
-  } as any)
-const ApiPublicAuthWalletExchangeRoute =
-  ApiPublicAuthWalletExchangeRouteImport.update({
-    id: '/public/auth/wallet-exchange',
-    path: '/public/auth/wallet-exchange',
-    getParentRoute: () => ApiRoute,
-  } as any)
-const ApiPublicAuthWalletChallengeRoute =
-  ApiPublicAuthWalletChallengeRouteImport.update({
-    id: '/public/auth/wallet-challenge',
-    path: '/public/auth/wallet-challenge',
-    getParentRoute: () => ApiRoute,
-  } as any)
-const ApiPublicAuthWalletCallbackRoute =
-  ApiPublicAuthWalletCallbackRouteImport.update({
-    id: '/public/auth/wallet-callback',
-    path: '/public/auth/wallet-callback',
-    getParentRoute: () => ApiRoute,
-  } as any)
-const ApiPublicAdminRetryStampsRoute =
-  ApiPublicAdminRetryStampsRouteImport.update({
-    id: '/public/admin/retry-stamps',
-    path: '/public/admin/retry-stamps',
-    getParentRoute: () => ApiRoute,
-  } as any)
-const ApiPublicAdminImpersonateWalletRoute =
-  ApiPublicAdminImpersonateWalletRouteImport.update({
-    id: '/public/admin/impersonate-wallet',
-    path: '/public/admin/impersonate-wallet',
-    getParentRoute: () => ApiRoute,
-  } as any)
-const ApiPublicAdminFinalizeHlsRoute =
-  ApiPublicAdminFinalizeHlsRouteImport.update({
-    id: '/public/admin/finalize-hls',
-    path: '/public/admin/finalize-hls',
-    getParentRoute: () => ApiRoute,
-  } as any)
-const ApiPublicAdminBackfillTranscriptsRoute =
-  ApiPublicAdminBackfillTranscriptsRouteImport.update({
-    id: '/public/admin/backfill-transcripts',
-    path: '/public/admin/backfill-transcripts',
+const ApiPublicAdminBackfillHlsRoute =
+  ApiPublicAdminBackfillHlsRouteImport.update({
+    id: '/public/admin/backfill-hls',
+    path: '/public/admin/backfill-hls',
     getParentRoute: () => ApiRoute,
   } as any)
 const ApiPublicAdminBackfillSelfPinsRoute =
@@ -299,12 +189,122 @@ const ApiPublicAdminBackfillSelfPinsRoute =
     path: '/public/admin/backfill-self-pins',
     getParentRoute: () => ApiRoute,
   } as any)
-const ApiPublicAdminBackfillHlsRoute =
-  ApiPublicAdminBackfillHlsRouteImport.update({
-    id: '/public/admin/backfill-hls',
-    path: '/public/admin/backfill-hls',
+const ApiPublicAdminBackfillTranscriptsRoute =
+  ApiPublicAdminBackfillTranscriptsRouteImport.update({
+    id: '/public/admin/backfill-transcripts',
+    path: '/public/admin/backfill-transcripts',
     getParentRoute: () => ApiRoute,
   } as any)
+const ApiPublicAdminFinalizeHlsRoute =
+  ApiPublicAdminFinalizeHlsRouteImport.update({
+    id: '/public/admin/finalize-hls',
+    path: '/public/admin/finalize-hls',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicAdminImpersonateWalletRoute =
+  ApiPublicAdminImpersonateWalletRouteImport.update({
+    id: '/public/admin/impersonate-wallet',
+    path: '/public/admin/impersonate-wallet',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicAdminRetryStampsRoute =
+  ApiPublicAdminRetryStampsRouteImport.update({
+    id: '/public/admin/retry-stamps',
+    path: '/public/admin/retry-stamps',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicAuthWalletCallbackRoute =
+  ApiPublicAuthWalletCallbackRouteImport.update({
+    id: '/public/auth/wallet-callback',
+    path: '/public/auth/wallet-callback',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicAuthWalletChallengeRoute =
+  ApiPublicAuthWalletChallengeRouteImport.update({
+    id: '/public/auth/wallet-challenge',
+    path: '/public/auth/wallet-challenge',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicAuthWalletExchangeRoute =
+  ApiPublicAuthWalletExchangeRouteImport.update({
+    id: '/public/auth/wallet-exchange',
+    path: '/public/auth/wallet-exchange',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicAuthWalletStatusRoute =
+  ApiPublicAuthWalletStatusRouteImport.update({
+    id: '/public/auth/wallet-status',
+    path: '/public/auth/wallet-status',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicHooksFinalizeLiveArchiveRoute =
+  ApiPublicHooksFinalizeLiveArchiveRouteImport.update({
+    id: '/public/hooks/finalize-live-archive',
+    path: '/public/hooks/finalize-live-archive',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicHooksFinalizeStuckHlsRoute =
+  ApiPublicHooksFinalizeStuckHlsRouteImport.update({
+    id: '/public/hooks/finalize-stuck-hls',
+    path: '/public/hooks/finalize-stuck-hls',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicHooksIpfsPinCompleteRoute =
+  ApiPublicHooksIpfsPinCompleteRouteImport.update({
+    id: '/public/hooks/ipfs-pin-complete',
+    path: '/public/hooks/ipfs-pin-complete',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicHooksLiveBillingTickRoute =
+  ApiPublicHooksLiveBillingTickRouteImport.update({
+    id: '/public/hooks/live-billing-tick',
+    path: '/public/hooks/live-billing-tick',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicHooksMediaconvertRoute =
+  ApiPublicHooksMediaconvertRouteImport.update({
+    id: '/public/hooks/mediaconvert',
+    path: '/public/hooks/mediaconvert',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicHooksPaymentWatcherRoute =
+  ApiPublicHooksPaymentWatcherRouteImport.update({
+    id: '/public/hooks/payment-watcher',
+    path: '/public/hooks/payment-watcher',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicHooksTelegramRoute = ApiPublicHooksTelegramRouteImport.update({
+  id: '/public/hooks/telegram',
+  path: '/public/hooks/telegram',
+  getParentRoute: () => ApiRoute,
+} as any)
+const ApiPublicMinehmeProfileUpdateRoute =
+  ApiPublicMinehmeProfileUpdateRouteImport.update({
+    id: '/public/minehme/profile-update',
+    path: '/public/minehme/profile-update',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicNotifyVerifyEmailRoute =
+  ApiPublicNotifyVerifyEmailRouteImport.update({
+    id: '/public/notify/verify-email',
+    path: '/public/notify/verify-email',
+    getParentRoute: () => ApiRoute,
+  } as any)
+const ApiPublicV1WalletLinkRoute = ApiPublicV1WalletLinkRouteImport.update({
+  id: '/public/v1/wallet-link',
+  path: '/public/v1/wallet-link',
+  getParentRoute: () => ApiRoute,
+} as any)
+const ApiStreamCidSplatRoute = ApiStreamCidSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => ApiStreamCidRoute,
+} as any)
+const EmbedLiveByWalletWalletRoute = EmbedLiveByWalletWalletRouteImport.update({
+  id: '/embed/live/by-wallet/$wallet',
+  path: '/embed/live/by-wallet/$wallet',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -622,74 +622,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/upload-aws': {
-      id: '/upload-aws'
-      path: '/upload-aws'
-      fullPath: '/upload-aws'
-      preLoaderRoute: typeof UploadAwsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/upload': {
-      id: '/upload'
-      path: '/upload'
-      fullPath: '/upload'
-      preLoaderRoute: typeof UploadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/terms': {
-      id: '/terms'
-      path: '/terms'
-      fullPath: '/terms'
-      preLoaderRoute: typeof TermsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sso': {
-      id: '/sso'
-      path: '/sso'
-      fullPath: '/sso'
-      preLoaderRoute: typeof SsoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/manifesto': {
-      id: '/manifesto'
-      path: '/manifesto'
-      fullPath: '/manifesto'
-      preLoaderRoute: typeof ManifestoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/manage': {
-      id: '/manage'
-      path: '/manage'
-      fullPath: '/manage'
-      preLoaderRoute: typeof ManageRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/brand': {
-      id: '/brand'
-      path: '/brand'
-      fullPath: '/brand'
-      preLoaderRoute: typeof BrandRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api': {
-      id: '/api'
-      path: '/api'
-      fullPath: '/api'
-      preLoaderRoute: typeof ApiRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/about': {
@@ -699,39 +636,74 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/api': {
+      id: '/api'
+      path: '/api'
+      fullPath: '/api'
+      preLoaderRoute: typeof ApiRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/live/': {
-      id: '/live/'
-      path: '/live'
-      fullPath: '/live/'
-      preLoaderRoute: typeof LiveIndexRouteImport
+    '/brand': {
+      id: '/brand'
+      path: '/brand'
+      fullPath: '/brand'
+      preLoaderRoute: typeof BrandRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/v/$cid': {
-      id: '/v/$cid'
-      path: '/v/$cid'
-      fullPath: '/v/$cid'
-      preLoaderRoute: typeof VCidRouteImport
+    '/manage': {
+      id: '/manage'
+      path: '/manage'
+      fullPath: '/manage'
+      preLoaderRoute: typeof ManageRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/u/$wallet': {
-      id: '/u/$wallet'
-      path: '/u/$wallet'
-      fullPath: '/u/$wallet'
-      preLoaderRoute: typeof UWalletRouteImport
+    '/manifesto': {
+      id: '/manifesto'
+      path: '/manifesto'
+      fullPath: '/manifesto'
+      preLoaderRoute: typeof ManifestoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/live/$streamId': {
-      id: '/live/$streamId'
-      path: '/live/$streamId'
-      fullPath: '/live/$streamId'
-      preLoaderRoute: typeof LiveStreamIdRouteImport
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sso': {
+      id: '/sso'
+      path: '/sso'
+      fullPath: '/sso'
+      preLoaderRoute: typeof SsoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/upload': {
+      id: '/upload'
+      path: '/upload'
+      fullPath: '/upload'
+      preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/upload-aws': {
+      id: '/upload-aws'
+      path: '/upload-aws'
+      fullPath: '/upload-aws'
+      preLoaderRoute: typeof UploadAwsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/embed/$cid': {
@@ -741,39 +713,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmbedCidRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/v/$cid/restore': {
-      id: '/v/$cid/restore'
-      path: '/restore'
-      fullPath: '/v/$cid/restore'
-      preLoaderRoute: typeof VCidRestoreRouteImport
-      parentRoute: typeof VCidRoute
-    }
-    '/embed/live/$streamId': {
-      id: '/embed/live/$streamId'
-      path: '/embed/live/$streamId'
-      fullPath: '/embed/live/$streamId'
-      preLoaderRoute: typeof EmbedLiveStreamIdRouteImport
+    '/live/': {
+      id: '/live/'
+      path: '/live'
+      fullPath: '/live/'
+      preLoaderRoute: typeof LiveIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/stream/$cid': {
-      id: '/api/stream/$cid'
-      path: '/stream/$cid'
-      fullPath: '/api/stream/$cid'
-      preLoaderRoute: typeof ApiStreamCidRouteImport
-      parentRoute: typeof ApiRoute
+    '/live/$streamId': {
+      id: '/live/$streamId'
+      path: '/live/$streamId'
+      fullPath: '/live/$streamId'
+      preLoaderRoute: typeof LiveStreamIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/public/upload': {
-      id: '/api/public/upload'
-      path: '/public/upload'
-      fullPath: '/api/public/upload'
-      preLoaderRoute: typeof ApiPublicUploadRouteImport
-      parentRoute: typeof ApiRoute
+    '/u/$wallet': {
+      id: '/u/$wallet'
+      path: '/u/$wallet'
+      fullPath: '/u/$wallet'
+      preLoaderRoute: typeof UWalletRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/public/txc-verify-message': {
-      id: '/api/public/txc-verify-message'
-      path: '/public/txc-verify-message'
-      fullPath: '/api/public/txc-verify-message'
-      preLoaderRoute: typeof ApiPublicTxcVerifyMessageRouteImport
+    '/v/$cid': {
+      id: '/v/$cid'
+      path: '/v/$cid'
+      fullPath: '/v/$cid'
+      preLoaderRoute: typeof VCidRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/import-stream': {
+      id: '/api/public/import-stream'
+      path: '/public/import-stream'
+      fullPath: '/api/public/import-stream'
+      preLoaderRoute: typeof ApiPublicImportStreamRouteImport
       parentRoute: typeof ApiRoute
     }
     '/api/public/txc-health': {
@@ -783,151 +755,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTxcHealthRouteImport
       parentRoute: typeof ApiRoute
     }
-    '/api/public/import-stream': {
-      id: '/api/public/import-stream'
-      path: '/public/import-stream'
-      fullPath: '/api/public/import-stream'
-      preLoaderRoute: typeof ApiPublicImportStreamRouteImport
+    '/api/public/txc-verify-message': {
+      id: '/api/public/txc-verify-message'
+      path: '/public/txc-verify-message'
+      fullPath: '/api/public/txc-verify-message'
+      preLoaderRoute: typeof ApiPublicTxcVerifyMessageRouteImport
       parentRoute: typeof ApiRoute
     }
-    '/embed/live/by-wallet/$wallet': {
-      id: '/embed/live/by-wallet/$wallet'
-      path: '/embed/live/by-wallet/$wallet'
-      fullPath: '/embed/live/by-wallet/$wallet'
-      preLoaderRoute: typeof EmbedLiveByWalletWalletRouteImport
+    '/api/public/upload': {
+      id: '/api/public/upload'
+      path: '/public/upload'
+      fullPath: '/api/public/upload'
+      preLoaderRoute: typeof ApiPublicUploadRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/stream/$cid': {
+      id: '/api/stream/$cid'
+      path: '/stream/$cid'
+      fullPath: '/api/stream/$cid'
+      preLoaderRoute: typeof ApiStreamCidRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/embed/live/$streamId': {
+      id: '/embed/live/$streamId'
+      path: '/embed/live/$streamId'
+      fullPath: '/embed/live/$streamId'
+      preLoaderRoute: typeof EmbedLiveStreamIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/stream/$cid/$': {
-      id: '/api/stream/$cid/$'
-      path: '/$'
-      fullPath: '/api/stream/$cid/$'
-      preLoaderRoute: typeof ApiStreamCidSplatRouteImport
-      parentRoute: typeof ApiStreamCidRoute
+    '/v/$cid/restore': {
+      id: '/v/$cid/restore'
+      path: '/restore'
+      fullPath: '/v/$cid/restore'
+      preLoaderRoute: typeof VCidRestoreRouteImport
+      parentRoute: typeof VCidRoute
     }
-    '/api/public/v1/wallet-link': {
-      id: '/api/public/v1/wallet-link'
-      path: '/public/v1/wallet-link'
-      fullPath: '/api/public/v1/wallet-link'
-      preLoaderRoute: typeof ApiPublicV1WalletLinkRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/notify/verify-email': {
-      id: '/api/public/notify/verify-email'
-      path: '/public/notify/verify-email'
-      fullPath: '/api/public/notify/verify-email'
-      preLoaderRoute: typeof ApiPublicNotifyVerifyEmailRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/minehme/profile-update': {
-      id: '/api/public/minehme/profile-update'
-      path: '/public/minehme/profile-update'
-      fullPath: '/api/public/minehme/profile-update'
-      preLoaderRoute: typeof ApiPublicMinehmeProfileUpdateRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/hooks/telegram': {
-      id: '/api/public/hooks/telegram'
-      path: '/public/hooks/telegram'
-      fullPath: '/api/public/hooks/telegram'
-      preLoaderRoute: typeof ApiPublicHooksTelegramRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/hooks/payment-watcher': {
-      id: '/api/public/hooks/payment-watcher'
-      path: '/public/hooks/payment-watcher'
-      fullPath: '/api/public/hooks/payment-watcher'
-      preLoaderRoute: typeof ApiPublicHooksPaymentWatcherRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/hooks/mediaconvert': {
-      id: '/api/public/hooks/mediaconvert'
-      path: '/public/hooks/mediaconvert'
-      fullPath: '/api/public/hooks/mediaconvert'
-      preLoaderRoute: typeof ApiPublicHooksMediaconvertRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/hooks/live-billing-tick': {
-      id: '/api/public/hooks/live-billing-tick'
-      path: '/public/hooks/live-billing-tick'
-      fullPath: '/api/public/hooks/live-billing-tick'
-      preLoaderRoute: typeof ApiPublicHooksLiveBillingTickRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/hooks/ipfs-pin-complete': {
-      id: '/api/public/hooks/ipfs-pin-complete'
-      path: '/public/hooks/ipfs-pin-complete'
-      fullPath: '/api/public/hooks/ipfs-pin-complete'
-      preLoaderRoute: typeof ApiPublicHooksIpfsPinCompleteRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/hooks/finalize-stuck-hls': {
-      id: '/api/public/hooks/finalize-stuck-hls'
-      path: '/public/hooks/finalize-stuck-hls'
-      fullPath: '/api/public/hooks/finalize-stuck-hls'
-      preLoaderRoute: typeof ApiPublicHooksFinalizeStuckHlsRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/hooks/finalize-live-archive': {
-      id: '/api/public/hooks/finalize-live-archive'
-      path: '/public/hooks/finalize-live-archive'
-      fullPath: '/api/public/hooks/finalize-live-archive'
-      preLoaderRoute: typeof ApiPublicHooksFinalizeLiveArchiveRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/auth/wallet-status': {
-      id: '/api/public/auth/wallet-status'
-      path: '/public/auth/wallet-status'
-      fullPath: '/api/public/auth/wallet-status'
-      preLoaderRoute: typeof ApiPublicAuthWalletStatusRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/auth/wallet-exchange': {
-      id: '/api/public/auth/wallet-exchange'
-      path: '/public/auth/wallet-exchange'
-      fullPath: '/api/public/auth/wallet-exchange'
-      preLoaderRoute: typeof ApiPublicAuthWalletExchangeRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/auth/wallet-challenge': {
-      id: '/api/public/auth/wallet-challenge'
-      path: '/public/auth/wallet-challenge'
-      fullPath: '/api/public/auth/wallet-challenge'
-      preLoaderRoute: typeof ApiPublicAuthWalletChallengeRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/auth/wallet-callback': {
-      id: '/api/public/auth/wallet-callback'
-      path: '/public/auth/wallet-callback'
-      fullPath: '/api/public/auth/wallet-callback'
-      preLoaderRoute: typeof ApiPublicAuthWalletCallbackRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/admin/retry-stamps': {
-      id: '/api/public/admin/retry-stamps'
-      path: '/public/admin/retry-stamps'
-      fullPath: '/api/public/admin/retry-stamps'
-      preLoaderRoute: typeof ApiPublicAdminRetryStampsRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/admin/impersonate-wallet': {
-      id: '/api/public/admin/impersonate-wallet'
-      path: '/public/admin/impersonate-wallet'
-      fullPath: '/api/public/admin/impersonate-wallet'
-      preLoaderRoute: typeof ApiPublicAdminImpersonateWalletRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/admin/finalize-hls': {
-      id: '/api/public/admin/finalize-hls'
-      path: '/public/admin/finalize-hls'
-      fullPath: '/api/public/admin/finalize-hls'
-      preLoaderRoute: typeof ApiPublicAdminFinalizeHlsRouteImport
-      parentRoute: typeof ApiRoute
-    }
-    '/api/public/admin/backfill-transcripts': {
-      id: '/api/public/admin/backfill-transcripts'
-      path: '/public/admin/backfill-transcripts'
-      fullPath: '/api/public/admin/backfill-transcripts'
-      preLoaderRoute: typeof ApiPublicAdminBackfillTranscriptsRouteImport
+    '/api/public/admin/backfill-hls': {
+      id: '/api/public/admin/backfill-hls'
+      path: '/public/admin/backfill-hls'
+      fullPath: '/api/public/admin/backfill-hls'
+      preLoaderRoute: typeof ApiPublicAdminBackfillHlsRouteImport
       parentRoute: typeof ApiRoute
     }
     '/api/public/admin/backfill-self-pins': {
@@ -937,12 +804,145 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAdminBackfillSelfPinsRouteImport
       parentRoute: typeof ApiRoute
     }
-    '/api/public/admin/backfill-hls': {
-      id: '/api/public/admin/backfill-hls'
-      path: '/public/admin/backfill-hls'
-      fullPath: '/api/public/admin/backfill-hls'
-      preLoaderRoute: typeof ApiPublicAdminBackfillHlsRouteImport
+    '/api/public/admin/backfill-transcripts': {
+      id: '/api/public/admin/backfill-transcripts'
+      path: '/public/admin/backfill-transcripts'
+      fullPath: '/api/public/admin/backfill-transcripts'
+      preLoaderRoute: typeof ApiPublicAdminBackfillTranscriptsRouteImport
       parentRoute: typeof ApiRoute
+    }
+    '/api/public/admin/finalize-hls': {
+      id: '/api/public/admin/finalize-hls'
+      path: '/public/admin/finalize-hls'
+      fullPath: '/api/public/admin/finalize-hls'
+      preLoaderRoute: typeof ApiPublicAdminFinalizeHlsRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/admin/impersonate-wallet': {
+      id: '/api/public/admin/impersonate-wallet'
+      path: '/public/admin/impersonate-wallet'
+      fullPath: '/api/public/admin/impersonate-wallet'
+      preLoaderRoute: typeof ApiPublicAdminImpersonateWalletRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/admin/retry-stamps': {
+      id: '/api/public/admin/retry-stamps'
+      path: '/public/admin/retry-stamps'
+      fullPath: '/api/public/admin/retry-stamps'
+      preLoaderRoute: typeof ApiPublicAdminRetryStampsRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/auth/wallet-callback': {
+      id: '/api/public/auth/wallet-callback'
+      path: '/public/auth/wallet-callback'
+      fullPath: '/api/public/auth/wallet-callback'
+      preLoaderRoute: typeof ApiPublicAuthWalletCallbackRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/auth/wallet-challenge': {
+      id: '/api/public/auth/wallet-challenge'
+      path: '/public/auth/wallet-challenge'
+      fullPath: '/api/public/auth/wallet-challenge'
+      preLoaderRoute: typeof ApiPublicAuthWalletChallengeRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/auth/wallet-exchange': {
+      id: '/api/public/auth/wallet-exchange'
+      path: '/public/auth/wallet-exchange'
+      fullPath: '/api/public/auth/wallet-exchange'
+      preLoaderRoute: typeof ApiPublicAuthWalletExchangeRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/auth/wallet-status': {
+      id: '/api/public/auth/wallet-status'
+      path: '/public/auth/wallet-status'
+      fullPath: '/api/public/auth/wallet-status'
+      preLoaderRoute: typeof ApiPublicAuthWalletStatusRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/hooks/finalize-live-archive': {
+      id: '/api/public/hooks/finalize-live-archive'
+      path: '/public/hooks/finalize-live-archive'
+      fullPath: '/api/public/hooks/finalize-live-archive'
+      preLoaderRoute: typeof ApiPublicHooksFinalizeLiveArchiveRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/hooks/finalize-stuck-hls': {
+      id: '/api/public/hooks/finalize-stuck-hls'
+      path: '/public/hooks/finalize-stuck-hls'
+      fullPath: '/api/public/hooks/finalize-stuck-hls'
+      preLoaderRoute: typeof ApiPublicHooksFinalizeStuckHlsRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/hooks/ipfs-pin-complete': {
+      id: '/api/public/hooks/ipfs-pin-complete'
+      path: '/public/hooks/ipfs-pin-complete'
+      fullPath: '/api/public/hooks/ipfs-pin-complete'
+      preLoaderRoute: typeof ApiPublicHooksIpfsPinCompleteRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/hooks/live-billing-tick': {
+      id: '/api/public/hooks/live-billing-tick'
+      path: '/public/hooks/live-billing-tick'
+      fullPath: '/api/public/hooks/live-billing-tick'
+      preLoaderRoute: typeof ApiPublicHooksLiveBillingTickRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/hooks/mediaconvert': {
+      id: '/api/public/hooks/mediaconvert'
+      path: '/public/hooks/mediaconvert'
+      fullPath: '/api/public/hooks/mediaconvert'
+      preLoaderRoute: typeof ApiPublicHooksMediaconvertRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/hooks/payment-watcher': {
+      id: '/api/public/hooks/payment-watcher'
+      path: '/public/hooks/payment-watcher'
+      fullPath: '/api/public/hooks/payment-watcher'
+      preLoaderRoute: typeof ApiPublicHooksPaymentWatcherRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/hooks/telegram': {
+      id: '/api/public/hooks/telegram'
+      path: '/public/hooks/telegram'
+      fullPath: '/api/public/hooks/telegram'
+      preLoaderRoute: typeof ApiPublicHooksTelegramRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/minehme/profile-update': {
+      id: '/api/public/minehme/profile-update'
+      path: '/public/minehme/profile-update'
+      fullPath: '/api/public/minehme/profile-update'
+      preLoaderRoute: typeof ApiPublicMinehmeProfileUpdateRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/notify/verify-email': {
+      id: '/api/public/notify/verify-email'
+      path: '/public/notify/verify-email'
+      fullPath: '/api/public/notify/verify-email'
+      preLoaderRoute: typeof ApiPublicNotifyVerifyEmailRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/public/v1/wallet-link': {
+      id: '/api/public/v1/wallet-link'
+      path: '/public/v1/wallet-link'
+      fullPath: '/api/public/v1/wallet-link'
+      preLoaderRoute: typeof ApiPublicV1WalletLinkRouteImport
+      parentRoute: typeof ApiRoute
+    }
+    '/api/stream/$cid/$': {
+      id: '/api/stream/$cid/$'
+      path: '/$'
+      fullPath: '/api/stream/$cid/$'
+      preLoaderRoute: typeof ApiStreamCidSplatRouteImport
+      parentRoute: typeof ApiStreamCidRoute
+    }
+    '/embed/live/by-wallet/$wallet': {
+      id: '/embed/live/by-wallet/$wallet'
+      path: '/embed/live/by-wallet/$wallet'
+      fullPath: '/embed/live/by-wallet/$wallet'
+      preLoaderRoute: typeof EmbedLiveByWalletWalletRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
