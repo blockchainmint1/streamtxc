@@ -2594,7 +2594,7 @@ function MyGoLiveSection({ wallet }: { wallet: string }) {
     setBusy(true);
     try {
       await startFn({ data: { title, description: desc || null } });
-      toast.success("Starting channel — give it up to 60s, then paste RTMP into StreamYard.");
+      toast.success("Starting channel — AWS usually takes 2–5 minutes. Wait for RUNNING before starting StreamYard.");
       setTitle("");
       setDesc("");
       qc.invalidateQueries({ queryKey: ["my-live-streams", wallet] });
