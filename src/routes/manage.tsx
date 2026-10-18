@@ -1727,7 +1727,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
             <div className="text-muted-foreground pt-1">
               In StreamYard: Destinations → Custom RTMP → Server URL + Stream key
               go into their two separate fields. Channel must be <b>RUNNING</b>{" "}
-              before StreamYard can connect — click <b>Go Live</b> and wait ~60s.
+              before StreamYard can connect — warm up ahead of time and wait for the green READY light (usually 2–5 min).
             </div>
           </div>
         )}
