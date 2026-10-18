@@ -337,7 +337,7 @@ export const archiveLiveStream = createServerFn({ method: "POST" })
 
     const { data: stream, error: sErr } = await supabaseAdmin
       .from("live_streams")
-      .select("id, title, status, archive_status, archive_transcode_job_id, started_at, ended_at, channel_row_id")
+      .select("id, title, status, archive_status, archive_transcode_job_id, started_at, ended_at, channel_row_id, warmup_started_at")
       .eq("id", data.id)
       .maybeSingle();
     if (sErr) throw new Error(sErr.message);
@@ -417,13 +417,30 @@ export const archiveLiveStream = createServerFn({ method: "POST" })
 
     let inputUris: string[];
     let segmentCount: number;
+    let trimStartSeconds = 0;
     if (master) {
       inputUris = [`s3://${archiveBucket}/${master.key}`];
       // Only count segments that sit alongside the chosen master.
       const masterDir = master.key.slice(0, master.key.lastIndexOf("/") + 1);
-      segmentCount = candidates.filter(
+      const runSegs = candidates.filter(
         (o) => o.key.endsWith(".ts") && o.key.startsWith(masterDir),
-      ).length;
+      );
+      segmentCount = runSegs.length;
+      // If AWS was warmed up early, the recording starts with dead air until
+      // "Go Live" was clicked. Cut everything before Go Live (keep 10s cushion).
+      const warmAt = (stream as any).warmup_started_at
+        ? Date.parse((stream as any).warmup_started_at)
+        : NaN;
+      if (Number.isFinite(startedAt) && Number.isFinite(warmAt) && warmAt < startedAt) {
+        const runStart = runSegs
+          .map((o) => o.lastModified ?? 0)
+          .filter((t) => t >= warmAt - 60_000)
+          .sort((a, b) => a - b)[0];
+        if (runStart) {
+          const lead = Math.floor((startedAt - runStart) / 1000) - 10;
+          if (lead > 30) trimStartSeconds = lead;
+        }
+      }
     } else {
       // Legacy .ts-only archive. Filter zero-byte/tiny junk stubs
       // (MediaLive leaves .tmp.zero files that break MediaConvert with
