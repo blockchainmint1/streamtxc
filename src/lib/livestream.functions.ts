@@ -387,7 +387,12 @@ export const archiveLiveStream = createServerFn({ method: "POST" })
     const SLACK_MS = 15 * 60 * 1000;
     const startedAt = stream.started_at ? Date.parse(stream.started_at) : NaN;
     const endedAt = stream.ended_at ? Date.parse(stream.ended_at) : NaN;
-    const windowStart = Number.isFinite(startedAt) ? startedAt - SLACK_MS : null;
+    const warmAtW = (stream as any).warmup_started_at
+      ? Date.parse((stream as any).warmup_started_at)
+      : NaN;
+    const windowStart = Number.isFinite(startedAt)
+      ? Math.min(startedAt, Number.isFinite(warmAtW) ? warmAtW : startedAt) - SLACK_MS
+      : null;
     const windowEnd = Number.isFinite(endedAt) ? endedAt + SLACK_MS : Date.now() + SLACK_MS;
     const inWindow =
       windowStart === null
@@ -465,6 +470,7 @@ export const archiveLiveStream = createServerFn({ method: "POST" })
       inputUris,
       outputPrefix,
       videoId: `live-archive:${stream.id}`,
+      trimStartSeconds,
     });
 
     const { error: uErr } = await supabaseAdmin
