@@ -84,6 +84,7 @@ import {
   listRecentLiveStreams,
   createLiveStream,
   startLiveStream,
+  warmUpLiveStream,
   stopLiveStream,
   markLiveStreamRunning,
   updateLiveStream,
@@ -1368,6 +1369,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const list = useServerFn(listRecentLiveStreams);
   const create = useServerFn(createLiveStream);
   const start = useServerFn(startLiveStream);
+  const warmUp = useServerFn(warmUpLiveStream);
   const stop = useServerFn(stopLiveStream);
   const markRunning = useServerFn(markLiveStreamRunning);
   const update = useServerFn(updateLiveStream);
@@ -1389,8 +1391,14 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const [ytUrl, setYtUrl] = useState("");
   const [xUrl, setXUrl] = useState("");
   const [fbUrl, setFbUrl] = useState("");
+  const [showtime, setShowtime] = useState("");
   const [busy, setBusy] = useState(false);
   const [channelState, setChannelState] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const iv = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, []);
   const [signal, setSignal] = useState<{
     receiving: boolean;
     lastSequence: number;
