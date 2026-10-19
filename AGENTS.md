@@ -1,2 +1,4 @@
-- honest.money SSO: /sso verifies HME_HMAC_SECRET tickets; members link a TXC wallet once (hm_sso_links) because streamTXC accounts are wallets.
+- honest.money SSO: verify the per-site ticket signature, issuer, site, expiry and single-use nonce; hm_sso_links.member_id stores the permanent HME UUID and its proven wallet association, never authorize or overwrite ownership by email, because contact emails change.
+- Keep HME protocol validation in hme-protocol.ts, used by SSO and profile receivers; outbound calls and inbound profile updates use the same per-site credential and stable site code to prevent cross-site access.
+- Shared pageMeta supplies complete leaf metadata for player and restore pages; other leaf routes retain their specific head metadata so shared root defaults cannot hide page identity.
 - Owner ownership records go to the member's HME Wallet branch 1105 (xpub in wallet_branch_links, hm-link-xpubs protocol at /api/public/v1/wallet-link); payments stay on server-held video_wallet so the 90/5/5 split keeps working.

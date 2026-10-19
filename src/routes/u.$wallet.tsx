@@ -20,6 +20,7 @@ export const Route = createFileRoute("/u/$wallet")({
     const url = `https://streamtxc.com/u/${params.wallet}`;
     return {
       meta: [
+      { name: "twitter:card", content: "summary" },
         { title },
         { name: "description", content: desc },
         { property: "og:title", content: title },

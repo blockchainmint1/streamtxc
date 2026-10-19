@@ -24,6 +24,7 @@ export const Route = createFileRoute("/about")({
     ];
     return {
       meta: [
+      { name: "twitter:card", content: "summary" },
         { title: "About — streamTXC" },
         { name: "description", content: "Why streamTXC exists: immutable CID filenames, on-chain receipts, no platform middleman. Pay-per-MB video hosting on IPFS, anchored to TXC." },
         { property: "og:title", content: "About — streamTXC" },

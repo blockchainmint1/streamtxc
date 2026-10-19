@@ -3,8 +3,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { VideoPlayerV2 } from "@/components/VideoPlayerV2";
+import { pageMeta } from "@/lib/page-meta";
 
 export const Route = createFileRoute("/embed/live/$streamId")({
+  head: () => ({ meta: pageMeta("Live broadcast player — streamTXC", "Watch an embedded live broadcast on streamTXC.") }),
   component: LiveEmbedPage,
   validateSearch: (s: Record<string, unknown>) => ({
     autoplay: s.autoplay === "1" || s.autoplay === 1,

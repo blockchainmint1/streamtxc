@@ -48,6 +48,10 @@ import {
 export const Route = createFileRoute("/upload-aws")({
   head: () => ({
     meta: [
+      { name: "twitter:card", content: "summary" },
+      { property: "og:type", content: "website" },
+      { property: "og:title", content: "Upload adaptive video — streamTXC" },
+      { property: "og:description", content: "Upload a video to streamTXC for adaptive streaming, IPFS hosting and TEXITcoin ownership records." },
       { title: "Upload (AWS HLS) — stream.texitcoin" },
       {
         name: "description",

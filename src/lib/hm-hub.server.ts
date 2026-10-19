@@ -1,6 +1,7 @@
 // Reports streamTXC sign-ins/signups to the honest.money Hub (honest.money/api §3).
 // Best-effort: never blocks a sign-in.
-export const HM_SERVICE = "streamtxc";
+import { HME_SITE } from "./hme-protocol";
+export const HM_SERVICE = HME_SITE;
 
 export async function sendHubEvent(args: {
   event: "signup" | "service_used" | "purchase";
@@ -9,12 +10,13 @@ export async function sendHubEvent(args: {
   ref?: string | null;
   metadata?: Record<string, unknown>;
 }) {
-  const secret = process.env.HME_HMAC_SECRET;
+  const secret = process.env.HME_ECOSYSTEM;
   if (!secret) return;
   try {
     await fetch("https://honest.money/api/public/hub/events", {
       method: "POST",
-      headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${secret}`, "X-HME-Site": HM_SERVICE, "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(8000),
       body: JSON.stringify({
         service: HM_SERVICE,
         event: args.event,
@@ -28,4 +30,4 @@ export async function sendHubEvent(args: {
   }
 }
 
-export const BLOCKED_STATUSES = ["blocked", "ban"];
+export { BLOCKED_STATUSES } from "./hme-protocol";

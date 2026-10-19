@@ -4,8 +4,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { VideoPlayerV2 } from "@/components/VideoPlayerV2";
 import { getVideo } from "@/lib/videos.functions";
 import { hlsUrlForVideo, ipfsThumbUrl } from "@/lib/ipfs-gateway";
+import { pageMeta } from "@/lib/page-meta";
 
 export const Route = createFileRoute("/embed/$cid")({
+  head: () => ({ meta: pageMeta("Video player — streamTXC", "Watch an embedded streamTXC video, hosted on IPFS.") }),
   component: EmbedPage,
   validateSearch: (s: Record<string, unknown>) => ({
     autoplay: s.autoplay === "1" || s.autoplay === 1,

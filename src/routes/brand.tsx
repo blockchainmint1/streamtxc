@@ -3,6 +3,11 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/brand")({
   head: () => ({
     meta: [
+      { name: "twitter:card", content: "summary" },
+      { property: "og:type", content: "website" },
+      { name: "description", content: "Official streamTXC brand assets and downloadable icons." },
+      { property: "og:title", content: "Brand assets — streamTXC" },
+      { property: "og:description", content: "Official streamTXC brand assets and downloadable icons." },
       { title: "Brand assets — streamTXC" },
       { name: "robots", content: "noindex, nofollow" },
     ],

@@ -21,6 +21,8 @@ import {
 export const Route = createFileRoute("/api")({
   head: () => ({
     meta: [
+      { name: "twitter:card", content: "summary" },
+      { property: "og:type", content: "website" },
       { title: "Public API — streamTXC" },
       {
         name: "description",
