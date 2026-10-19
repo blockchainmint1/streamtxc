@@ -45,7 +45,12 @@ function SsoPage() {
   function finish(redirect?: string | null) {
     setState({ kind: "done" });
     if (popup === "1" && window.opener) {
-      try { window.opener.postMessage({ type: "hm-sso-done" }, window.location.origin); } catch { /* ignore */ }
+      try {
+        window.opener.postMessage({ type: "hm-sso-done" }, window.location.origin);
+        if (window.opener.location.origin === window.location.origin) {
+          window.opener.location.replace(redirect ?? "/manage");
+        }
+      } catch { /* opener may be on a different domain */ }
       setTimeout(() => window.close(), 600);
     } else {
       setTimeout(() => window.location.replace(redirect ?? "/manage"), 600);
@@ -56,6 +61,8 @@ function SsoPage() {
     if (started.current) return;
     started.current = true;
     if (!token) { setState({ kind: "error", message: "Missing sign-in ticket." }); return; }
+    // Remove the one-use credential from the address bar and browser history.
+    window.history.replaceState(null, "", `/sso${popup === "1" ? "?popup=1" : ""}`);
     let ref: string | undefined;
     try {
       ref = (window as unknown as { honestMoney?: { ref?: () => string | null } }).honestMoney?.ref?.() ?? undefined;
