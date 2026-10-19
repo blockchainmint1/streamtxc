@@ -15,6 +15,9 @@ import { publicOrigin } from "@/lib/site-origin";
 export const Route = createFileRoute("/live/$streamId")({
   head: () => ({
     meta: [
+      { name: "twitter:card", content: "summary" },
+      { property: "og:title", content: "Live stream — streamTXC" },
+      { property: "og:description", content: "Watch this live broadcast on streamTXC." },
       { title: "Live stream — streamTXC" },
       { name: "description", content: "Watch this live broadcast on streamTXC." },
       { property: "og:type", content: "video.other" },

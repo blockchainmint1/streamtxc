@@ -11,6 +11,7 @@ import { useLiveViewerCount } from "@/hooks/useLiveViewerCount";
 export const Route = createFileRoute("/live/")({
   head: () => ({
     meta: [
+      { name: "twitter:card", content: "summary" },
       { title: "Live — streamTXC" },
       {
         name: "description",

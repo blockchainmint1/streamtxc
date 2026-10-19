@@ -36,6 +36,10 @@ import {
 export const Route = createFileRoute("/upload")({
   head: () => ({
     meta: [
+      { name: "twitter:card", content: "summary" },
+      { property: "og:type", content: "website" },
+      { property: "og:title", content: "Upload — streamTXC" },
+      { property: "og:description", content: "Upload a video to streamTXC, host it on IPFS and record ownership on TEXITcoin." },
       { title: "Upload — streamTXC" },
       {
         name: "description",

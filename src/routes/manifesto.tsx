@@ -7,6 +7,8 @@ import { Skull, ShieldCheck, Upload, ArrowRight, Flame } from "lucide-react";
 export const Route = createFileRoute("/manifesto")({
   head: () => ({
     meta: [
+      { name: "twitter:card", content: "summary" },
+      { property: "og:type", content: "website" },
       { title: "Manifesto — streamTXC" },
       {
         name: "description",
