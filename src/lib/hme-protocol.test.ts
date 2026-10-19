@@ -1,3 +1,4 @@
+/// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
 import { HME_SITE, hmeRedirect, hmeProfileUpdateSchema, linkedHmeWallet, verifyHmeTicket } from "./hme-protocol";
 
