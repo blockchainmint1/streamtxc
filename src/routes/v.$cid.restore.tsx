@@ -20,8 +20,10 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
+import { pageMeta } from "@/lib/page-meta";
 
 export const Route = createFileRoute("/v/$cid/restore")({
+  head: () => ({ meta: pageMeta("Restore video — streamTXC", "Restore your original video file to streamTXC while preserving its content identity and ownership records.") }),
   component: RestorePage,
 });
 

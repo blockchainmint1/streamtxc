@@ -25,7 +25,15 @@ const SORTS: { key: SortKey; label: string }[] = [
 export const Route = createFileRoute("/")({
   component: IndexPage,
   head: () => ({
-    meta: [{ property: "og:url", content: "https://streamtxc.com/" }],
+    meta: [
+      { title: "streamTXC — TEXITcoin video library" },
+      { name: "description", content: "Browse creator videos on streamTXC, hosted on IPFS with ownership recorded on TEXITcoin." },
+      { property: "og:title", content: "streamTXC — TEXITcoin video library" },
+      { property: "og:description", content: "Browse creator videos on streamTXC, hosted on IPFS with ownership recorded on TEXITcoin." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+      { property: "og:url", content: "https://streamtxc.com/" },
+    ],
     links: [{ rel: "canonical", href: "https://streamtxc.com/" }],
   }),
 });

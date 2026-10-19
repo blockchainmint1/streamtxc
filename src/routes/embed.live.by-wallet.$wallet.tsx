@@ -4,8 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { VideoPlayerV2 } from "@/components/VideoPlayerV2";
 import { getLiveStreamByWallet } from "@/lib/live-by-wallet.functions";
+import { pageMeta } from "@/lib/page-meta";
 
 export const Route = createFileRoute("/embed/live/by-wallet/$wallet")({
+  head: () => ({ meta: pageMeta("Creator live player — streamTXC", "Watch a creator's latest live broadcast through their permanent streamTXC player.") }),
   component: EmbedByWallet,
   validateSearch: (s: Record<string, unknown>) => ({
     autoplay: s.autoplay === "1" || s.autoplay === 1,

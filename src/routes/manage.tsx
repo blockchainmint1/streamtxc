@@ -98,7 +98,14 @@ import { Radio } from "lucide-react";
 
 export const Route = createFileRoute("/manage")({
   head: () => ({
-    meta: [{ title: "My videos — stream.texitcoin" }],
+    meta: [
+      { title: "My videos — streamTXC" },
+      { name: "description", content: "Manage your streamTXC videos, wallet branch, renewals and live broadcasts." },
+      { property: "og:title", content: "My videos — streamTXC" },
+      { property: "og:description", content: "Manage your streamTXC videos, wallet branch, renewals and live broadcasts." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
   }),
   component: ManagePage,
 });

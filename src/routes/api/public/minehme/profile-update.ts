@@ -42,7 +42,7 @@ export const Route = createFileRoute("/api/public/minehme/profile-update")({
           const { error } = await supabaseAdmin.from("hm_sso_links").update(updated).eq("member_id", memberId);
           if (error) return Response.json({ error: "update failed" }, { status: 500 });
         }
-        return Response.json({ ok: true });
+        return Response.json({ ok: true, minerId: memberId, updated });
       },
     },
   },
