@@ -712,8 +712,17 @@ async function processVideos() {
     }
 
     const ageMs = now - new Date(v.created_at).getTime();
-    if (ageMs > graceMs) {
-      // GRACE EXPIRED — takedown.
+    // Unpaid videos (e.g. live archives on their free window) get the same
+    // notice ladder + 30-day grace as paid ones before anything is removed.
+    const deadlineMs = v.expires_at
+      ? new Date(v.expires_at).getTime()
+      : new Date(v.created_at).getTime() + graceMs;
+    const uTitle = v.title ?? v.cid.slice(0, 12);
+    const markU = (patch: Record<string, unknown>) =>
+      supabaseAdmin.from("videos").update(patch as never).eq("cid", v.cid);
+
+    if (v.unpin_after && now > new Date(v.unpin_after as string).getTime()) {
+      // 30-day grace over — takedown.
       try {
         const stamp = await recordChainEvent({
           cid: v.cid,
@@ -723,20 +732,76 @@ async function processVideos() {
           extra: "unpaid",
         });
         await unpinByCid(v.cid);
-        await supabaseAdmin
-          .from("videos")
-          .update({
-            unpinned_at: new Date().toISOString(),
-            status: "unpinned",
-            payment_received_txc: received,
-          })
-          .eq("cid", v.cid);
+        await markU({
+          unpinned_at: new Date().toISOString(),
+          status: "unpinned",
+          payment_received_txc: received,
+        });
+        if (!v.notified_unpinned_at && v.owner_wallet) {
+          await deliverAlert({
+            wallet: v.owner_wallet,
+            telegramText: `🗑️ <b>Video unpinned</b>\n<b>${uTitle}</b> was removed from storage because no payment arrived during the 30-day grace.\n\nPay any time to restore it:\n${explorerVideoUrl(v.cid)}`,
+            email: {
+              templateName: "video-unpinned",
+              templateData: { title: uTitle, cid: v.cid, videoUrl: explorerVideoUrl(v.cid), manageUrl: manageUrl() },
+              idempotencyKey: `unpinned-${v.cid}`,
+            },
+          });
+          await markU({ notified_unpinned_at: new Date().toISOString() });
+        }
         results.push({ cid: v.cid, action: "unpinned", txid: stamp.txid });
       } catch (err) {
         results.push({ cid: v.cid, action: "unpin_failed", error: String(err) });
       }
       continue;
     }
+
+    if (now > deadlineMs && ageMs > graceMs) {
+      if (v.status !== "expiring") {
+        const unpinAfter = new Date(now + POST_EXPIRY_GRACE_MS).toISOString();
+        await markU({ status: "expiring", expiring_at: new Date(now).toISOString(), unpin_after: unpinAfter, payment_received_txc: received });
+        if (!v.notified_expiring_at && v.owner_wallet) {
+          await deliverAlert({
+            wallet: v.owner_wallet,
+            telegramText: `⚠️ <b>Video expired</b>\n<b>${uTitle}</b> has reached its paid-through date. We'll keep it pinned for 30 more days, then remove the file from storage.\n\nRenew now to keep it online:\n${manageUrl()}`,
+            email: {
+              templateName: "video-expiring",
+              templateData: { title: uTitle, cid: v.cid, videoUrl: explorerVideoUrl(v.cid), manageUrl: manageUrl(), unpinAfter },
+              idempotencyKey: `expiring-${v.cid}`,
+            },
+          });
+          await markU({ notified_expiring_at: new Date().toISOString() });
+        }
+        results.push({ cid: v.cid, action: "entered_expiring", unpin_after: unpinAfter });
+      }
+      continue;
+    }
+
+    if (now < deadlineMs && v.owner_wallet) {
+      const left = deadlineMs - now;
+      const stage =
+        left < DAY_MS && !v.notified_1d_at
+          ? { days: 1, col: "notified_1d_at", text: `🚨 <b>Last chance:</b> <b>${uTitle}</b> expires <b>tomorrow</b>. After that it gets a 30-day grace period, then the file is removed.` }
+          : left < 3 * DAY_MS && !v.notified_3d_at && !v.notified_1d_at
+            ? { days: 3, col: "notified_3d_at", text: `⚠️ <b>Reminder:</b> <b>${uTitle}</b> expires in 3 days.` }
+            : left < PRE_EXPIRY_WARNING_MS && !v.notified_pre_expiry_at && !v.notified_3d_at && !v.notified_1d_at
+              ? { days: Math.max(1, Math.ceil(left / DAY_MS)), col: "notified_pre_expiry_at", text: `⏰ <b>Heads-up:</b> <b>${uTitle}</b> expires in ${Math.max(1, Math.ceil(left / DAY_MS))} days.` }
+              : null;
+      if (stage) {
+        await deliverAlert({
+          wallet: v.owner_wallet,
+          telegramText: `${stage.text} Renew anytime in Manage:\n${manageUrl()}`,
+          email: {
+            templateName: "video-expiry-warning",
+            templateData: { title: uTitle, cid: v.cid, daysLeft: stage.days, expiresAt: v.expires_at, videoUrl: explorerVideoUrl(v.cid), manageUrl: manageUrl() },
+            idempotencyKey: `${stage.col}-${v.cid}`,
+          },
+        });
+        await markU({ [stage.col]: new Date().toISOString() });
+        results.push({ cid: v.cid, action: `unpaid_warned_${stage.days}d` });
+      }
+    }
+
 
     // Still in grace, just record progress.
     if (received > 0) {
