@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { resolveGatewayUrl, fetchThroughGateways, withGatewayKey } from "@/lib/ipfs.server";
+import { resolveGatewayUrl, fetchThroughGateways, serveGateway } from "@/lib/ipfs.server";
 import { recordView } from "@/lib/videos.functions";
 
 async function hashIp(ip: string): Promise<string> {
@@ -103,16 +103,7 @@ export const Route = createFileRoute("/api/stream/$cid/$")({
         // feel sluggish. Bounded at 1h so a gateway change still
         // propagates quickly.
         const isSegment = /\.(ts|m4s|mp4|aac|vtt|jpg|jpeg|png|webp)$/i.test(splat);
-        return new Response(null, {
-          status: 302,
-          headers: {
-            location: withGatewayKey(target),
-            "cache-control": isSegment
-              ? "public, max-age=3600"
-              : "no-store",
-            "access-control-allow-origin": "*",
-          },
-        });
+        return serveGateway(target, request, isSegment ? "public, max-age=3600" : "no-store");
       },
     },
   },

@@ -68,6 +68,18 @@ export async function pinFileToIPFS(
   const form = new FormData();
   // Single-file add — no wrap. The returned root CID is the file CID.
   form.append("file", file, filename);
+  const writeKey = process.env.IPFS_WRITE_KEY;
+  if (writeKey && file.size <= 95 * 1024 * 1024) {
+    const res = await fetch("https://ipfs.honest.money/api/public/v1/upload", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${writeKey}` },
+      body: form,
+    });
+    if (!res.ok) throw new Error(`IPFS upload failed [${res.status}]`);
+    const result = (await res.json()) as PinResult;
+    if (!result.cid) throw new Error("IPFS upload returned no CID");
+    return { cid: result.cid, size: result.size ?? file.size };
+  }
   const primary = await addToSelfNode(form, { wrap: false, name: filename });
   return { cid: primary.cid, size: primary.size || file.size };
 }
@@ -143,14 +155,40 @@ export async function pinByCid(cid: string, name?: string): Promise<void> {
 }
 
 /**
- * The HME IPFS gateway requires an app key (hme_ipfs_…) on every read.
- * Append it as ?key= to any final gateway URL (redirects, fetches).
- * No-op when IPFS_KEY isn't set, so playback keeps working before lockdown.
+ * Public links use our media endpoint, never a credential-bearing URL.
  */
 export function withGatewayKey(url: string): string {
-  const key = process.env.IPFS_KEY;
-  if (!key) return url;
-  return `${url}${url.includes("?") ? "&" : "?"}key=${encodeURIComponent(key)}`;
+  const parsed = new URL(url);
+  return parsed.pathname.replace(/^\/ipfs\//, "/api/stream/");
+}
+
+/** Authenticate only server-to-node reads, preserving range and accept headers. */
+export async function fetchGateway(url: string, init?: RequestInit): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  const key = process.env.IPFS_READ_KEY;
+  if (key) headers.set("Authorization", `Bearer ${key}`);
+  return fetch(url, { ...init, headers, redirect: "error" });
+}
+
+/** Stream bytes without forwarding upstream credentials, cookies or redirects. */
+export async function serveGateway(url: string, request: Request, cacheControl: string): Promise<Response> {
+  const headers = new Headers();
+  for (const name of ["range", "accept", "if-none-match", "if-modified-since"]) {
+    const value = request.headers.get(name);
+    if (value) headers.set(name, value);
+  }
+  try {
+    const upstream = await fetchGateway(url, { headers });
+    if (!upstream.ok && upstream.status !== 304) return new Response("Media unavailable", { status: 502 });
+    const outgoing = new Headers({ "cache-control": cacheControl, "access-control-allow-origin": "*" });
+    for (const name of ["content-type", "content-length", "content-range", "accept-ranges", "etag", "last-modified"]) {
+      const value = upstream.headers.get(name);
+      if (value) outgoing.set(name, value);
+    }
+    return new Response(upstream.body, { status: upstream.status, headers: outgoing });
+  } catch {
+    return new Response("Media unavailable", { status: 502 });
+  }
 }
 
 export function gatewayUrl(cid: string): string {
@@ -191,7 +229,7 @@ export async function fetchThroughGateways(
   const suffix = path ? `/${path.replace(/^\/+/, "")}` : "";
   const base = gatewayUrl(cid);
   try {
-    const res = await fetch(withGatewayKey(`${base}${suffix}`), init);
+    const res = await fetchGateway(`${base}${suffix}`, init);
     if (res.ok) return { res, base };
   } catch {
     // Report unavailable to the caller.
@@ -207,7 +245,7 @@ export async function headCidOnGateway(
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(withGatewayKey(url), { method: "HEAD", signal: ctrl.signal });
+    const res = await fetchGateway(url, { method: "HEAD", signal: ctrl.signal });
     return res.ok;
   } catch {
     return false;
