@@ -21,7 +21,7 @@ import {
   abortMultipartUpload,
 } from "./aws-s3.server";
 import { startHlsTranscode } from "./aws-mediaconvert.server";
-import { gatewayUrl } from "./ipfs.server";
+import { gatewayUrl, withGatewayKey } from "./ipfs.server";
 
 // Multipart cutoff. Keep single-PUT path memory-bounded; anything larger goes
 // through 16 MB ranged chunks so the Worker never holds the full file in RAM.
