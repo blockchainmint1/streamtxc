@@ -143,7 +143,7 @@ export async function pinByCid(cid: string, name?: string): Promise<void> {
 }
 
 export function gatewayUrl(cid: string): string {
-  const ownNode = process.env.IPFS_GATEWAY_DOMAIN || "ipfs.honest.money";
+  const ownNode = process.env.IPFS_GATEWAY_DOMAIN || "node.ipfs.honest.money";
   return `https://${ownNode}/ipfs/${cid}`;
 }
 

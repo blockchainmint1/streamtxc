@@ -451,7 +451,7 @@ export const addByCid = createServerFn({ method: "POST" })
 
     // 2) Probe the gateway to learn size + mime, with a generous timeout.
     //    IPFS DHT lookups for fresh CIDs can take 20-30s on a cold gateway.
-    const gatewayDomain = process.env.IPFS_GATEWAY_DOMAIN || "ipfs.honest.money";
+    const gatewayDomain = process.env.IPFS_GATEWAY_DOMAIN || "node.ipfs.honest.money";
     const url = `https://${gatewayDomain}/ipfs/${data.cid}`;
 
     let sizeBytes = 0;
