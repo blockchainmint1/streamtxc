@@ -18,7 +18,7 @@ export function Footer() {
           ecosystem
         </div>
         <div className="flex gap-4">
-          <span className="text-muted-foreground">pinned to ipfs.honest.money</span>
+          <span className="text-muted-foreground">pinned to node.ipfs.honest.money</span>
           <a
             href="https://ipfs.io"
             target="_blank"
