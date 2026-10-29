@@ -43,3 +43,14 @@ test("sharing links contain no stored credential", () => {
   process.env.IPFS_WRITE_KEY = "fixture-write";
   expect(withGatewayKey("https://node.ipfs.honest.money/ipfs/fixture/file.vtt")).toBe("/api/stream/fixture/file.vtt");
 });
+test("downloads never follow redirects, using a mode Cloudflare supports", async () => {
+  process.env.IPFS_READ_KEY = "fixture-read";
+  let mode: RequestRedirect | undefined;
+  globalThis.fetch = (async (_url, init) => {
+    mode = init?.redirect;
+    return new Response(null, { status: 302, headers: { location: "https://elsewhere.example/" } });
+  }) as typeof fetch;
+  const res = await fetchGateway("https://node.ipfs.honest.money/ipfs/fixture");
+  expect(mode).toBe("manual");
+  expect(res.status).toBe(502);
+});
