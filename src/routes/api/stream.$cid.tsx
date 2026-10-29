@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { resolveGatewayUrl, withGatewayKey } from "@/lib/ipfs.server";
+import { resolveGatewayUrl, serveGateway } from "@/lib/ipfs.server";
 import { recordView } from "@/lib/videos.functions";
 
 async function hashIp(ip: string): Promise<string> {
@@ -30,18 +30,7 @@ export const Route = createFileRoute("/api/stream/$cid")({
         const isImage = dest === "image" || accept.startsWith("image/");
         if (isImage) {
           const target = await resolveGatewayUrl(cid);
-          return new Response(null, {
-            status: 302,
-            headers: {
-              location: withGatewayKey(target),
-              // Thumbnails are immutable content-addressed bytes. Caching
-              // the redirect for an hour removes a Worker round trip per
-              // card on the home page, while still letting a gateway
-              // change propagate quickly.
-              "cache-control": "public, max-age=3600",
-              "access-control-allow-origin": "*",
-            },
-          });
+          return serveGateway(target, request, "public, max-age=3600");
         }
 
         const ip =
@@ -73,14 +62,7 @@ export const Route = createFileRoute("/api/stream/$cid")({
         // 302 per playback.
         // All media resolves through the self-hosted gateway.
         const location = await resolveGatewayUrl(cid);
-        return new Response(null, {
-          status: 302,
-          headers: {
-            location: withGatewayKey(location),
-            "cache-control": "no-store",
-            "access-control-allow-origin": "*",
-          },
-        });
+        return serveGateway(location, request, "no-store");
       },
     },
   },

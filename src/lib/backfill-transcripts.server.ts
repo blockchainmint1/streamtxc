@@ -13,7 +13,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { headObject, s3PutObject } from "./aws-s3.server";
 import { startAudioOnlyTranscode } from "./aws-mediaconvert.server";
 import { maybeTranscribeVideo } from "./transcription.server";
-import { gatewayUrl, withGatewayKey } from "./ipfs.server";
+import { gatewayUrl, fetchGateway } from "./ipfs.server";
 
 const SINGLE_PUT_MAX_BYTES = 200 * 1024 * 1024;
 
@@ -68,15 +68,15 @@ export async function backfillOneTranscript(
   let inputHead = await headObject(inputBucket, inputKey).catch(() => null);
   if (!inputHead || inputHead.size === 0) {
     // Try fetching the origin from IPFS.
-    const origin = withGatewayKey(gatewayUrl(cid));
-    const head = await fetch(origin, { method: "HEAD" });
+    const origin = gatewayUrl(cid);
+    const head = await fetchGateway(origin, { method: "HEAD" });
     if (!head.ok) return { cid, action: "skipped_no_input" };
     const size = Number(head.headers.get("content-length") ?? 0);
     const contentType = head.headers.get("content-type") || "video/mp4";
     if (!size || size > SINGLE_PUT_MAX_BYTES) {
       return { cid, action: "skipped_too_large" };
     }
-    const res = await fetch(origin);
+    const res = await fetchGateway(origin);
     if (!res.ok) return { cid, action: "skipped_no_input" };
     const blob = await res.blob();
     await s3PutObject({ bucket: inputBucket, key: inputKey, body: blob, contentType });

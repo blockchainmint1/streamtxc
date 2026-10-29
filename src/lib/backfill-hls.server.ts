@@ -21,7 +21,7 @@ import {
   abortMultipartUpload,
 } from "./aws-s3.server";
 import { startHlsTranscode } from "./aws-mediaconvert.server";
-import { gatewayUrl, withGatewayKey } from "./ipfs.server";
+import { gatewayUrl, fetchGateway } from "./ipfs.server";
 
 // Multipart cutoff. Keep single-PUT path memory-bounded; anything larger goes
 // through 16 MB ranged chunks so the Worker never holds the full file in RAM.
@@ -65,11 +65,11 @@ export async function backfillOneHls(cid: string): Promise<BackfillResult> {
     return { cid, bytes: 0, mode: "single", jobId: `in_flight:${row.transcode_status}` };
   }
 
-  const origin = withGatewayKey(gatewayUrl(cid));
+  const origin = gatewayUrl(cid);
   const key = `inputs/${cid}`;
 
   // HEAD first to size-route and to fail fast if gateway can't serve it.
-  const head = await fetch(origin, { method: "HEAD" });
+  const head = await fetchGateway(origin, { method: "HEAD" });
   if (!head.ok) {
     throw new Error(`Gateway HEAD ${origin} -> ${head.status}`);
   }
@@ -89,7 +89,7 @@ export async function backfillOneHls(cid: string): Promise<BackfillResult> {
 
   if (size <= SINGLE_PUT_MAX_BYTES) {
     mode = "single";
-    const res = await fetch(origin);
+    const res = await fetchGateway(origin);
     if (!res.ok) throw new Error(`Gateway GET ${origin} -> ${res.status}`);
     const blob = await res.blob();
     await s3PutObject({ bucket: inputBucket, key, body: blob, contentType });
@@ -105,7 +105,7 @@ export async function backfillOneHls(cid: string): Promise<BackfillResult> {
       let partNumber = 1;
       for (let start = 0; start < size; start += PART_SIZE_BYTES) {
         const end = Math.min(start + PART_SIZE_BYTES - 1, size - 1);
-        const rangeRes = await fetch(origin, {
+        const rangeRes = await fetchGateway(origin, {
           headers: { Range: `bytes=${start}-${end}` },
         });
         if (!rangeRes.ok && rangeRes.status !== 206) {
