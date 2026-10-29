@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { resolveGatewayUrl, fetchThroughGateways } from "@/lib/ipfs.server";
+import { resolveGatewayUrl, fetchThroughGateways, withGatewayKey } from "@/lib/ipfs.server";
 import { recordView } from "@/lib/videos.functions";
 
 async function hashIp(ip: string): Promise<string> {
@@ -106,7 +106,7 @@ export const Route = createFileRoute("/api/stream/$cid/$")({
         return new Response(null, {
           status: 302,
           headers: {
-            location: target,
+            location: withGatewayKey(target),
             "cache-control": isSegment
               ? "public, max-age=3600"
               : "no-store",

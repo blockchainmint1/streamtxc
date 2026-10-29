@@ -19,7 +19,7 @@ import { createHash } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { explorerTxUrl } from "./txc.server";
 import { assignVideoWallet } from "./txc-wallets.server";
-import { gatewayUrl } from "./ipfs.server";
+import { gatewayUrl, withGatewayKey } from "./ipfs.server";
 
 const optionalWalletSchema = z
   .string()
@@ -184,7 +184,7 @@ export const getCommentStatus = createServerFn({ method: "POST" })
     return {
       ...row,
       explorerUrl: row.tx_hash ? explorerTxUrl(row.tx_hash) : null,
-      ipfsUrl: row.comment_cid ? gatewayUrl(row.comment_cid) : null,
+      ipfsUrl: row.comment_cid ? withGatewayKey(gatewayUrl(row.comment_cid)) : null,
     };
   });
 
@@ -229,7 +229,7 @@ export const listComments = createServerFn({ method: "POST" })
     return (rows ?? []).map((r) => ({
       ...r,
       explorerUrl: r.tx_hash ? explorerTxUrl(r.tx_hash) : null,
-      ipfsUrl: r.comment_cid ? gatewayUrl(r.comment_cid) : null,
+      ipfsUrl: r.comment_cid ? withGatewayKey(gatewayUrl(r.comment_cid)) : null,
     }));
   });
 
@@ -264,6 +264,6 @@ export const listCommentsByWallet = createServerFn({ method: "POST" })
       ...r,
       videoTitle: titleByCid.get(r.video_cid) ?? null,
       explorerUrl: r.tx_hash ? explorerTxUrl(r.tx_hash) : null,
-      ipfsUrl: r.comment_cid ? gatewayUrl(r.comment_cid) : null,
+      ipfsUrl: r.comment_cid ? withGatewayKey(gatewayUrl(r.comment_cid)) : null,
     }));
   });

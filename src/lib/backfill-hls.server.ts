@@ -21,7 +21,7 @@ import {
   abortMultipartUpload,
 } from "./aws-s3.server";
 import { startHlsTranscode } from "./aws-mediaconvert.server";
-import { gatewayUrl } from "./ipfs.server";
+import { gatewayUrl, withGatewayKey } from "./ipfs.server";
 
 // Multipart cutoff. Keep single-PUT path memory-bounded; anything larger goes
 // through 16 MB ranged chunks so the Worker never holds the full file in RAM.
@@ -65,7 +65,7 @@ export async function backfillOneHls(cid: string): Promise<BackfillResult> {
     return { cid, bytes: 0, mode: "single", jobId: `in_flight:${row.transcode_status}` };
   }
 
-  const origin = gatewayUrl(cid);
+  const origin = withGatewayKey(gatewayUrl(cid));
   const key = `inputs/${cid}`;
 
   // HEAD first to size-route and to fail fast if gateway can't serve it.
