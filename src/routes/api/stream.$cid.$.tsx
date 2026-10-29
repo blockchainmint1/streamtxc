@@ -106,7 +106,7 @@ export const Route = createFileRoute("/api/stream/$cid/$")({
         return new Response(null, {
           status: 302,
           headers: {
-            location: target,
+            location: withGatewayKey(target),
             "cache-control": isSegment
               ? "public, max-age=3600"
               : "no-store",

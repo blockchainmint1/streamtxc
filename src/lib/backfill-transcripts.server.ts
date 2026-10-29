@@ -68,7 +68,7 @@ export async function backfillOneTranscript(
   let inputHead = await headObject(inputBucket, inputKey).catch(() => null);
   if (!inputHead || inputHead.size === 0) {
     // Try fetching the origin from IPFS.
-    const origin = gatewayUrl(cid);
+    const origin = withGatewayKey(gatewayUrl(cid));
     const head = await fetch(origin, { method: "HEAD" });
     if (!head.ok) return { cid, action: "skipped_no_input" };
     const size = Number(head.headers.get("content-length") ?? 0);

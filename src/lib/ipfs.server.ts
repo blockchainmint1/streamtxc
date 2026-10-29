@@ -142,6 +142,17 @@ export async function pinByCid(cid: string, name?: string): Promise<void> {
 
 }
 
+/**
+ * The HME IPFS gateway requires an app key (hme_ipfs_…) on every read.
+ * Append it as ?key= to any final gateway URL (redirects, fetches).
+ * No-op when IPFS_KEY isn't set, so playback keeps working before lockdown.
+ */
+export function withGatewayKey(url: string): string {
+  const key = process.env.IPFS_KEY;
+  if (!key) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}key=${encodeURIComponent(key)}`;
+}
+
 export function gatewayUrl(cid: string): string {
   const ownNode = process.env.IPFS_GATEWAY_DOMAIN || "node.ipfs.honest.money";
   return `https://${ownNode}/ipfs/${cid}`;
@@ -180,7 +191,7 @@ export async function fetchThroughGateways(
   const suffix = path ? `/${path.replace(/^\/+/, "")}` : "";
   const base = gatewayUrl(cid);
   try {
-    const res = await fetch(`${base}${suffix}`, init);
+    const res = await fetch(withGatewayKey(`${base}${suffix}`), init);
     if (res.ok) return { res, base };
   } catch {
     // Report unavailable to the caller.
@@ -196,7 +207,7 @@ export async function headCidOnGateway(
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { method: "HEAD", signal: ctrl.signal });
+    const res = await fetch(withGatewayKey(url), { method: "HEAD", signal: ctrl.signal });
     return res.ok;
   } catch {
     return false;

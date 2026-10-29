@@ -395,7 +395,7 @@ export const lookupPinnedCid = createServerFn({ method: "POST" })
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 2000);
       try {
-        const res = await fetch(`https://${ownNode}/ipfs/${cid}`, {
+        const res = await fetch(withGatewayKey(`https://${ownNode}/ipfs/${cid}`), {
           method: "HEAD",
           signal: ctrl.signal,
         });
@@ -461,7 +461,7 @@ export const addByCid = createServerFn({ method: "POST" })
       const ctl = new AbortController();
       const t = setTimeout(() => ctl.abort(), 30_000);
       try {
-        return await fetch(url, { ...init, signal: ctl.signal });
+        return await fetch(withGatewayKey(url), { ...init, signal: ctl.signal });
       } finally {
         clearTimeout(t);
       }

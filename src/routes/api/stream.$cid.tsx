@@ -33,7 +33,7 @@ export const Route = createFileRoute("/api/stream/$cid")({
           return new Response(null, {
             status: 302,
             headers: {
-              location: target,
+              location: withGatewayKey(target),
               // Thumbnails are immutable content-addressed bytes. Caching
               // the redirect for an hour removes a Worker round trip per
               // card on the home page, while still letting a gateway
@@ -76,7 +76,7 @@ export const Route = createFileRoute("/api/stream/$cid")({
         return new Response(null, {
           status: 302,
           headers: {
-            location,
+            location: withGatewayKey(location),
             "cache-control": "no-store",
             "access-control-allow-origin": "*",
           },

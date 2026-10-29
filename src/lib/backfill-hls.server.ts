@@ -65,7 +65,7 @@ export async function backfillOneHls(cid: string): Promise<BackfillResult> {
     return { cid, bytes: 0, mode: "single", jobId: `in_flight:${row.transcode_status}` };
   }
 
-  const origin = gatewayUrl(cid);
+  const origin = withGatewayKey(gatewayUrl(cid));
   const key = `inputs/${cid}`;
 
   // HEAD first to size-route and to fail fast if gateway can't serve it.
