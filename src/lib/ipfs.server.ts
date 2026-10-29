@@ -167,7 +167,15 @@ export async function fetchGateway(url: string, init?: RequestInit): Promise<Res
   const headers = new Headers(init?.headers);
   const key = process.env.IPFS_READ_KEY;
   if (key) headers.set("Authorization", `Bearer ${key}`);
-  return fetch(url, { ...init, headers, redirect: "error" });
+  // Cloudflare Workers reject redirect: "error" (only "follow"/"manual" are
+  // supported), which made every published media request fail. "manual"
+  // still never follows a redirect, so the key can't leak to another host;
+  // callers treat a 3xx as unavailable.
+  const res = await fetch(url, { ...init, headers, redirect: "manual" });
+  if (res.status >= 300 && res.status < 400 && res.status !== 304) {
+    return new Response(null, { status: 502 });
+  }
+  return res;
 }
 
 /** Stream bytes without forwarding upstream credentials, cookies or redirects. */
