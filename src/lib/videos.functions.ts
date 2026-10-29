@@ -9,6 +9,7 @@ import {
   pinFileToIPFS,
   pinByCid,
   headCidOnGateway,
+  withGatewayKey,
 } from "./ipfs.server";
 import { mockPaymentTx } from "./chain";
 import { getTxStatus, explorerTxUrl } from "./txc.server";
