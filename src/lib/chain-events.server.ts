@@ -174,7 +174,13 @@ export async function recordOwnershipAnchor(input: {
   videoWallet: string;
   ownerWallet: string;
 }): Promise<StampResult> {
-  const payload = `${TXC_PROTO_TAG}O|${input.videoCid}|${input.ownerWallet}`;
+  const { buildEventRecordPayload } = await import("./txc.server");
+  const { payload } = await buildEventRecordPayload({
+    cid: input.videoCid,
+    wallet: input.ownerWallet,
+    eventType: "O",
+    details: { videoWallet: input.videoWallet, proof: "signed-challenge" },
+  });
   let stamp: StampResult;
   try {
     stamp = await stampRawPayload({
