@@ -91,6 +91,51 @@ export function buildOpReturnPayload(
   return `${tag}|h:${h}`;
 }
 
+/** SHA-256 hex via WebCrypto (Worker-safe; no node:crypto in this module). */
+async function sha256Hex(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * File Fingerprint-style record: the full event is saved as a JSON file on
+ * IPFS and only its CID goes on chain (`TXCV1<type>|<recordCid>`, ~66 bytes).
+ * The JSON can hold as much detail as we like. If IPFS is unreachable we
+ * fall back to the short direct form, or a reproducible SHA-256 commitment
+ * of `type|cid|wallet|extra` — never a random code.
+ */
+export async function buildEventRecordPayload(input: {
+  cid: string;
+  wallet: string;
+  eventType: TxcEventType;
+  extra?: string;
+  details?: Record<string, unknown>;
+}): Promise<{ payload: string; recordCid: string | null }> {
+  const tag = `${TXC_PROTO_TAG}${input.eventType}`;
+  const record = {
+    v: 1,
+    proto: TXC_PROTO_TAG,
+    type: input.eventType,
+    videoCid: input.cid,
+    wallet: input.wallet,
+    extra: input.extra ?? null,
+    details: input.details ?? {},
+    ts: new Date().toISOString(),
+  };
+  try {
+    const { pinJsonToIPFS } = await import("./ipfs.server");
+    const pin = await pinJsonToIPFS(record, `${input.cid}.${input.eventType}.event.json`);
+    const payload = `${tag}|${pin.cid}`;
+    if (Buffer.byteLength(payload, "utf8") <= 80) return { payload, recordCid: pin.cid };
+  } catch (err) {
+    console.warn("buildEventRecordPayload: IPFS pin failed, using fallback", err);
+  }
+  const direct = [tag, input.cid, input.wallet, ...(input.extra ? [input.extra] : [])].join("|");
+  if (Buffer.byteLength(direct, "utf8") <= 80) return { payload: direct, recordCid: null };
+  const h = await sha256Hex(`${input.eventType}|${input.cid}|${input.wallet}|${input.extra ?? ""}`);
+  return { payload: `${tag}|s:${h.slice(0, 64)}`, recordCid: null };
+}
+
 function rpcConfigured(): boolean {
   return !!(process.env.TXC_RPC_URL && process.env.TXC_RPC_USER && process.env.TXC_RPC_PASS);
 }
@@ -292,9 +337,10 @@ export async function stampEvent(opts: {
   eventType: TxcEventType;
   toAddress?: string;
   extra?: string;
+  details?: Record<string, unknown>;
 }): Promise<StampResult> {
   const { cid, wallet, eventType, toAddress, extra } = opts;
-  const payload = buildOpReturnPayload(cid, wallet, eventType, extra);
+  const { payload } = await buildEventRecordPayload({ cid, wallet, eventType, extra, details: opts.details });
 
   if (!rpcConfigured()) {
     // Stub mode — deterministic 64-hex "txid" so the UI flow works.
