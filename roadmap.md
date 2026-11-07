@@ -1,6 +1,6 @@
 # HME API update
-- [x] Build and test append-only historical repair with IPFS read-back and persisted signed transactions; 222 records repaired, originals retained.
-- [ ] Finish remaining 321 historical records. Current run stopped at execution time limit; rerun scripts/repair-historical-chain-records.ts in small serial batches, which skips completed records and reuses prepared transactions.
+- [x] Build and test append-only historical repair with IPFS read-back and persisted signed transactions; 362 records repaired, originals retained.
+- [ ] Finish remaining 181 historical records. Current turn reached its time budget; rerun scripts/repair-historical-chain-records.ts in small serial batches, which skips completed records and reuses prepared transactions. Gateway propagation retries and unambiguous original-chain destination recovery are supported.
 - [x] Check current HME API instructions and existing member links; HME confirmed all four stored UUIDs.
 - [x] Switch SSO, Hub reporting, and profile updates to HME_ECOSYSTEM and permanent UUIDs without changing wallet ownership.
 - [x] Test real member lookup and Hub reporting; test signed site ticket through the browser to Bobby's 103-video account, replay rejection and profile sync; ten protocol tests pass.
