@@ -107,6 +107,56 @@ export type Database = {
         }
         Relationships: []
       }
+      chain_record_repairs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          fee_txc: number | null
+          payload: string | null
+          record_cid: string | null
+          record_json: Json | null
+          replacement_event_id: string
+          signed_tx_hex: string | null
+          source_event_id: string
+          state: string
+          tx_hash: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          fee_txc?: number | null
+          payload?: string | null
+          record_cid?: string | null
+          record_json?: Json | null
+          replacement_event_id?: string
+          signed_tx_hex?: string | null
+          source_event_id: string
+          state?: string
+          tx_hash?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          fee_txc?: number | null
+          payload?: string | null
+          record_cid?: string | null
+          record_json?: Json | null
+          replacement_event_id?: string
+          signed_tx_hex?: string | null
+          source_event_id?: string
+          state?: string
+          tx_hash?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chain_record_repairs_source_event_id_fkey"
+            columns: ["source_event_id"]
+            isOneToOne: true
+            referencedRelation: "chain_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comment_boosts: {
         Row: {
           amount_txc: number
