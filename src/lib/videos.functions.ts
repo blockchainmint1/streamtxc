@@ -268,6 +268,15 @@ export const registerUpload = createServerFn({ method: "POST" })
 
 // --- Upload + pin + timestamp ---------------------------------------------
 
+// --- Add an existing IPFS CID (no re-upload) ------------------------------
+
+const cidSchema = z
+  .string()
+  .trim()
+  .min(46)
+  .max(120)
+  .regex(/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|b[A-Za-z2-7]{50,})$/, "Invalid IPFS CID");
+
 /**
  * Look up whether either form (CIDv1 or CIDv0) is already available on our
  * self-hosted node so the upload flow can skip re-uploading bytes we host.
