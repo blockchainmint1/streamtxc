@@ -36,11 +36,23 @@ for (const event of events.filter(isLegacyRandomRecord)) {
   if (journal.state === "pending") {
     if (!journal.record_cid) {
       const pin = await pinJsonToIPFS(journal.record_json, `${event.id}.historical-record.json`);
-      const response = await fetchGateway(`https://node.ipfs.honest.money/ipfs/${pin.cid}`);
-      if (!response.ok || JSON.stringify(await response.json()) !== JSON.stringify(journal.record_json)) throw new Error("Pinned historical record failed read-back");
       journal = checked(await db.from("chain_record_repairs").update({ record_cid: pin.cid, payload: historicalPayload(event.event_type, pin.cid) }).eq("source_event_id", event.id).select("*").single()).data;
     }
     if (!journal?.payload) throw new Error("Missing pinned payload");
+    // A new pin can take a few seconds to reach the gateway. Persist its CID
+    // first, then read it back on every attempt; never spend on an unread file.
+    let verified = false;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const response = await fetchGateway(`https://node.ipfs.honest.money/ipfs/${journal.record_cid}`);
+      if (response.ok) {
+        if (JSON.stringify(await response.json()) !== JSON.stringify(journal.record_json)) throw new Error("Pinned record contents differ");
+        verified = true;
+        break;
+      }
+      console.log(JSON.stringify({ eventId: event.id, readStatus: response.status, attempt: attempt + 1 }));
+      await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)));
+    }
+    if (!verified) throw new Error("Pinned historical record unavailable; no transaction prepared");
     const claim = checked(await db.from("chain_record_repairs").update({ state: "preparing" }).eq("source_event_id", event.id).eq("state", "pending").select("*")).data;
     if (claim?.length !== 1) throw new Error("Repair already claimed");
     const recipient = event.to_wallet ?? event.video_wallet;
