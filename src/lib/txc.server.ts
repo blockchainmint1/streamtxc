@@ -270,6 +270,41 @@ export interface StampResult {
   real: boolean;
 }
 
+/** Operator repair path: verify evidence before creating any replacement. */
+export async function verifyHistoricalPayload(txid: string, payload: string): Promise<boolean> {
+  const tx = await rpc<{ hex: string }>("gettransaction", [txid]);
+  const decoded = await rpc<{ vout: Array<{ scriptPubKey: { asm?: string } }> }>("decoderawtransaction", [tx.hex]);
+  const hex = Buffer.from(payload, "utf8").toString("hex");
+  return decoded.vout.some((out) => out.scriptPubKey.asm === `OP_RETURN ${hex}`);
+}
+
+/** Persist returned signed bytes BEFORE broadcast; retries must reuse them. */
+export async function prepareHistoricalStamp(payload: string, recipient: string) {
+  if (!rpcConfigured()) throw new Error("Historical repairs require real RPC credentials");
+  if (Buffer.byteLength(payload, "utf8") > 80) throw new Error("Payload exceeds 80 bytes");
+  const raw = await rpc<string>("createrawtransaction", [[], [{ data: Buffer.from(payload).toString("hex") }, { [recipient]: 0.0001 }]]);
+  const funded = await rpc<{ hex: string; fee: number }>("fundrawtransaction", [raw, await fundOptions()]);
+  // A conservative safety ceiling, not an estimated or advertised fee.
+  if (funded.fee > 0.01) throw new Error("Repair fee exceeds safety ceiling");
+  const signed = await rpc<{ hex: string; complete: boolean }>("signrawtransactionwithwallet", [funded.hex]);
+  if (!signed.complete) throw new Error("Historical repair signing incomplete");
+  const decoded = await rpc<{ txid: string }>("decoderawtransaction", [signed.hex]);
+  return { signedHex: signed.hex, txid: decoded.txid, fee: funded.fee };
+}
+
+export async function broadcastHistoricalStamp(signedHex: string, expectedTxid: string): Promise<string> {
+  try {
+    const txid = await rpc<string>("sendrawtransaction", [signedHex]);
+    if (txid !== expectedTxid) throw new Error("Unexpected repair transaction ID");
+    return txid;
+  } catch (error) {
+    // A timeout or already-known response must never fund another transaction.
+    const existing = await rpc<{ txid: string }>("gettransaction", [expectedTxid]).catch(() => null);
+    if (existing?.txid === expectedTxid) return expectedTxid;
+    throw error;
+  }
+}
+
 /**
  * Anchor a comment on chain by referencing its IPFS CID. The full body
  * (and metadata: video CID, wallet, amount, timestamp) lives in a JSON
