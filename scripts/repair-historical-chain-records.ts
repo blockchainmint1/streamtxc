@@ -34,17 +34,40 @@ for (const event of events.filter(isLegacyRandomRecord)) {
   if (!journal) throw new Error("Missing journal");
   if (journal.state === "preparing") throw new Error("Interrupted preparation needs review; no automatic new transaction");
   if (journal.state === "pending") {
+    let recipient = event.to_wallet ?? event.video_wallet;
+    if (!recipient) {
+      // Early rows omitted wallets. Recover only the unambiguous 10,000-sat
+      // event output from the original transaction, never today's owner.
+      const base = process.env.TXC_MEMPOOL_URL || "https://mempool.texitcoin.org";
+      const response = await fetch(`${base}/api/tx/${event.tx_hash}`);
+      if (!response.ok) throw new Error("Original destination lookup unavailable");
+      const tx = await response.json() as { vout: Array<{ value: number; scriptpubkey_address?: string }> };
+      const destinations = tx.vout.filter((output) => output.value === 10000 && output.scriptpubkey_address);
+      if (destinations.length !== 1) throw new Error("Original destination ambiguous; no transaction prepared");
+      recipient = destinations[0]?.scriptpubkey_address;
+    }
+    if (!recipient) throw new Error("Missing original recipient; no transaction prepared");
     if (!journal.record_cid) {
       const pin = await pinJsonToIPFS(journal.record_json, `${event.id}.historical-record.json`);
-      const response = await fetchGateway(`https://node.ipfs.honest.money/ipfs/${pin.cid}`);
-      if (!response.ok || JSON.stringify(await response.json()) !== JSON.stringify(journal.record_json)) throw new Error("Pinned historical record failed read-back");
       journal = checked(await db.from("chain_record_repairs").update({ record_cid: pin.cid, payload: historicalPayload(event.event_type, pin.cid) }).eq("source_event_id", event.id).select("*").single()).data;
     }
     if (!journal?.payload) throw new Error("Missing pinned payload");
+    // A new pin can take a few seconds to reach the gateway. Persist its CID
+    // first, then read it back on every attempt; never spend on an unread file.
+    let verified = false;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const response = await fetchGateway(`https://node.ipfs.honest.money/ipfs/${journal.record_cid}`);
+      if (response.ok) {
+        if (JSON.stringify(await response.json()) !== JSON.stringify(journal.record_json)) throw new Error("Pinned record contents differ");
+        verified = true;
+        break;
+      }
+      console.log(JSON.stringify({ eventId: event.id, readStatus: response.status, attempt: attempt + 1 }));
+      await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)));
+    }
+    if (!verified) throw new Error("Pinned historical record unavailable; no transaction prepared");
     const claim = checked(await db.from("chain_record_repairs").update({ state: "preparing" }).eq("source_event_id", event.id).eq("state", "pending").select("*")).data;
     if (claim?.length !== 1) throw new Error("Repair already claimed");
-    const recipient = event.to_wallet ?? event.video_wallet;
-    if (!recipient) throw new Error("Missing original recipient");
     const prepared = await prepareHistoricalStamp(journal.payload, recipient);
     journal = checked(await db.from("chain_record_repairs").update({ state: "prepared", signed_tx_hex: prepared.signedHex, tx_hash: prepared.txid, fee_txc: prepared.fee }).eq("source_event_id", event.id).select("*").single()).data;
   }
