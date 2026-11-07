@@ -272,10 +272,17 @@ export interface StampResult {
 
 /** Operator repair path: verify evidence before creating any replacement. */
 export async function verifyHistoricalPayload(txid: string, payload: string): Promise<boolean> {
-  const tx = await rpc<{ hex: string }>("gettransaction", [txid]);
-  const decoded = await rpc<{ vout: Array<{ scriptPubKey: { asm?: string } }> }>("decoderawtransaction", [tx.hex]);
   const hex = Buffer.from(payload, "utf8").toString("hex");
-  return decoded.vout.some((out) => out.scriptPubKey.asm === `OP_RETURN ${hex}`);
+  // Older transactions may predate the current hot wallet; the public chain
+  // remains the authoritative evidence even when gettransaction cannot see it.
+  const base = process.env.TXC_MEMPOOL_URL || "https://mempool.texitcoin.org";
+  const response = await fetch(`${base}/api/tx/${txid}`);
+  if (!response.ok) throw new Error(`Historical transaction lookup unavailable [${response.status}]`);
+  const tx = await response.json() as { txid: string; vout: Array<{ scriptpubkey_asm?: string }> };
+  return tx.txid === txid && tx.vout.some((out) => {
+    const asm = out.scriptpubkey_asm ?? "";
+    return asm.startsWith("OP_RETURN ") && asm.split(" ").at(-1) === hex;
+  });
 }
 
 /** Persist returned signed bytes BEFORE broadcast; retries must reuse them. */
