@@ -1404,8 +1404,8 @@ function hashReporter(): string {
   // on the same video, but their identity is never stored in plaintext.
   // cf-connecting-ip is set by Cloudflare and can't be spoofed by the client.
   const ip = getRequestHeader("cf-connecting-ip") || getRequestIP() || "unknown";
-  const day = new Date().toISOString().slice(0, 10);
-  return createHash("sha256").update(`${ip}|${day}`).digest("hex");
+  // No date in the hash: one IP counts as one reporter per video, forever.
+  return createHash("sha256").update(`report|${ip}`).digest("hex");
 }
 
 export const reportVideo = createServerFn({ method: "POST" })
