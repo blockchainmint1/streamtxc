@@ -49,6 +49,7 @@ export async function recordChainEvent(
       eventType: input.eventType,
       toAddress: input.videoWallet,
       extra: input.extra,
+      details: { videoWallet: input.videoWallet, fromWallet: input.fromWallet ?? null, ...(input.metadata ?? {}) },
     });
   } catch (err) {
     // Chain broadcast failed (RPC down, insufficient funds, dust, etc.) —
