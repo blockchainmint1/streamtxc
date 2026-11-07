@@ -62,17 +62,19 @@ export const isTranscodeConfigured = createServerFn({ method: "GET" }).handler(
  * addByCid finishes.
  */
 export const kickoffHlsFromCid = createServerFn({ method: "POST" })
+  .middleware([optionalWalletSession])
   .inputValidator((d: { cid: string }) => {
     if (!d.cid || typeof d.cid !== "string" || d.cid.length > 200) {
       throw new Error("Invalid cid");
     }
     return d;
   })
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const e = transcodeEnv();
     if (!e.inputBucket || !e.outputBucket) {
       return { ok: false, reason: "transcode_not_configured" as const };
     }
+    await assertTranscodeAllowed(data.cid, context.wallet, true);
     const { backfillOneHls } = await import("./backfill-hls.server");
     try {
       const r = await backfillOneHls(data.cid);
