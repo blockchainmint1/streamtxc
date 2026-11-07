@@ -1164,63 +1164,6 @@ export const buildBulkExtendQuote = createServerFn({ method: "POST" })
   });
 
 /**
- * Trust-based "I paid the sendmany" confirmation. Bumps expires_at on every
- * video the user owns by N months and inserts a payments row per video so the
- * audit log matches. Does NOT verify the on-chain TX — pair with the watcher
- * later when extension semantics land there.
- */
-export const markBulkExtended = createServerFn({ method: "POST" })
-  .middleware([requireWalletSession])
-  .inputValidator((input) =>
-    z
-      .object({
-        wallet: walletSchema,
-        months: z.number().int().min(1).max(12).default(1),
-        txHash: z.string().trim().max(200).optional(),
-      })
-      .parse(input),
-  )
-  .handler(async ({ data, context }) => {
-    const wallet = context.wallet;
-    const { data: rows, error } = await supabaseAdmin
-      .from("videos")
-      .select("cid, video_wallet, size_bytes, expires_at, months_prepaid")
-      .eq("owner_wallet", wallet)
-      .not("video_wallet", "is", null);
-    if (error) throw new Error(error.message);
-
-    const price = await getTxcUsdPrice();
-    const updated: string[] = [];
-    for (const v of rows ?? []) {
-      const usd = quoteUsd(v.size_bytes, data.months);
-      const txcAmount = Math.round(usdToTxc(usd, price.usd) * 1e8) / 1e8;
-      const base = new Date(
-        Math.max(new Date(v.expires_at).getTime(), Date.now()),
-      );
-      base.setDate(base.getDate() + data.months * 30);
-
-      const { error: uErr } = await supabaseAdmin
-        .from("videos")
-        .update({
-          expires_at: base.toISOString(),
-          months_prepaid: (v.months_prepaid ?? 0) + data.months,
-        })
-        .eq("cid", v.cid);
-      if (uErr) continue;
-
-      await supabaseAdmin.from("payments").insert({
-        video_cid: v.cid,
-        wallet,
-        txc_amount: txcAmount,
-        months_prepaid: data.months,
-        mock_tx_hash: data.txHash || `bulk-extend-${Date.now()}`,
-      });
-      updated.push(v.cid);
-    }
-    return { extended: updated.length, cids: updated };
-  });
-
-/**
  * Verify a real on-chain `sendmany` TX and credit each matching video by the
  * exact amount paid to its deposit address. Per-output proration:
  *   days_added = (paidTxc / monthlyFeeTxc) * 30  (floored to whole days)
@@ -1453,15 +1396,16 @@ const REPORT_REASONS = [
   "other",
 ] as const;
 
+/** Distinct reporters needed before a video is auto-hidden for review. */
+export const REPORTS_TO_HIDE = 3;
+
 function hashReporter(): string {
   // Stable per-IP hash (with daily salt) so the same person can't spam reports
   // on the same video, but their identity is never stored in plaintext.
-  const ip =
-    getRequestIP({ xForwardedFor: true }) ||
-    getRequestHeader("x-real-ip") ||
-    "unknown";
-  const day = new Date().toISOString().slice(0, 10);
-  return createHash("sha256").update(`${ip}|${day}`).digest("hex");
+  // cf-connecting-ip is set by Cloudflare and can't be spoofed by the client.
+  const ip = getRequestHeader("cf-connecting-ip") || getRequestIP() || "unknown";
+  // No date in the hash: one IP counts as one reporter per video, forever.
+  return createHash("sha256").update(`report|${ip}`).digest("hex");
 }
 
 export const reportVideo = createServerFn({ method: "POST" })
@@ -1505,7 +1449,13 @@ export const reportVideo = createServerFn({ method: "POST" })
       .select("id", { count: "exact", head: true })
       .eq("video_cid", data.cid);
 
-    const shouldHide = !video.hidden_at && (count ?? 0) > 0;
+    // Distinct reporters (ip hash) — one person can't hide a video alone.
+    const { data: reporters } = await supabaseAdmin
+      .from("video_reports")
+      .select("reporter_ip_hash")
+      .eq("video_cid", data.cid);
+    const distinct = new Set((reporters ?? []).map((r) => r.reporter_ip_hash)).size;
+    const shouldHide = !video.hidden_at && distinct >= REPORTS_TO_HIDE;
     await supabaseAdmin
       .from("videos")
       .update({
@@ -2029,12 +1979,31 @@ const signableOwnershipWalletSchema = txcWalletSchema.refine(
   "Use a TXC wallet address (legacy T… or bech32 txc1…) for ownership verification.",
 );
 
+function sameWallet(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const x = a.trim(), y = b.trim();
+  return x.startsWith("0x") || y.startsWith("0x") ? x.toLowerCase() === y.toLowerCase() : x === y;
+}
+/** The signed-in wallet must be the wallet being proven. */
+function assertSameWallet(sessionWallet: string, claimed: string) {
+  if (!sameWallet(sessionWallet, claimed)) {
+    throw new Error("Sign in with the wallet you're proving ownership for.");
+  }
+}
+/** Only the current owner (or anyone, for an unowned video) may prove ownership — never a takeover. */
+export function assertCanClaim(currentOwner: string | null | undefined, claimant: string) {
+  if (currentOwner && !sameWallet(currentOwner, claimant)) {
+    throw new Error("This video already belongs to another wallet.");
+  }
+}
+
 /**
  * Issue a fresh nonce + return the exact message the user must sign in
  * their TXC web wallet. Re-callable: each call rotates the nonce so an
  * abandoned attempt can't be replayed.
  */
 export const getOwnershipChallenge = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input) =>
     z
       .object({
@@ -2043,7 +2012,8 @@ export const getOwnershipChallenge = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    assertSameWallet(context.wallet, data.ownerWallet);
     const { data: video, error } = await supabaseAdmin
       .from("videos")
       .select("cid, owner_wallet, video_wallet, owner_nonce")
@@ -2051,6 +2021,7 @@ export const getOwnershipChallenge = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!video) throw new Error("Video not found");
+    assertCanClaim(video.owner_wallet, data.ownerWallet);
 
     // Reuse an existing nonce when one is already set so re-opening the
     // dialog (or the wallet-input debounce re-firing) does NOT invalidate
@@ -2087,6 +2058,7 @@ export const getOwnershipChallenge = createServerFn({ method: "POST" })
  * earnings to the now-verified wallet.
  */
 export const submitOwnershipProof = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input) =>
     z
       .object({
@@ -2096,7 +2068,8 @@ export const submitOwnershipProof = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    assertSameWallet(context.wallet, data.ownerWallet);
     const { data: video, error } = await supabaseAdmin
       .from("videos")
       .select(
@@ -2106,6 +2079,7 @@ export const submitOwnershipProof = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!video) throw new Error("Video not found");
+    assertCanClaim(video.owner_wallet, data.ownerWallet);
     if (!video.owner_nonce)
       throw new Error("No active challenge — request a new one");
 

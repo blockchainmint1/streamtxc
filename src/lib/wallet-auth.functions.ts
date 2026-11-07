@@ -169,3 +169,29 @@ export const requireWalletSession = createMiddleware({ type: "function" })
     }
     return next({ context: { wallet: claims.wallet } });
   });
+/**
+ * Like requireWalletSession but never throws: context.wallet is the verified
+ * wallet or null. For flows that also serve anonymous uploaders.
+ */
+export const optionalWalletSession = createMiddleware({ type: "function" })
+  .client(async ({ next }) => {
+    let token: string | null = null;
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem("txc:wallet");
+        if (raw) token = (JSON.parse(raw) as { token?: string })?.token ?? null;
+      } catch {
+        token = null;
+      }
+    }
+    return next({ headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  })
+  .server(async ({ next }) => {
+    const auth = getRequestHeader("authorization");
+    let wallet: string | null = null;
+    if (auth && auth.toLowerCase().startsWith("bearer ")) {
+      const claims = await verifySessionToken(auth.slice(7).trim());
+      wallet = claims?.wallet ?? null;
+    }
+    return next({ context: { wallet } });
+  });

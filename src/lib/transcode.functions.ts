@@ -12,6 +12,22 @@
 // vars aren't set yet, so legacy single-MP4 playback keeps working.
 
 import { createServerFn } from "@tanstack/react-start";
+import { optionalWalletSession } from "./wallet-auth.functions";
+import { transcodeAllowed, isValidCid, type TranscodeGuardRow } from "./transcode-guard";
+
+async function assertTranscodeAllowed(cid: string, wallet: string | null, requireRow: boolean) {
+  if (!isValidCid(cid)) throw new Error("Invalid cid");
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: row, error } = await supabaseAdmin
+    .from("videos")
+    .select("owner_wallet, hls_cid, transcode_status, created_at")
+    .eq("cid", cid)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!row && requireRow) throw new Error("Video not found");
+  const verdict = transcodeAllowed(row as TranscodeGuardRow | null, wallet, Date.now());
+  if (!verdict.ok) throw new Error(verdict.reason);
+}
 
 function transcodeEnv() {
   return {
@@ -69,14 +85,16 @@ export const kickoffHlsFromCid = createServerFn({ method: "POST" })
   });
 
 export const getTranscodeUploadUrl = createServerFn({ method: "POST" })
+  .middleware([optionalWalletSession])
   .inputValidator((d: { cid: string; contentType: string }) => {
     if (!d.cid || d.cid.length > 200) throw new Error("Invalid cid");
     if (!d.contentType || d.contentType.length > 100) throw new Error("Invalid contentType");
     return d;
   })
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const e = transcodeEnv();
     if (!e.inputBucket) throw new Error("Transcode not configured");
+    await assertTranscodeAllowed(data.cid, context.wallet, false);
     const { createPresignedPutUrl } = await import("./aws-s3.server");
     const key = `inputs/${data.cid}`;
     const url = await createPresignedPutUrl({
@@ -121,13 +139,15 @@ export const checkS3InputExists = createServerFn({ method: "POST" })
   });
 
 export const startTranscode = createServerFn({ method: "POST" })
+  .middleware([optionalWalletSession])
   .inputValidator((d: { cid: string }) => {
     if (!d.cid || d.cid.length > 200) throw new Error("Invalid cid");
     return d;
   })
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const e = transcodeEnv();
     if (!e.inputBucket || !e.outputBucket) throw new Error("Transcode not configured");
+    await assertTranscodeAllowed(data.cid, context.wallet, true);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { startHlsTranscode } = await import("./aws-mediaconvert.server");

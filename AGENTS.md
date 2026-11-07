@@ -3,3 +3,4 @@
 - Shared pageMeta supplies complete leaf metadata for player and restore pages; other leaf routes retain their specific head metadata so shared root defaults cannot hide page identity.
 - Owner ownership records go to the member's HME Wallet branch 1105 (xpub in wallet_branch_links, hm-link-xpubs protocol at /api/public/v1/wallet-link); payments stay on server-held video_wallet so the 90/5/5 split keeps working.
 - IPFS reads authenticate server-to-node and public media streams through same-origin endpoints so no stored credential enters browser responses; small single-file writes use the HME IPFS upload API while directory and large archive writes retain the private Lambda transport to avoid the public upload size limit.
+- Ownership claims and HLS source replacement require the signed-in current owner (transcode-guard.ts); anonymous uploaders may only touch brand-new, never-converted videos, so nobody can hijack an existing video.
