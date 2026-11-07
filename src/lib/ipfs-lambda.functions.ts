@@ -9,6 +9,22 @@
 //   IPFS_LAMBDA_TOKEN  bearer token printed by the deploy script
 
 import { createServerFn } from "@tanstack/react-start";
+import { optionalWalletSession } from "./wallet-auth.functions";
+import { transcodeAllowed, isValidCid, type TranscodeGuardRow } from "./transcode-guard";
+
+async function assertPinAllowed(cid: string, wallet: string | null) {
+  if (!isValidCid(cid)) throw new Error("Invalid cid");
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: row } = await supabaseAdmin
+    .from("videos")
+    .select("owner_wallet, hls_cid, transcode_status, created_at")
+    .eq("cid", cid)
+    .maybeSingle();
+  // An in-flight conversion is expected here; only block finished/owned-by-others.
+  const r = row as TranscodeGuardRow | null;
+  const v = transcodeAllowed(r && r.transcode_status === "processing" ? { ...r, transcode_status: null } : r, wallet, Date.now());
+  if (!v.ok) throw new Error(v.reason);
+}
 
 export interface PinManifestEntry {
   path: string;
@@ -54,6 +70,7 @@ export const isIpfsLambdaConfigured = createServerFn({ method: "GET" }).handler(
  * the inner file CIDs.
  */
 export const pinS3ToIpfs = createServerFn({ method: "POST" })
+  .middleware([optionalWalletSession])
   .inputValidator(
     (d: { bucket?: string; prefix?: string; keys?: string[] }) => {
       if (d.bucket && d.bucket.length > 200) throw new Error("Invalid bucket");
@@ -64,11 +81,17 @@ export const pinS3ToIpfs = createServerFn({ method: "POST" })
       return d;
     },
   )
-  .handler(async ({ data }): Promise<PinFromS3Result> => {
+  .handler(async ({ data, context }): Promise<PinFromS3Result> => {
     const token = process.env.IPFS_LAMBDA_TOKEN;
     if (!token) throw new Error("IPFS_LAMBDA_TOKEN missing");
-    const bucket = data.bucket || process.env.AWS_S3_INPUT_BUCKET;
+    // Browser callers may only pin their own single upload from our input bucket.
+    const bucket = process.env.AWS_S3_INPUT_BUCKET;
     if (!bucket) throw new Error("bucket required (no AWS_S3_INPUT_BUCKET default)");
+    if (data.bucket && data.bucket !== bucket) throw new Error("Invalid bucket");
+    if (data.prefix || !data.keys || data.keys.length !== 1) throw new Error("Pin exactly one uploaded file");
+    const m = /^inputs\/([A-Za-z0-9]+)$/.exec(data.keys[0]);
+    if (!m) throw new Error("Invalid key");
+    await assertPinAllowed(m[1], context.wallet);
 
     const t0 = Date.now();
     const payload = {
@@ -223,12 +246,14 @@ export const ipfsLambdaHealth = createServerFn({ method: "GET" }).handler(
  *   AWS_S3_OUTPUT_BUCKET, AWS_S3_INPUT_BUCKET
  */
 export const kickHlsPinAsync = createServerFn({ method: "POST" })
+  .middleware([optionalWalletSession])
   .inputValidator((d: { cid: string; jobId: string }) => {
     if (!d.cid || d.cid.length > 200) throw new Error("Invalid cid");
     if (!d.jobId || d.jobId.length > 200) throw new Error("Invalid jobId");
     return d;
   })
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertPinAllowed(data.cid, context.wallet);
     return kickHlsPinAsyncForJob(data);
   });
 

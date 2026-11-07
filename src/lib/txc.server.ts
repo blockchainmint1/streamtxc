@@ -593,7 +593,8 @@ export async function sendToAddress(
 }
 
 /**
- * Total TXC received at an address (confirmed + mempool), via the
+ * Total CONFIRMED TXC received at an address (mempool ignored, so an
+ * unconfirmed deposit can never trigger a payout or credit), via the
  * mempool.texitcoin.org esplora API. Returns 0 on any failure so callers
  * can treat "unknown" as "not yet paid".
  */
@@ -606,9 +607,7 @@ export async function getAddressReceived(address: string): Promise<number> {
       chain_stats?: { funded_txo_sum?: number };
       mempool_stats?: { funded_txo_sum?: number };
     };
-    const sats =
-      (data.chain_stats?.funded_txo_sum ?? 0) +
-      (data.mempool_stats?.funded_txo_sum ?? 0);
+    const sats = data.chain_stats?.funded_txo_sum ?? 0;
     return sats / 1e8;
   } catch {
     return 0;

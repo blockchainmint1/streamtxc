@@ -4,7 +4,16 @@ import { getRequestIP, getRequestHeader } from "@tanstack/react-start/server";
 import { createHash } from "crypto";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { requireWalletSession } from "./wallet-auth.functions";
+import { requireWalletSession, optionalWalletSession } from "./wallet-auth.functions";
+
+/** The owner of a new upload is the signed-in wallet — never a typed-in address. */
+function verifiedOwner(claimed: string | null | undefined, session: string | null): string | null {
+  if (!claimed) return null;
+  if (!session) throw new Error("Your wallet session has expired. Sign in again to upload under your wallet.");
+  const same = claimed.startsWith("0x") ? claimed.toLowerCase() === session.toLowerCase() : claimed === session;
+  if (!same) throw new Error("You can only upload under the wallet you're signed in with.");
+  return session;
+}
 import {
   pinFileToIPFS,
   pinByCid,
@@ -141,6 +150,7 @@ export const getQuote = createServerFn({ method: "POST" })
 
 /** After the browser uploads, persist metadata + mock payment. */
 export const registerUpload = createServerFn({ method: "POST" })
+  .middleware([optionalWalletSession])
   .inputValidator((input) =>
     z
       .object({
@@ -167,7 +177,7 @@ export const registerUpload = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     await assertCidUnclaimed(data.cid);
     // Draft (created at page load) is the source of truth for the chosen
     // thumbnail / title / description / NSFW flag — protects against
@@ -179,7 +189,7 @@ export const registerUpload = createServerFn({ method: "POST" })
     const nsfw = draft?.nsfw ?? data.nsfw;
     const _price = (await getTxcUsdPrice()).usd;
     const fee = usdToTxc(quoteUsd(data.sizeBytes, data.months), _price);
-    const ownerWallet = data.wallet ?? null;
+    const ownerWallet = verifiedOwner(data.wallet, context.wallet);
     const opReturnWallet = ownerWallet ?? "anon";
     const paymentTx = mockPaymentTx(opReturnWallet, fee);
     const videoWallet = await assignVideoWallet();
@@ -258,115 +268,6 @@ export const registerUpload = createServerFn({ method: "POST" })
 
 // --- Upload + pin + timestamp ---------------------------------------------
 
-export const finalizeUpload = createServerFn({ method: "POST" })
-  .inputValidator((input) =>
-    z
-      .object({
-        wallet: optionalWalletSchema,
-        title: z.string().min(1).max(200),
-        description: z.string().max(2000).optional().default(""),
-        months: z.number().int().min(1).max(12).default(1),
-        // Base64-encoded file (for MVP < 100MB).
-        fileBase64: z.string().min(1),
-        filename: z.string().min(1).max(255),
-        mimeType: z.string().min(1).max(100),
-        thumbnailCid: cidStringSchema.optional(),
-        nsfw: z.boolean().optional().default(false),
-      })
-      .parse(input),
-  )
-  .handler(async ({ data }) => {
-    // Decode base64 → Blob
-    const binary = Uint8Array.from(atob(data.fileBase64), (c) =>
-      c.charCodeAt(0),
-    );
-    if (binary.byteLength > MAX_UPLOAD_BYTES) {
-      throw new Error(`File exceeds ${MAX_UPLOAD_BYTES} byte limit`);
-    }
-    const blob = new Blob([binary as BlobPart], { type: data.mimeType });
-
-    // 1. Pin to our self-hosted IPFS node
-    const pin = await pinFileToIPFS(blob, data.filename);
-
-    // Reject duplicates BEFORE we stamp the chain.
-    await assertCidUnclaimed(pin.cid);
-
-    // 2. Mock payment + real on-chain stamp
-    const _price = (await getTxcUsdPrice()).usd;
-    const fee = usdToTxc(quoteUsd(binary.byteLength, data.months), _price);
-    const ownerWallet = data.wallet ?? null;
-    const opReturnWallet = ownerWallet ?? "anon";
-    const paymentTx = mockPaymentTx(opReturnWallet, fee);
-    const videoWallet = await assignVideoWallet();
-    const stamp = await recordChainEvent({
-      cid: pin.cid,
-      videoWallet: videoWallet.address,
-      eventType: "C",
-      uploaderWallet: opReturnWallet,
-    });
-    const videoStatus = stamp.real ? "mempool" : "stamp_failed";
-    const txHash = stamp.real ? stamp.txid : null;
-
-    const meta = await recordMetadataAnchor({
-      videoCid: pin.cid,
-      videoWallet: videoWallet.address,
-      uploaderWallet: opReturnWallet,
-      title: data.title,
-      description: data.description ?? "",
-      thumbnailCid: data.thumbnailCid ?? null,
-    });
-
-    // 3. Persist — 7-day free grace; payment extends from created_at.
-    const expires = new Date(Date.now() + PAYMENT_GRACE_HOURS * 3_600_000);
-
-    const { error: vErr } = await supabaseAdmin
-      .from("videos")
-      .insert({
-        cid: pin.cid,
-        owner_wallet: ownerWallet,
-        title: data.title,
-        description: data.description || null,
-        size_bytes: binary.byteLength,
-        mime_type: data.mimeType,
-        status: videoStatus,
-        tx_hash: txHash,
-        op_return_payload: stamp.payload,
-        months_prepaid: data.months,
-        expires_at: expires.toISOString(),
-        video_wallet: videoWallet.address,
-        derivation_index: videoWallet.derivationIndex,
-        payment_required_txc: fee,
-        metadata_cid: meta?.metaCid ?? null,
-        thumbnail_cid: data.thumbnailCid ?? null,
-        is_nsfw: data.nsfw,
-      });
-    if (vErr) {
-      if (vErr.code === "23505") await assertCidUnclaimed(pin.cid);
-      throw new Error(`Failed to save video: ${vErr.message}`);
-    }
-    await fileVideoInOwnerBranch({ cid: pin.cid, ownerWallet });
-
-    if (ownerWallet) {
-      const { error: pErr } = await supabaseAdmin.from("payments").insert({
-        video_cid: pin.cid,
-        wallet: ownerWallet,
-        txc_amount: fee,
-        months_prepaid: data.months,
-        mock_tx_hash: paymentTx,
-      });
-      if (pErr) throw new Error(`Failed to save payment: ${pErr.message}`);
-    }
-
-    return {
-      cid: pin.cid,
-      txHash,
-      explorerUrl: txHash ? explorerTxUrl(txHash) : null,
-      chainStatus: videoStatus,
-      paymentTx,
-      txcAmount: fee,
-    };
-  });
-
 // --- Add an existing IPFS CID (no re-upload) ------------------------------
 
 const cidSchema = z
@@ -418,6 +319,7 @@ export const lookupPinnedCid = createServerFn({ method: "POST" })
   });
 
 export const addByCid = createServerFn({ method: "POST" })
+  .middleware([optionalWalletSession])
   .inputValidator((input) =>
     z
       .object({
@@ -436,7 +338,7 @@ export const addByCid = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     // Reject if already registered (with structured details for the UI)
     await assertCidUnclaimed(data.cid);
     const draft = await consumeDraftForFinalize(data.draftId, data.draftToken);
@@ -505,7 +407,7 @@ export const addByCid = createServerFn({ method: "POST" })
 
     const _price = (await getTxcUsdPrice()).usd;
     const fee = usdToTxc(quoteUsd(Math.max(sizeBytes, 1), data.months), _price);
-    const ownerWallet = data.wallet ?? null;
+    const ownerWallet = verifiedOwner(data.wallet, context.wallet);
     const opReturnWallet = ownerWallet ?? "anon";
     const paymentTx = mockPaymentTx(opReturnWallet, fee);
     const videoWallet = await assignVideoWallet();
@@ -689,76 +591,6 @@ export const getVideo = createServerFn({ method: "POST" })
     return stripSensitiveVideoFields(video);
   });
 
-/**
- * Backfill metadata anchors for older videos that pre-date the "T" stamp.
- * Idempotent — only touches rows where metadata_cid is null. Pass a `cids`
- * array to limit scope (useful for one-off targeted backfills); leave
- * empty for "all".
- */
-export const backfillMetadataAnchors = createServerFn({ method: "POST" })
-  .inputValidator((input) =>
-    z
-      .object({
-        cids: z.array(z.string().min(1).max(120)).max(50).optional(),
-        limit: z.number().int().min(1).max(50).default(10),
-      })
-      .parse(input ?? {}),
-  )
-  .handler(async ({ data }) => {
-    let q = supabaseAdmin
-      .from("videos")
-      .select("cid, video_wallet, owner_wallet, title, description")
-      .is("metadata_cid", null)
-      .not("video_wallet", "is", null)
-      .order("created_at", { ascending: true })
-      .limit(data.limit);
-    if (data.cids && data.cids.length > 0) q = q.in("cid", data.cids);
-    const { data: rows, error } = await q;
-    if (error) throw new Error(error.message);
-
-    const results: Array<{
-      cid: string;
-      metaCid: string | null;
-      txid: string | null;
-      ok: boolean;
-      error?: string;
-    }> = [];
-
-    for (const v of rows ?? []) {
-      try {
-        const meta = await recordMetadataAnchor({
-          videoCid: v.cid,
-          videoWallet: v.video_wallet!,
-          uploaderWallet: v.owner_wallet ?? "anon",
-          title: v.title,
-          description: v.description ?? "",
-        });
-        if (!meta) {
-          results.push({ cid: v.cid, metaCid: null, txid: null, ok: false, error: "pin failed" });
-          continue;
-        }
-        await supabaseAdmin
-          .from("videos")
-          .update({ metadata_cid: meta.metaCid })
-          .eq("cid", v.cid);
-        results.push({
-          cid: v.cid,
-          metaCid: meta.metaCid,
-          txid: meta.stamp.real ? meta.stamp.txid : null,
-          ok: meta.stamp.real,
-        });
-      } catch (err) {
-        results.push({
-          cid: v.cid,
-          metaCid: null,
-          txid: null,
-          ok: false,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
-    return { processed: results.length, results };
-  });
 
 export const listMyVideos = createServerFn({ method: "POST" })
   .middleware([requireWalletSession])
@@ -808,10 +640,12 @@ export const listVideosByOwner = createServerFn({ method: "POST" })
  * that once a renewal payment lands.
  */
 export const restoreUnpinnedVideos = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input) =>
     z.object({ wallet: walletSchema }).parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    if (data.wallet !== context.wallet) throw new Error("You can only restore your own videos.");
     const { data: rows, error } = await supabaseAdmin
       .from("videos")
       .select("cid, title")
@@ -871,31 +705,6 @@ export const probeAvailability = createServerFn({ method: "POST" })
     };
   });
 
-/**
- * Public single-CID restore. Asks our node to re-fetch this CID from the
- * IPFS DHT. Best-effort — the node may say "queued" even if no peer is
- * actually seeding it. Status is not flipped here; the watch page's
- * probeAvailability call decides truth from the live gateway HEAD.
- */
-export const restoreOneFromIpfs = createServerFn({ method: "POST" })
-  .inputValidator((input) =>
-    z.object({ cid: cidStringSchema }).parse(input),
-  )
-  .handler(async ({ data }) => {
-    const { data: row } = await supabaseAdmin
-      .from("videos")
-      .select("cid, title")
-      .eq("cid", data.cid)
-      .maybeSingle();
-    if (!row) throw new Error("Video not found.");
-    try {
-      await pinByCid(row.cid, row.title ?? row.cid);
-      return { ok: true };
-    } catch (err) {
-      console.warn("restoreOneFromIpfs failed", row.cid, err);
-      return { ok: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  });
 
 /**
  * Owner-only re-seed. Called after the browser has re-uploaded the
