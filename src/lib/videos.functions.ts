@@ -591,76 +591,6 @@ export const getVideo = createServerFn({ method: "POST" })
     return stripSensitiveVideoFields(video);
   });
 
-/**
- * Backfill metadata anchors for older videos that pre-date the "T" stamp.
- * Idempotent — only touches rows where metadata_cid is null. Pass a `cids`
- * array to limit scope (useful for one-off targeted backfills); leave
- * empty for "all".
- */
-export const backfillMetadataAnchors = createServerFn({ method: "POST" })
-  .inputValidator((input) =>
-    z
-      .object({
-        cids: z.array(z.string().min(1).max(120)).max(50).optional(),
-        limit: z.number().int().min(1).max(50).default(10),
-      })
-      .parse(input ?? {}),
-  )
-  .handler(async ({ data }) => {
-    let q = supabaseAdmin
-      .from("videos")
-      .select("cid, video_wallet, owner_wallet, title, description")
-      .is("metadata_cid", null)
-      .not("video_wallet", "is", null)
-      .order("created_at", { ascending: true })
-      .limit(data.limit);
-    if (data.cids && data.cids.length > 0) q = q.in("cid", data.cids);
-    const { data: rows, error } = await q;
-    if (error) throw new Error(error.message);
-
-    const results: Array<{
-      cid: string;
-      metaCid: string | null;
-      txid: string | null;
-      ok: boolean;
-      error?: string;
-    }> = [];
-
-    for (const v of rows ?? []) {
-      try {
-        const meta = await recordMetadataAnchor({
-          videoCid: v.cid,
-          videoWallet: v.video_wallet!,
-          uploaderWallet: v.owner_wallet ?? "anon",
-          title: v.title,
-          description: v.description ?? "",
-        });
-        if (!meta) {
-          results.push({ cid: v.cid, metaCid: null, txid: null, ok: false, error: "pin failed" });
-          continue;
-        }
-        await supabaseAdmin
-          .from("videos")
-          .update({ metadata_cid: meta.metaCid })
-          .eq("cid", v.cid);
-        results.push({
-          cid: v.cid,
-          metaCid: meta.metaCid,
-          txid: meta.stamp.real ? meta.stamp.txid : null,
-          ok: meta.stamp.real,
-        });
-      } catch (err) {
-        results.push({
-          cid: v.cid,
-          metaCid: null,
-          txid: null,
-          ok: false,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
-    return { processed: results.length, results };
-  });
 
 export const listMyVideos = createServerFn({ method: "POST" })
   .middleware([requireWalletSession])
@@ -775,31 +705,6 @@ export const probeAvailability = createServerFn({ method: "POST" })
     };
   });
 
-/**
- * Public single-CID restore. Asks our node to re-fetch this CID from the
- * IPFS DHT. Best-effort — the node may say "queued" even if no peer is
- * actually seeding it. Status is not flipped here; the watch page's
- * probeAvailability call decides truth from the live gateway HEAD.
- */
-export const restoreOneFromIpfs = createServerFn({ method: "POST" })
-  .inputValidator((input) =>
-    z.object({ cid: cidStringSchema }).parse(input),
-  )
-  .handler(async ({ data }) => {
-    const { data: row } = await supabaseAdmin
-      .from("videos")
-      .select("cid, title")
-      .eq("cid", data.cid)
-      .maybeSingle();
-    if (!row) throw new Error("Video not found.");
-    try {
-      await pinByCid(row.cid, row.title ?? row.cid);
-      return { ok: true };
-    } catch (err) {
-      console.warn("restoreOneFromIpfs failed", row.cid, err);
-      return { ok: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  });
 
 /**
  * Owner-only re-seed. Called after the browser has re-uploaded the
