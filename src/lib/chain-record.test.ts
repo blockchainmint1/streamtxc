@@ -15,10 +15,10 @@ test("on-chain record is the IPFS record's CID and fits in 80 bytes", async () =
   const recordCid = "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku";
   globalThis.fetch = (async () =>
     new Response(JSON.stringify({ cid: recordCid, Hash: recordCid, IpfsHash: recordCid }), { status: 200 })) as unknown as typeof fetch;
+  process.env.IPFS_WRITE_KEY ||= "test-write-key";
   const r = await buildEventRecordPayload(input);
-  if (r.recordCid) {
-    expect(r.payload).toBe(`TXCV1C|${recordCid}`);
-  }
+  expect(r.recordCid).toBe(recordCid);
+  expect(r.payload).toBe(`TXCV1C|${recordCid}`);
   expect(Buffer.byteLength(r.payload)).toBeLessThanOrEqual(80);
 });
 
