@@ -263,7 +263,7 @@ async function processStuckPinning() {
   if (error) return { ok: false, error: error.message };
   if (!stuck || stuck.length === 0) return { retried: 0 };
 
-  const { kickHlsPinAsyncForJob } = await import("@/lib/ipfs-lambda.functions");
+  const { kickHlsPinAsyncForJob } = await import("@/lib/hls-pin.server");
   const results: Array<Record<string, unknown>> = [];
   for (const row of stuck) {
     try {
