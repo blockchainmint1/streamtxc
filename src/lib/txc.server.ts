@@ -595,8 +595,7 @@ async function verifyLegacyTMessageWith(
  * For bech32 `txc1…` addresses we keep a local BIP-322 fallback, though the UI
  * currently restricts sign-in and ownership proof to legacy `T…` addresses.
  *
- * In stub mode (no RPC configured) we accept any non-empty signature so local
- * dev still works.
+ * Missing RPC configuration never bypasses cryptographic verification.
  */
 export async function verifyMessage(
   address: string,
@@ -609,10 +608,6 @@ export async function verifyMessage(
     msgLen: message.length,
     rpcConfigured: rpcConfigured(),
   });
-  if (!rpcConfigured()) {
-    return signature.trim().length >= 8;
-  }
-
   const trimmedAddress = address.trim();
   const trimmedSignature = signature.trim();
   const isLegacyT = /^T[1-9A-HJ-NP-Za-km-z]{20,90}$/.test(trimmedAddress);
@@ -632,6 +627,7 @@ export async function verifyMessage(
 
       if (localOk) return true;
 
+      if (!rpcConfigured()) return false;
       const rpcOk = await rpc<boolean>("verifymessage", [
         trimmedAddress,
         trimmedSignature,

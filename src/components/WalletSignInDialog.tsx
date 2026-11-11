@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 
 interface Challenge {
   id: string;
+  browser_proof: string;
   nonce: string;
   expires_at: string;
   message: string;
@@ -149,7 +150,7 @@ function WalletQrSignIn({ onClose }: { onClose: () => void }) {
   }, [qr]);
 
   const exchange = useCallback(
-    async (challengeId: string, oneTimeToken: string) => {
+    async (challengeId: string, oneTimeToken: string, browserProof: string) => {
       setQr((s) =>
         s.kind === "waiting" ? { kind: "signing", challenge: s.challenge } : s,
       );
@@ -157,7 +158,7 @@ function WalletQrSignIn({ onClose }: { onClose: () => void }) {
         const res = await fetch("/api/public/auth/wallet-exchange", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ id: challengeId, token: oneTimeToken }),
+          body: JSON.stringify({ id: challengeId, token: oneTimeToken, browser_proof: browserProof }),
         });
         if (!res.ok) {
           const err = (await res.json().catch(() => ({}))) as { error?: string };
@@ -187,8 +188,9 @@ function WalletQrSignIn({ onClose }: { onClose: () => void }) {
 
   // Poll for the phone's signature
   const waitingId = qr.kind === "waiting" ? qr.challenge.id : null;
+  const waitingProof = qr.kind === "waiting" ? qr.challenge.browser_proof : null;
   useEffect(() => {
-    if (!waitingId) return;
+    if (!waitingId || !waitingProof) return;
     let stopped = false;
     (async () => {
       while (!stopped) {
@@ -197,6 +199,7 @@ function WalletQrSignIn({ onClose }: { onClose: () => void }) {
         try {
           const res = await fetch(
             `/api/public/auth/wallet-status?id=${waitingId}`,
+            { headers: { "x-wallet-browser-proof": waitingProof } },
           );
           if (!res.ok) continue;
           const data = (await res.json()) as { status: string; token?: string };
@@ -206,7 +209,7 @@ function WalletQrSignIn({ onClose }: { onClose: () => void }) {
           }
           if (data.status === "signed" && data.token) {
             stopped = true;
-            await exchange(waitingId, data.token);
+            await exchange(waitingId, data.token, waitingProof);
             return;
           }
         } catch {
@@ -217,7 +220,7 @@ function WalletQrSignIn({ onClose }: { onClose: () => void }) {
     return () => {
       stopped = true;
     };
-  }, [waitingId, exchange]);
+  }, [waitingId, waitingProof, exchange]);
 
   const mmss = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}`;
 

@@ -6,3 +6,6 @@
 - Ownership claims and HLS source replacement require the signed-in current owner (transcode-guard.ts); anonymous uploaders may only touch brand-new, never-converted videos, so nobody can hijack an existing video.
 - Every on-chain event (except T, which already does) pins a full JSON record to IPFS and stamps only TXCV1<type>|<recordCid> (File Fingerprint pattern) so OP_RETURN stays under 80 bytes; fallbacks must be deterministic, never random.
 - Historical random-code repairs are append-only supplements with frozen original evidence; use the private repair journal and persist signed transaction bytes before broadcasting so retries cannot duplicate spending or replay business actions.
+- Media responses use media-security.ts for inert MIME handling and sandbox headers, including playlists; user bytes must never execute with site authority.
+- Wallet QR messages use the canonical domain and exact server reconstruction; polling and exchange require a signed browser-only challenge proof to keep QR observers from acquiring sessions.
+- Branch sharing requires an exact match to the requesting wallet, and renewal credit requires a mined transaction regardless of client inputs; identity and payment rules remain server-enforced.

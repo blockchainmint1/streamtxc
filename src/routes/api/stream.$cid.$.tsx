@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { resolveGatewayUrl, fetchThroughGateways, serveGateway } from "@/lib/ipfs.server";
 import { recordView } from "@/lib/videos.functions";
+import { mediaResponseHeaders } from "@/lib/media-security";
 
 async function hashIp(ip: string): Promise<string> {
   const data = new TextEncoder().encode(ip);
@@ -81,18 +82,12 @@ export const Route = createFileRoute("/api/stream/$cid/$")({
             return new Response("Playlist not found", { status: 502 });
           }
           const body = await hit.res.text();
+          const secureHeaders = mediaResponseHeaders("application/vnd.apple.mpegurl");
+          secureHeaders.set("cache-control", "public, max-age=300, s-maxage=86400, stale-while-revalidate=86400");
+          secureHeaders.set("access-control-allow-origin", "*");
           return new Response(body, {
             status: 200,
-            headers: {
-              "content-type": "application/vnd.apple.mpegurl",
-              // Playlists inside a directory CID are immutable (the CID
-              // pins the whole bundle), so let the edge hold them. This
-              // removes the ~3s cold proxy fetch at the start of playback
-              // for everyone after the first viewer.
-              "cache-control":
-                "public, max-age=300, s-maxage=86400, stale-while-revalidate=86400",
-              "access-control-allow-origin": "*",
-            },
+            headers: secureHeaders,
           });
         }
 

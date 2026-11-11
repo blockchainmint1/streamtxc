@@ -6,6 +6,7 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
+import { branchIdentityMatches } from "@/lib/audit-access-rules";
 import {
   BRANCH_XPUB_PATH,
   IDENTITY_PATH,
@@ -90,6 +91,10 @@ export const Route = createFileRoute("/api/public/v1/wallet-link")({
         if (new Date(row.expires_at).getTime() < Date.now()) {
           await supabaseAdmin.from("wallet_branch_requests").update({ status: "expired" }).eq("id", row.id);
           return json({ error: "token expired" }, 410);
+        }
+
+        if (!branchIdentityMatches(row.wallet, input.identity_address)) {
+          return json({ error: "Sign with the wallet this branch request belongs to." }, 403);
         }
 
         const path = input.path || BRANCH_XPUB_PATH;

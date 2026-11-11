@@ -2247,8 +2247,7 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
     setVerifying(true);
     setVerifyResult(null);
     try {
-      // Mempool-OK: don't make the user wait for a block. We trust the txid.
-      const res = await verifyTx({ data: { txHash, requireConfirmed: false } });
+      const res = await verifyTx({ data: { txHash } });
       setVerifyResult(res);
       if (res.pending) {
         toast.message("TX not confirmed yet — try again after the next block.");

@@ -1,7 +1,7 @@
 // Step 2: the HME Wallet posts the signed challenge back here.
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { authDomainFromRequest } from "@/lib/wallet-auth-shared";
+import { authDomainFromRequest, matchesSignableMessage } from "@/lib/wallet-auth-shared";
 
 const CORS = {
   "access-control-allow-origin": "*",
@@ -148,18 +148,15 @@ export const Route = createFileRoute("/api/public/auth/wallet-callback")({
           );
         }
 
-        const message =
-          "message" in payload && payload.message
-            ? payload.message
-            : buildSignableMessage({
-                nonce: ch.nonce,
-                domain: authDomainFromRequest(request),
-                issuedAt: ch.created_at,
-              });
+        const message = buildSignableMessage({
+          nonce: ch.nonce,
+          domain: authDomainFromRequest(request),
+          issuedAt: ch.created_at,
+        });
 
-        if (!message.includes(`Nonce: ${ch.nonce}`)) {
+        if (!matchesSignableMessage(payload.message, message) || ("chain" in payload && payload.chain.toLowerCase() !== "txc")) {
           return Response.json(
-            { error: "nonce mismatch" },
+            { error: "Sign the exact streamTXC sign-in message." },
             { status: 400, headers: CORS },
           );
         }
@@ -177,7 +174,7 @@ export const Route = createFileRoute("/api/public/auth/wallet-callback")({
         }
 
         const oneTimeToken = randomToken();
-        const { error: upErr } = await supabaseAdmin
+        const { data: updated, error: upErr } = await supabaseAdmin
           .from("wallet_login_challenges")
           .update({
             status: "signed",
@@ -187,7 +184,8 @@ export const Route = createFileRoute("/api/public/auth/wallet-callback")({
             signed_at: new Date().toISOString(),
           })
           .eq("id", ch.id)
-          .eq("status", "pending");
+          .eq("status", "pending")
+          .select("id");
 
         if (upErr) {
           console.error("[wallet-callback] update failed:", upErr);
@@ -196,6 +194,7 @@ export const Route = createFileRoute("/api/public/auth/wallet-callback")({
             { status: 500, headers: CORS },
           );
         }
+        if (!updated?.length) return Response.json({ error: "challenge already used" }, { status: 409, headers: CORS });
 
         return Response.json({ ok: true }, { headers: CORS });
       },
