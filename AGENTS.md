@@ -9,3 +9,4 @@
 - Media responses use media-security.ts for inert MIME handling and sandbox headers, including playlists; user bytes must never execute with site authority.
 - Wallet QR messages use the canonical domain and exact server reconstruction; polling and exchange require a signed browser-only challenge proof to keep QR observers from acquiring sessions.
 - Branch sharing requires an exact match to the requesting wallet, and renewal credit requires a mined transaction regardless of client inputs; identity and payment rules remain server-enforced.
+- Public diagnostic/status functions return only status and progress (audit-access-rules.ts); raw AWS, node and pipeline error text is shown only to the video's owner, so infrastructure details never reach strangers.

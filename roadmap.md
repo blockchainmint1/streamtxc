@@ -13,4 +13,4 @@
 - [ ] M-5 sessions signed with service key, 7-day tokens, no revocation
 - [ ] M-7 no site-wide browser security headers (clickjacking etc.)
 - [ ] M-10 email verification link returned to caller, no rate limit
-- [ ] M-11 admin/diagnostic tools exposed without sign-in
+- [x] M-11 diagnostic tools now return only status/progress; raw errors owner-only; tests added
