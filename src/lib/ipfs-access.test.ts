@@ -1,6 +1,7 @@
 /// <reference types="bun" />
 import { afterEach, expect, test } from "bun:test";
 import { fetchGateway, pinFileToIPFS, withGatewayKey, serveGateway } from "./ipfs.server";
+import { mediaResponseHeaders } from "./media-security";
 
 const originalFetch = globalThis.fetch;
 const originalRead = process.env.IPFS_READ_KEY;
@@ -71,4 +72,10 @@ test("normal video ranges still stream with protection and no credentials", asyn
   expect(res.headers.get("content-range")).toBe("bytes 0-6/100");
   expect(res.headers.get("set-cookie")).toBeNull();
   expect(await res.text()).toBe("segment");
+});
+
+test("Kubo generic transport segments remain playable but HTML cannot masquerade as one", () => {
+  expect(mediaResponseHeaders("text/vnd.trolltech.linguist", "/segment.ts").get("content-type")).toBe("video/mp2t");
+  expect(mediaResponseHeaders("application/octet-stream", "/segment.m4s").get("content-disposition")).toBeNull();
+  expect(mediaResponseHeaders("text/html", "/segment.ts").get("content-disposition")).toBe("attachment");
 });

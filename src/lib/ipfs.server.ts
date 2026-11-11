@@ -190,7 +190,7 @@ export async function serveGateway(url: string, request: Request, cacheControl: 
   try {
     const upstream = await fetchGateway(url, { headers });
     if (!upstream.ok && upstream.status !== 304) return new Response("Media unavailable", { status: 502 });
-    const outgoing = mediaResponseHeaders(upstream.headers.get("content-type"));
+    const outgoing = mediaResponseHeaders(upstream.headers.get("content-type"), new URL(url).pathname);
     outgoing.set("cache-control", cacheControl);
     outgoing.set("access-control-allow-origin", "*");
     for (const name of ["content-length", "content-range", "accept-ranges", "etag", "last-modified"]) {
