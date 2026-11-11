@@ -39,7 +39,7 @@ export const Route = createFileRoute("/api/public/hooks/finalize-stuck-hls")({
           "@/integrations/supabase/client.server"
         );
         const { describeJob } = await import("@/lib/aws-mediaconvert.server");
-        const { kickHlsPinAsyncForJob } = await import("@/lib/ipfs-lambda.functions");
+        const { kickHlsPinAsyncForJob } = await import("@/lib/hls-pin.server");
 
         const { data: rows, error } = await supabaseAdmin
           .from("videos")

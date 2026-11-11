@@ -1,6 +1,6 @@
 /// <reference types="bun" />
 import { afterEach, expect, test } from "bun:test";
-import { branchIdentityMatches, renewalPaymentConfirmed } from "./audit-access-rules";
+import { branchIdentityMatches, renewalPaymentConfirmed, publicTranscodeError, publicJobSummary } from "./audit-access-rules";
 import { authDomainFromRequest, publicOriginFromRequest, buildSignableMessage, matchesSignableMessage } from "./wallet-auth-shared";
 import { issueWalletBrowserProof, verifyWalletBrowserProof } from "./wallet-auth.server";
 import { verifyMessage } from "./txc.server";
@@ -50,4 +50,13 @@ test("browser proof is bound to one challenge and expires", async () => {
 test("missing RPC cannot turn a fabricated signature into wallet access", async () => {
   delete process.env.TXC_RPC_URL;
   expect(await verifyMessage(owner, "fake-signature-eight-characters", "Sign in")).toBe(false);
+});
+test("conversion errors show raw details only to the video's owner", () => {
+  expect(publicTranscodeError("AccessDenied arn:aws:s3:::bucket/inputs/x", false)).toBe("Video conversion failed.");
+  expect(publicTranscodeError("AccessDenied arn:aws:s3:::bucket/inputs/x", true)).toBe("AccessDenied arn:aws:s3:::bucket/inputs/x");
+  expect(publicTranscodeError(null, false)).toBeNull();
+});
+test("job lookups return only status and progress", () => {
+  const out = publicJobSummary({ job: { status: "ERROR", jobPercentComplete: 40, errorMessage: "s3://secret-bucket/key", id: "arn:aws:x" } as never });
+  expect(out).toEqual({ job: { status: "ERROR", jobPercentComplete: 40 } });
 });

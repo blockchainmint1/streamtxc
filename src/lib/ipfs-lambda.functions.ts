@@ -55,10 +55,6 @@ export const isIpfsLambdaConfigured = createServerFn({ method: "GET" }).handler(
             process.env.AWS_ACCESS_KEY_ID &&
             process.env.AWS_REGION)),
     ),
-    gateway: process.env.IPFS_GATEWAY_DOMAIN ?? null,
-    transport: process.env.IPFS_LAMBDA_NAME && process.env.AWS_ACCESS_KEY_ID
-      ? "direct-invoke"
-      : "api-gateway",
   }),
 );
 
@@ -173,62 +169,12 @@ export async function callPinLambda(
  * Health probe — calls `GET /health` on the Lambda. Useful to surface
  * "node not reachable" in the UI before kicking off a long upload.
  */
-export const ipfsLambdaHealth = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const fnName = process.env.IPFS_LAMBDA_NAME;
-    if (fnName && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_REGION) {
-      try {
-        const { invokeApiGatewayLambda } = await import("./aws-lambda.server");
-        const body = await invokeApiGatewayLambda<unknown>(fnName, {
-          routeKey: "GET /health",
-          headers: {},
-        });
-        return {
-          ok: true,
-          status: 200,
-          body: JSON.stringify(body).slice(0, 500),
-          transport: "direct-invoke",
-        };
-      } catch (err) {
-        return {
-          ok: false,
-          status: 0,
-          body: "",
-          transport: "direct-invoke",
-          reason: err instanceof Error ? err.message : String(err),
-        };
-      }
-    }
-    const url = process.env.IPFS_LAMBDA_URL;
-    if (!url) {
-      return {
-        ok: false,
-        status: 0,
-        body: "",
-        transport: "none",
-        reason: "Neither IPFS_LAMBDA_NAME (+AWS creds) nor IPFS_LAMBDA_URL set",
-      };
-    }
-    try {
-      const res = await fetch(`${url.replace(/\/$/, "")}/health`);
-      const text = await res.text();
-      return {
-        ok: res.ok,
-        status: res.status,
-        body: text.slice(0, 500),
-        transport: "api-gateway",
-      };
-    } catch (err) {
-      return {
-        ok: false,
-        status: 0,
-        body: "",
-        transport: "api-gateway",
-        reason: err instanceof Error ? err.message : String(err),
-      };
-    }
-  },
-);
+/** Public probe: reports only whether the pinning service answered. */
+export const ipfsLambdaHealth = createServerFn({ method: "GET" }).handler(async () => {
+  const { probeIpfsLambdaHealth } = await import("./ipfs-lambda-health.server");
+  const result = await probeIpfsLambdaHealth();
+  return { ok: result.ok };
+});
 
 /**
  * Kick off an asynchronous HLS-bundle pin on the IPFS Lambda. Returns
@@ -254,70 +200,6 @@ export const kickHlsPinAsync = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     await assertPinAllowed(data.cid, context.wallet);
+    const { kickHlsPinAsyncForJob } = await import("./hls-pin.server");
     return kickHlsPinAsyncForJob(data);
   });
-
-export async function kickHlsPinAsyncForJob(data: { cid: string; jobId: string }) {
-    const token = process.env.IPFS_LAMBDA_TOKEN;
-    const fnName = process.env.IPFS_LAMBDA_NAME;
-    const callbackSecret = process.env.MEDIACONVERT_WEBHOOK_SECRET;
-    const outputBucket = process.env.AWS_S3_OUTPUT_BUCKET;
-    const inputBucket = process.env.AWS_S3_INPUT_BUCKET;
-    if (!token) throw new Error("IPFS_LAMBDA_TOKEN missing");
-    if (!fnName) throw new Error("IPFS_LAMBDA_NAME missing — async pin requires direct Lambda invoke");
-    if (!callbackSecret) throw new Error("MEDIACONVERT_WEBHOOK_SECRET missing — needed to sign the pin callback");
-    if (!outputBucket) throw new Error("AWS_S3_OUTPUT_BUCKET missing");
-
-    const prefix = `hls/${data.cid}/`;
-    const { listObjects, copyObject } = await import("./aws-s3.server");
-    let keys = await listObjects(outputBucket, prefix);
-    if (keys.length === 0) throw new Error(`No HLS outputs at s3://${outputBucket}/${prefix}`);
-
-    // Bundle the original input file inside the HLS wrap directory (mirrors
-    // what the EventBridge webhook does), so the resulting CID contains
-    // both `original` and the HLS ladder.
-    if (inputBucket) {
-      const dstKey = `${prefix}original`;
-      try {
-        await copyObject({
-          srcBucket: inputBucket,
-          srcKey: `inputs/${data.cid}`,
-          dstBucket: outputBucket,
-          dstKey,
-        });
-        keys = [dstKey, ...keys.filter((k) => k !== dstKey)];
-      } catch (err) {
-        console.warn(`[kickHlsPinAsync ${data.cid}] copy original failed:`, err);
-      }
-    }
-
-    // Derive the callback URL from the request origin so this works in
-    // preview + production without hardcoding hostnames.
-    const { getRequest } = await import("@tanstack/react-start/server");
-    const origin = new URL(getRequest().url).origin;
-    const callbackUrl = `${origin}/api/public/hooks/ipfs-pin-complete`;
-
-    // Flip the DB row to a distinct "pinning" state so the UI can show
-    // an accurate stage while we wait for the Lambda callback.
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin
-      .from("videos")
-      .update({ transcode_status: "pinning", transcode_error: null })
-      .eq("cid", data.cid)
-      .eq("transcode_job_id", data.jobId);
-
-    const { invokeLambdaAsync } = await import("./aws-lambda.server");
-    await invokeLambdaAsync(fnName, {
-      routeKey: "POST /pin",
-      headers: { authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        bucket: outputBucket,
-        keys,
-        callbackUrl,
-        callbackSecret,
-        callbackMeta: { cid: data.cid, jobId: data.jobId, prefix },
-      }),
-    });
-
-    return { ok: true, files: keys.length, callbackUrl };
-}

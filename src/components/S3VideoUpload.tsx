@@ -402,7 +402,7 @@ export function S3VideoUpload({
       pushLog("info", "checking AWS + IPFS Lambda configuration…");
       const [{ configured: awsConfigured }, ipfsCfg] = await Promise.all([checkConfig(), checkIpfs()]);
       pushLog(awsConfigured ? "ok" : "err", `aws transcode configured: ${awsConfigured}`);
-      pushLog(ipfsCfg.configured ? "ok" : "err", `ipfs lambda configured: ${ipfsCfg.configured}${ipfsCfg.gateway ? ` · gateway: ${ipfsCfg.gateway}` : ""}`);
+      pushLog(ipfsCfg.configured ? "ok" : "err", `ipfs lambda configured: ${ipfsCfg.configured}`);
       if (!awsConfigured) throw new Error("AWS transcode pipeline not configured — set AWS_* env vars.");
       if (!ipfsCfg.configured) throw new Error("IPFS Lambda not configured — set IPFS_LAMBDA_URL + IPFS_LAMBDA_TOKEN.");
       const health = await probeIpfs();

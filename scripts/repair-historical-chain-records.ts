@@ -16,7 +16,12 @@ function checked<T extends { error: unknown }>(result: T): T {
   return result;
 }
 
-const events = checked(await db.from("chain_events").select("*").order("created_at").limit(2000)).data ?? [];
+const events: any[] = [];
+for (let from = 0; ; from += 1000) {
+  const page = checked(await db.from("chain_events").select("*").order("created_at").order("id").range(from, from + 999)).data ?? [];
+  events.push(...page);
+  if (page.length < 1000) break;
+}
 let completed = 0;
 let skipped = 0;
 for (const event of events.filter(isLegacyRandomRecord)) {
