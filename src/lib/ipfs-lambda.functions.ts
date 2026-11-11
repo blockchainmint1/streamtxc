@@ -9,6 +9,7 @@
 //   IPFS_LAMBDA_TOKEN  bearer token printed by the deploy script
 
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { optionalWalletSession } from "./wallet-auth.functions";
 import { transcodeAllowed, isValidCid, type TranscodeGuardRow } from "./transcode-guard";
 
@@ -239,7 +240,6 @@ export async function kickHlsPinAsyncForJob(data: { cid: string; jobId: string }
 
     // Derive the callback URL from the request origin so this works in
     // preview + production without hardcoding hostnames.
-    const { getRequest } = await import("@tanstack/react-start/server");
     const origin = new URL(getRequest().url).origin;
     const callbackUrl = `${origin}/api/public/hooks/ipfs-pin-complete`;
 
