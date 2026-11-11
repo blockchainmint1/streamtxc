@@ -45,110 +45,17 @@ export function base64UrlEncode(input: string): string {
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function firstHeaderValue(value: string | null): string | null {
-  return value?.split(",")[0]?.trim().replace(/^"|"$/g, "") || null;
+/** Sign-in always names the canonical site; no caller headers or query can change it. */
+export function publicOriginFromRequest(_request: Request): string {
+  return WALLET_AUTH_PUBLIC_ORIGIN;
 }
 
-function forwardedHost(headers: Headers): string | null {
-  const forwarded = firstHeaderValue(headers.get("forwarded"));
-  const match = forwarded?.match(/(?:^|;)\s*host=([^;]+)/i);
-  return match?.[1]?.trim().replace(/^"|"$/g, "") || null;
+export function authDomainFromRequest(_request: Request): string {
+  return new URL(WALLET_AUTH_PUBLIC_ORIGIN).hostname;
 }
 
-function hostnameFromHost(host: string): string {
-  try {
-    return new URL(`https://${host}`).hostname;
-  } catch {
-    return host.split(":")[0] || host;
-  }
-}
-
-function isLocalHostname(hostname: string): boolean {
-  return (
-    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0"
-  );
-}
-
-function stableLovablePreviewOrigin(hostname: string): string | null {
-  if (!hostname.endsWith(".lovableproject.com")) return null;
-  const previewId = hostname.slice(0, -".lovableproject.com".length);
-  if (!/^[0-9a-f-]{36}$/i.test(previewId)) return null;
-  return `https://id-preview--${previewId}.lovable.app`;
-}
-
-function publicOrPreferredOrigin(origin: string): string {
-  try {
-    const parsed = new URL(origin);
-    const stablePreview = stableLovablePreviewOrigin(parsed.hostname);
-    if (stablePreview) return stablePreview;
-    if (isLocalHostname(parsed.hostname)) return WALLET_AUTH_PUBLIC_ORIGIN;
-    return parsed.origin;
-  } catch {
-    return origin;
-  }
-}
-
-/** Public, phone-reachable origin for this request (never localhost). */
-export function publicOriginFromRequest(request: Request): string {
-  const url = new URL(request.url);
-
-  const origin = request.headers.get("origin");
-  if (origin) {
-    try {
-      const parsed = new URL(origin);
-      if (!isLocalHostname(parsed.hostname)) {
-        return publicOrPreferredOrigin(parsed.origin);
-      }
-    } catch {
-      // ignore malformed header
-    }
-  }
-
-  const referer = request.headers.get("referer");
-  if (referer) {
-    try {
-      const parsed = new URL(referer);
-      if (!isLocalHostname(parsed.hostname)) {
-        return publicOrPreferredOrigin(parsed.origin);
-      }
-    } catch {
-      // ignore malformed header
-    }
-  }
-
-  const host =
-    forwardedHost(request.headers) ??
-    firstHeaderValue(request.headers.get("x-forwarded-host")) ??
-    firstHeaderValue(request.headers.get("host"));
-  if (host) {
-    const hostname = hostnameFromHost(host);
-    if (!isLocalHostname(hostname)) {
-      const proto =
-        firstHeaderValue(request.headers.get("x-forwarded-proto")) ?? "https";
-      return publicOrPreferredOrigin(`${proto}://${host}`);
-    }
-  }
-
-  return publicOrPreferredOrigin(url.origin);
-}
-
-export function authDomainFromRequest(request: Request): string {
-  const url = new URL(request.url);
-  const queryDomain = url.searchParams.get("domain");
-  if (queryDomain && !isLocalHostname(queryDomain)) return queryDomain;
-
-  try {
-    return new URL(publicOriginFromRequest(request)).hostname;
-  } catch {
-    // fall through
-  }
-
-  const host =
-    forwardedHost(request.headers) ??
-    firstHeaderValue(request.headers.get("x-forwarded-host")) ??
-    firstHeaderValue(request.headers.get("host")) ??
-    url.host;
-  return hostnameFromHost(host);
+export function matchesSignableMessage(message: string | undefined, expected: string): boolean {
+  return message === undefined || message.replace(/\r\n/g, "\n") === expected;
 }
 
 export function buildWalletCallbackUrl(opts: {
@@ -158,7 +65,6 @@ export function buildWalletCallbackUrl(opts: {
   const originUrl = new URL(opts.origin);
   const cbUrl = new URL("/api/public/auth/wallet-callback", originUrl);
   cbUrl.searchParams.set("id", opts.challengeId);
-  cbUrl.searchParams.set("domain", originUrl.hostname);
   return cbUrl.toString();
 }
 
