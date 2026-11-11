@@ -6,6 +6,8 @@
 //   - POST /pin      streams S3 objects → kubo /api/v0/add   (for big bundles
 //                    like HLS ladders — see ipfs-lambda.functions.ts)
 
+import { mediaResponseHeaders } from "./media-security";
+
 export interface PinResult {
   cid: string;
   size: number;
@@ -188,12 +190,14 @@ export async function serveGateway(url: string, request: Request, cacheControl: 
   try {
     const upstream = await fetchGateway(url, { headers });
     if (!upstream.ok && upstream.status !== 304) return new Response("Media unavailable", { status: 502 });
-    const outgoing = new Headers({ "cache-control": cacheControl, "access-control-allow-origin": "*" });
-    for (const name of ["content-type", "content-length", "content-range", "accept-ranges", "etag", "last-modified"]) {
+    const outgoing = mediaResponseHeaders(upstream.headers.get("content-type"));
+    outgoing.set("cache-control", cacheControl);
+    outgoing.set("access-control-allow-origin", "*");
+    for (const name of ["content-length", "content-range", "accept-ranges", "etag", "last-modified"]) {
       const value = upstream.headers.get(name);
       if (value) outgoing.set(name, value);
     }
-    return new Response(upstream.body, { status: upstream.status, headers: outgoing });
+    return new Response(upstream.status === 304 ? null : upstream.body, { status: upstream.status, headers: outgoing });
   } catch {
     return new Response("Media unavailable", { status: 502 });
   }

@@ -29,6 +29,7 @@ import { verifyMessage, sendToAddress, getPlatformAddress } from "./txc.server";
 import { retryStuckStampForVideo } from "./stamp-retry.server";
 import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES, MAX_S3_UPLOAD_BYTES, PAYMENT_GRACE_HOURS } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
+import { renewalPaymentConfirmed } from "./audit-access-rules";
 
 /**
  * Admin wallet allowed to mirror any owned video's CIDs to the self-hosted
@@ -988,8 +989,6 @@ export const verifyBulkExtensionTx = createServerFn({ method: "POST" })
           .string()
           .trim()
           .regex(/^[0-9a-fA-F]{64}$/, "Expected a 64-char hex txid"),
-        // Mempool is fine — we trust the sender. Set true to require ≥1 conf.
-        requireConfirmed: z.boolean().default(false),
       })
       .parse(input),
   )
@@ -1021,8 +1020,8 @@ export const verifyBulkExtensionTx = createServerFn({ method: "POST" })
       throw new Error("Failed to fetch tx");
     }
 
-    const confirmed = !!tx.status?.confirmed;
-    if (data.requireConfirmed && !confirmed) {
+    const confirmed = renewalPaymentConfirmed(tx.status);
+    if (!confirmed) {
       return {
         pending: true,
         confirmed: false,
