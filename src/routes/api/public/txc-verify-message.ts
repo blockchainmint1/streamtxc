@@ -14,26 +14,8 @@ export const Route = createFileRoute("/api/public/txc-verify-message")({
       POST: async ({ request }) => {
         try {
           const input = schema.parse(await request.json());
-          const valid = await verifyMessage(input.address.trim(), input.signature.trim(), input.message);
+          const valid = await verifyMessage(input.address, input.signature, input.message);
           return Response.json({ valid: valid === true });
-        } catch {
-            validateAddress = {
-              error: error instanceof Error ? error.message : String(error),
-            };
-          }
-
-          return Response.json({
-            ok: true,
-            verifyResult,
-            address: trimmedAddress,
-            message: trimmedMessage,
-            signature: {
-              length: trimmedSignature.length,
-              bytes: base64Bytes.length,
-              headerByte: base64Bytes[0] ?? null,
-            },
-            validateAddress,
-          });
         } catch {
           // No node or validation details leave the server.
           return Response.json({ valid: false, error: "Invalid request" }, { status: 400 });
