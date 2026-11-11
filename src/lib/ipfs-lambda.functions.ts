@@ -223,8 +223,14 @@ async function probeIpfsLambdaHealth() {
         reason: err instanceof Error ? err.message : String(err),
       };
     }
-  },
-);
+  }
+}
+
+/** Public probe: reports only whether the pinning service answered. */
+export const ipfsLambdaHealth = createServerFn({ method: "GET" }).handler(async () => {
+  const result = await probeIpfsLambdaHealth();
+  return { ok: result.ok };
+});
 
 /**
  * Kick off an asynchronous HLS-bundle pin on the IPFS Lambda. Returns
