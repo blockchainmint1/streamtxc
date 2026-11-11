@@ -14,6 +14,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { optionalWalletSession } from "./wallet-auth.functions";
 import { transcodeAllowed, isValidCid, type TranscodeGuardRow } from "./transcode-guard";
+import { publicJobSummary, publicTranscodeError } from "./audit-access-rules";
 
 async function assertTranscodeAllowed(cid: string, wallet: string | null, requireRow: boolean) {
   if (!isValidCid(cid)) throw new Error("Invalid cid");
@@ -118,15 +119,17 @@ export const getTranscodeUploadUrl = createServerFn({ method: "POST" })
  * `{ exists: true, key, bucket, size, contentType }` when present.
  */
 export const checkS3InputExists = createServerFn({ method: "POST" })
+  .middleware([optionalWalletSession])
   .inputValidator((d: { cid: string }) => {
     if (!d.cid || typeof d.cid !== "string" || d.cid.length > 200) {
       throw new Error("Invalid cid");
     }
     return d;
   })
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const e = transcodeEnv();
     if (!e.inputBucket) return { exists: false as const };
+    await assertTranscodeAllowed(data.cid, context.wallet, false);
     const { headObject } = await import("./aws-s3.server");
     const key = `inputs/${data.cid}`;
     const meta = await headObject(e.inputBucket, key);
@@ -182,19 +185,23 @@ export const startTranscode = createServerFn({ method: "POST" })
   });
 
 export const getTranscodeStatus = createServerFn({ method: "GET" })
+  .middleware([optionalWalletSession])
   .inputValidator((d: { cid: string }) => {
     if (!d.cid || d.cid.length > 200) throw new Error("Invalid cid");
     return d;
   })
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin
       .from("videos")
-      .select("transcode_status, transcode_job_id, transcode_error, transcode_started_at, hls_cid, renditions")
+      .select("owner_wallet, transcode_status, transcode_job_id, transcode_error, transcode_started_at, hls_cid, renditions")
       .eq("cid", data.cid)
       .maybeSingle();
-    if (error) throw error;
-    return row ?? null;
+    if (error) throw new Error("Status unavailable");
+    if (!row) return null;
+    const { owner_wallet, ...rest } = row;
+    const isOwner = !!owner_wallet && !!context.wallet && owner_wallet === context.wallet;
+    return { ...rest, transcode_error: publicTranscodeError(row.transcode_error, isOwner) };
   });
 
 
@@ -204,8 +211,21 @@ export const getMediaConvertJob = createServerFn({ method: "POST" })
     return d;
   })
   .handler(async ({ data }) => {
+    // Only jobs that belong to one of our videos; only progress is returned.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await supabaseAdmin
+      .from("videos")
+      .select("cid")
+      .eq("transcode_job_id", data.jobId)
+      .limit(1)
+      .maybeSingle();
+    if (!row) throw new Error("Job not found");
     const { describeJob } = await import("./aws-mediaconvert.server");
-    return await describeJob(data.jobId);
+    try {
+      return publicJobSummary(await describeJob(data.jobId));
+    } catch {
+      throw new Error("Job status unavailable");
+    }
   });
 
 

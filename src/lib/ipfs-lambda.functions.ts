@@ -55,10 +55,6 @@ export const isIpfsLambdaConfigured = createServerFn({ method: "GET" }).handler(
             process.env.AWS_ACCESS_KEY_ID &&
             process.env.AWS_REGION)),
     ),
-    gateway: process.env.IPFS_GATEWAY_DOMAIN ?? null,
-    transport: process.env.IPFS_LAMBDA_NAME && process.env.AWS_ACCESS_KEY_ID
-      ? "direct-invoke"
-      : "api-gateway",
   }),
 );
 
@@ -173,8 +169,8 @@ export async function callPinLambda(
  * Health probe — calls `GET /health` on the Lambda. Useful to surface
  * "node not reachable" in the UI before kicking off a long upload.
  */
-export const ipfsLambdaHealth = createServerFn({ method: "GET" }).handler(
-  async () => {
+async function probeIpfsLambdaHealth() {
+  {
     const fnName = process.env.IPFS_LAMBDA_NAME;
     if (fnName && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_REGION) {
       try {
