@@ -14,7 +14,7 @@ export const Route = createFileRoute("/api/public/txc-verify-message")({
       POST: async ({ request }) => {
         try {
           const input = schema.parse(await request.json());
-          const valid = await verifyMessage(input.address, input.signature, input.message);
+          const valid = await verifyMessage(input.address, input.signature, input.message).catch(() => false);
           return Response.json({ valid: valid === true });
         } catch {
           // No node or validation details leave the server.
