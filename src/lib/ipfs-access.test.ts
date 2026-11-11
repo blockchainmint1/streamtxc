@@ -1,6 +1,6 @@
 /// <reference types="bun" />
 import { afterEach, expect, test } from "bun:test";
-import { fetchGateway, pinFileToIPFS, withGatewayKey } from "./ipfs.server";
+import { fetchGateway, pinFileToIPFS, withGatewayKey, serveGateway } from "./ipfs.server";
 
 const originalFetch = globalThis.fetch;
 const originalRead = process.env.IPFS_READ_KEY;
@@ -53,4 +53,22 @@ test("downloads never follow redirects, using a mode Cloudflare supports", async
   const res = await fetchGateway("https://node.ipfs.honest.money/ipfs/fixture");
   expect(mode).toBe("manual");
   expect(res.status).toBe(502);
+});
+
+test("HTML user files are downloaded inertly and cannot execute on the site", async () => {
+  globalThis.fetch = (async () => new Response("<script>localStorage.clear()</script>", { headers: { "content-type": "text/html; charset=utf-8" } })) as typeof fetch;
+  const res = await serveGateway("https://node.ipfs.honest.money/ipfs/fixture", new Request("https://streamtxc.com/api/stream/fixture"), "no-store");
+  expect(res.headers.get("content-type")).toBe("application/octet-stream");
+  expect(res.headers.get("content-disposition")).toBe("attachment");
+  expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+  expect(res.headers.get("content-security-policy")).toContain("sandbox;");
+});
+test("normal video ranges still stream with protection and no credentials", async () => {
+  globalThis.fetch = (async () => new Response("segment", { status: 206, headers: { "content-type": "video/mp4", "content-range": "bytes 0-6/100", "set-cookie": "private=value" } })) as typeof fetch;
+  const res = await serveGateway("https://node.ipfs.honest.money/ipfs/fixture", new Request("https://streamtxc.com/api/stream/fixture"), "no-store");
+  expect(res.status).toBe(206);
+  expect(res.headers.get("content-type")).toBe("video/mp4");
+  expect(res.headers.get("content-range")).toBe("bytes 0-6/100");
+  expect(res.headers.get("set-cookie")).toBeNull();
+  expect(await res.text()).toBe("segment");
 });

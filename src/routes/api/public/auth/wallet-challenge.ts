@@ -57,12 +57,15 @@ export const Route = createFileRoute("/api/public/auth/wallet-challenge")({
           domain,
           issuedAt: data.created_at ?? new Date().toISOString(),
         });
+        const { issueWalletBrowserProof } = await import("@/lib/wallet-auth.server");
+        const browserProof = await issueWalletBrowserProof(data.id, data.expires_at);
 
         void supabaseAdmin.rpc("purge_expired_wallet_challenges");
 
         return Response.json(
           {
             id: data.id,
+            browser_proof: browserProof,
             nonce: data.nonce,
             expires_at: data.expires_at,
             message,

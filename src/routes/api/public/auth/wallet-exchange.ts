@@ -1,7 +1,7 @@
 // Step 4: swap the one-time token for a normal streamTXC wallet session token.
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { issueSessionToken } from "@/lib/wallet-auth.server";
+import { issueSessionToken, verifyWalletBrowserProof } from "@/lib/wallet-auth.server";
 
 const CORS = {
   "access-control-allow-origin": "*",
@@ -12,6 +12,7 @@ const CORS = {
 const bodySchema = z.object({
   id: z.string().uuid(),
   token: z.string().min(32).max(128),
+  browser_proof: z.string().min(32).max(1000),
 });
 
 function safeEqual(a: string, b: string): boolean {
@@ -43,6 +44,10 @@ export const Route = createFileRoute("/api/public/auth/wallet-exchange")({
           );
         }
 
+        if (!await verifyWalletBrowserProof(parsed.data.browser_proof, parsed.data.id)) {
+          return Response.json({ error: "Browser proof required" }, { status: 403, headers: { ...CORS, "cache-control": "no-store" } });
+        }
+
         const { supabaseAdmin } = await import(
           "@/integrations/supabase/client.server"
         );
@@ -59,6 +64,7 @@ export const Route = createFileRoute("/api/public/auth/wallet-exchange")({
           );
         }
         if (
+          new Date(ch.expires_at).getTime() <= Date.now() ||
           ch.status !== "signed" ||
           !ch.one_time_token ||
           !ch.wallet_address ||

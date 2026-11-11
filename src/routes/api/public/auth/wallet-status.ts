@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 const CORS = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET, OPTIONS",
-  "access-control-allow-headers": "content-type",
+  "access-control-allow-headers": "content-type, x-wallet-browser-proof",
 } as const;
 
 export const Route = createFileRoute("/api/public/auth/wallet-status")({
@@ -19,6 +19,11 @@ export const Route = createFileRoute("/api/public/auth/wallet-status")({
             { error: "invalid id" },
             { status: 400, headers: CORS },
           );
+        }
+
+        const { verifyWalletBrowserProof } = await import("@/lib/wallet-auth.server");
+        if (!await verifyWalletBrowserProof(request.headers.get("x-wallet-browser-proof"), id)) {
+          return Response.json({ error: "Browser proof required" }, { status: 403, headers: { ...CORS, "cache-control": "no-store" } });
         }
 
         const { supabaseAdmin } = await import(
@@ -40,7 +45,6 @@ export const Route = createFileRoute("/api/public/auth/wallet-status")({
         const headers = { ...CORS, "cache-control": "no-store" };
 
         if (
-          data.status === "pending" &&
           new Date(data.expires_at).getTime() < Date.now()
         ) {
           return Response.json({ status: "expired" }, { headers });

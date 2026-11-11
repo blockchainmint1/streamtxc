@@ -172,3 +172,15 @@ export async function verifyHmLinkToken(token: string): Promise<HmLinkClaims | n
   if (!c || c.kind !== "hm-link") return null;
   return c;
 }
+
+// Only the requesting browser receives this proof; never include it in a QR.
+export async function issueWalletBrowserProof(challengeId: string, expiresAt: string): Promise<string> {
+  return sign({ kind: "wallet-browser", challengeId, exp: Math.floor(new Date(expiresAt).getTime() / 1000) });
+}
+
+export async function verifyWalletBrowserProof(token: string | null, challengeId: string): Promise<boolean> {
+  if (!token) return false;
+  const claims = await verify<{ kind: string; challengeId: string; exp: number }>(token);
+  return claims?.kind === "wallet-browser" && claims.challengeId === challengeId &&
+    typeof claims.exp === "number" && claims.exp > Math.floor(Date.now() / 1000);
+}
