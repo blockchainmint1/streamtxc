@@ -313,3 +313,22 @@ export async function abortMultipartUpload(opts: {
   const url = `${s3Host(opts.bucket)}/${encodeKey(opts.key)}?uploadId=${encodeURIComponent(opts.uploadId)}`;
   await client.fetch(url, { method: "DELETE" }).catch(() => {});
 }
+/** Short-lived download/playback link for a private object (never stored, never public). */
+export async function createPresignedGetUrl(opts: {
+  bucket: string;
+  key: string;
+  expiresSeconds?: number;
+  downloadName?: string;
+}): Promise<string> {
+  const client = s3Client();
+  const url = new URL(`${s3Host(opts.bucket)}/${encodeKey(opts.key)}`);
+  url.searchParams.set("X-Amz-Expires", String(opts.expiresSeconds ?? 3600));
+  if (opts.downloadName) {
+    url.searchParams.set(
+      "response-content-disposition",
+      `attachment; filename="${opts.downloadName.replace(/[^A-Za-z0-9 ._-]/g, "")}"`,
+    );
+  }
+  const signed = await client.sign(new Request(url.toString(), { method: "GET" }), { aws: { signQuery: true } });
+  return signed.url;
+}
