@@ -43,6 +43,13 @@
       "when": 1794056277585,
       "tag": "0005_historical_chain_record_repairs",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794670389818,
+      "tag": "0006_meeting_rooms",
+      "breakpoints": true
     }
   ]
 }

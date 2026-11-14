@@ -24,6 +24,8 @@ import { Route as UploadAwsRouteImport } from './routes/upload-aws'
 import { Route as EmbedCidRouteImport } from './routes/embed.$cid'
 import { Route as LiveIndexRouteImport } from './routes/live.index'
 import { Route as LiveStreamIdRouteImport } from './routes/live.$streamId'
+import { Route as MeetIndexRouteImport } from './routes/meet.index'
+import { Route as MeetCodeRouteImport } from './routes/meet.$code'
 import { Route as UWalletRouteImport } from './routes/u.$wallet'
 import { Route as VCidRouteImport } from './routes/v.$cid'
 import { Route as ApiPublicImportStreamRouteImport } from './routes/api/public/import-stream'
@@ -129,6 +131,16 @@ const LiveIndexRoute = LiveIndexRouteImport.update({
 const LiveStreamIdRoute = LiveStreamIdRouteImport.update({
   id: '/live/$streamId',
   path: '/live/$streamId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MeetIndexRoute = MeetIndexRouteImport.update({
+  id: '/meet/',
+  path: '/meet/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MeetCodeRoute = MeetCodeRouteImport.update({
+  id: '/meet/$code',
+  path: '/meet/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UWalletRoute = UWalletRouteImport.update({
@@ -321,9 +333,11 @@ export interface FileRoutesByFullPath {
   '/upload-aws': typeof UploadAwsRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/live/$streamId': typeof LiveStreamIdRoute
+  '/meet/$code': typeof MeetCodeRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
   '/live/': typeof LiveIndexRoute
+  '/meet/': typeof MeetIndexRoute
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
@@ -369,9 +383,11 @@ export interface FileRoutesByTo {
   '/upload-aws': typeof UploadAwsRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/live/$streamId': typeof LiveStreamIdRoute
+  '/meet/$code': typeof MeetCodeRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
   '/live': typeof LiveIndexRoute
+  '/meet': typeof MeetIndexRoute
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
@@ -418,9 +434,11 @@ export interface FileRoutesById {
   '/upload-aws': typeof UploadAwsRoute
   '/embed/$cid': typeof EmbedCidRoute
   '/live/$streamId': typeof LiveStreamIdRoute
+  '/meet/$code': typeof MeetCodeRoute
   '/u/$wallet': typeof UWalletRoute
   '/v/$cid': typeof VCidRouteWithChildren
   '/live/': typeof LiveIndexRoute
+  '/meet/': typeof MeetIndexRoute
   '/api/public/import-stream': typeof ApiPublicImportStreamRoute
   '/api/public/txc-health': typeof ApiPublicTxcHealthRoute
   '/api/public/txc-verify-message': typeof ApiPublicTxcVerifyMessageRoute
@@ -468,9 +486,11 @@ export interface FileRouteTypes {
     | '/upload-aws'
     | '/embed/$cid'
     | '/live/$streamId'
+    | '/meet/$code'
     | '/u/$wallet'
     | '/v/$cid'
     | '/live/'
+    | '/meet/'
     | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
@@ -516,9 +536,11 @@ export interface FileRouteTypes {
     | '/upload-aws'
     | '/embed/$cid'
     | '/live/$streamId'
+    | '/meet/$code'
     | '/u/$wallet'
     | '/v/$cid'
     | '/live'
+    | '/meet'
     | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
@@ -564,9 +586,11 @@ export interface FileRouteTypes {
     | '/upload-aws'
     | '/embed/$cid'
     | '/live/$streamId'
+    | '/meet/$code'
     | '/u/$wallet'
     | '/v/$cid'
     | '/live/'
+    | '/meet/'
     | '/api/public/import-stream'
     | '/api/public/txc-health'
     | '/api/public/txc-verify-message'
@@ -613,9 +637,11 @@ export interface RootRouteChildren {
   UploadAwsRoute: typeof UploadAwsRoute
   EmbedCidRoute: typeof EmbedCidRoute
   LiveStreamIdRoute: typeof LiveStreamIdRoute
+  MeetCodeRoute: typeof MeetCodeRoute
   UWalletRoute: typeof UWalletRoute
   VCidRoute: typeof VCidRouteWithChildren
   LiveIndexRoute: typeof LiveIndexRoute
+  MeetIndexRoute: typeof MeetIndexRoute
   EmbedLiveStreamIdRoute: typeof EmbedLiveStreamIdRoute
   EmbedLiveByWalletWalletRoute: typeof EmbedLiveByWalletWalletRoute
 }
@@ -725,6 +751,20 @@ declare module '@tanstack/react-router' {
       path: '/live/$streamId'
       fullPath: '/live/$streamId'
       preLoaderRoute: typeof LiveStreamIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/meet/': {
+      id: '/meet/'
+      path: '/meet'
+      fullPath: '/meet/'
+      preLoaderRoute: typeof MeetIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/meet/$code': {
+      id: '/meet/$code'
+      path: '/meet/$code'
+      fullPath: '/meet/$code'
+      preLoaderRoute: typeof MeetCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/u/$wallet': {
@@ -1044,9 +1084,11 @@ const rootRouteChildren: RootRouteChildren = {
   UploadAwsRoute: UploadAwsRoute,
   EmbedCidRoute: EmbedCidRoute,
   LiveStreamIdRoute: LiveStreamIdRoute,
+  MeetCodeRoute: MeetCodeRoute,
   UWalletRoute: UWalletRoute,
   VCidRoute: VCidRouteWithChildren,
   LiveIndexRoute: LiveIndexRoute,
+  MeetIndexRoute: MeetIndexRoute,
   EmbedLiveStreamIdRoute: EmbedLiveStreamIdRoute,
   EmbedLiveByWalletWalletRoute: EmbedLiveByWalletWalletRoute,
 }

@@ -14,3 +14,6 @@
 - [ ] M-7 no site-wide browser security headers (clickjacking etc.)
 - [ ] M-10 email verification link returned to caller, no rate limit
 - [x] M-11 diagnostic tools now return only status/progress; raw errors owner-only; tests added
+# Team meetings (/meet)
+- [x] Build /meet host page, team link + view-only link, meeting screen (mic, camera, screen share, leave, end for all), send-to-live-stream button; 6 link-rule tests pass.
+- [ ] Live meeting test with real audio/video. Blocker: AWS user `streamtxc` lacks Chime permission — Bobby must run the CloudShell command.
