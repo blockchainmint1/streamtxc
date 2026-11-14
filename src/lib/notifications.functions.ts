@@ -7,6 +7,7 @@ import { z } from "zod";
 import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireWalletSession } from "./wallet-auth.functions";
+import { emailSendDecision } from "./security-limits";
 
 const TABLE = "wallet_notification_prefs";
 
@@ -91,6 +92,30 @@ export const setWalletEmail = createServerFn({ method: "POST" })
         );
       return { ok: true, email: null, sent: false };
     }
+    // Limit how often one wallet can trigger verification emails so nobody
+    // can use us to flood someone's inbox.
+    const { data: prev } = await (supabaseAdmin as any)
+      .from(TABLE)
+      .select("email_verify_last_sent_at, email_verify_window_start, email_verify_send_count")
+      .eq("wallet", wallet)
+      .maybeSingle();
+    const decision = emailSendDecision(
+      {
+        lastSentAt: prev?.email_verify_last_sent_at ?? null,
+        windowStart: prev?.email_verify_window_start ?? null,
+        count: prev?.email_verify_send_count ?? 0,
+      },
+      Date.now(),
+    );
+    if (!decision.ok) {
+      const mins = Math.ceil(decision.retryInSec / 60);
+      throw new Error(
+        decision.retryInSec <= 60
+          ? `Please wait ${decision.retryInSec} seconds before sending another verification email.`
+          : `You've sent the most verification emails allowed for today. Try again in about ${mins >= 60 ? `${Math.ceil(mins / 60)} hours` : `${mins} minutes`}.`,
+      );
+    }
+
     const token = randomBytes(24).toString("base64url");
     const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     const { error } = await (supabaseAdmin as any).from(TABLE).upsert(
@@ -100,6 +125,9 @@ export const setWalletEmail = createServerFn({ method: "POST" })
         email_verify_token: token,
         email_verify_expires_at: expires,
         email_verified_at: null,
+        email_verify_last_sent_at: decision.next.lastSentAt,
+        email_verify_window_start: decision.next.windowStart,
+        email_verify_send_count: decision.next.count,
       },
       { onConflict: "wallet" },
     );
@@ -115,15 +143,14 @@ export const setWalletEmail = createServerFn({ method: "POST" })
       templateData: { wallet, verifyLink },
       idempotencyKey: `verify-${wallet}-${token.slice(0, 8)}`,
     });
+    // The link only ever goes to the inbox — never back to the browser —
+    // so nobody can "verify" an address they don't control.
     return {
       ok: true,
       email: data.email,
       sent: send.ok,
       skipped: send.skipped,
-      error: send.error,
-      // Surface the link in dev/preview so the user can verify even before
-      // the email-domain is fully wired up.
-      devLink: send.ok ? undefined : verifyLink,
+      error: send.ok ? undefined : "We couldn't send the email right now. Try again in a few minutes.",
     };
   });
 

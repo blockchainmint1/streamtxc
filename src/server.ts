@@ -3,6 +3,7 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { runWithCfCtx } from "./lib/cf-context.server";
+import { securityHeadersFor } from "./lib/security-limits";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -67,15 +68,40 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   return brandedErrorResponse();
 }
 
+// Adds the baseline browser protections without overriding stricter headers a
+// route already set (media responses carry their own sandbox policy).
+function withSecurityHeaders(response: Response, request: Request): Response {
+  let pathname = "/";
+  try {
+    pathname = new URL(request.url).pathname;
+  } catch {
+    /* keep default */
+  }
+  const extra = securityHeadersFor(pathname);
+  let out = response;
+  try {
+    for (const [k, v] of Object.entries(extra)) {
+      if (!out.headers.has(k)) out.headers.set(k, v);
+    }
+  } catch {
+    // Immutable headers (e.g. a passed-through fetch response): copy once.
+    out = new Response(response.body, response);
+    for (const [k, v] of Object.entries(extra)) {
+      if (!out.headers.has(k)) out.headers.set(k, v);
+    }
+  }
+  return out;
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
       const response = await runWithCfCtx(ctx, () => handler.fetch(request, env, ctx));
-      return await normalizeCatastrophicSsrResponse(response);
+      return withSecurityHeaders(await normalizeCatastrophicSsrResponse(response), request);
     } catch (error) {
       console.error(error);
-      return brandedErrorResponse();
+      return withSecurityHeaders(brandedErrorResponse(), request);
     }
   },
 };

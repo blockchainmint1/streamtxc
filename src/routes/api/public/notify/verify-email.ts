@@ -3,6 +3,7 @@
 // nice confirmation in their browser.
 
 import { createFileRoute } from "@tanstack/react-router";
+import { escapeHtml } from "@/lib/security-limits";
 
 function htmlPage(title: string, body: string, ok: boolean) {
   const color = ok ? "#16a34a" : "#dc2626";
@@ -17,7 +18,7 @@ function htmlPage(title: string, body: string, ok: boolean) {
   p{font-size:14px;line-height:1.6;color:#a3a3a3}
   a{color:#60a5fa}
 </style></head><body><div class="box"><h1>${title}</h1>${body}</div></body></html>`,
-    { status: ok ? 200 : 400, headers: { "Content-Type": "text/html; charset=utf-8" } },
+    { status: ok ? 200 : 400, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } },
   );
 }
 
@@ -48,7 +49,7 @@ export const Route = createFileRoute("/api/public/notify/verify-email")({
         if (row.email_verified_at) {
           return htmlPage(
             "Already verified",
-            `<p>${row.email} is already verified for this wallet. <a href="/manage">Back to Manage</a>.</p>`,
+            `<p>${escapeHtml(String(row.email ?? ""))} is already verified for this wallet. <a href="/manage">Back to Manage</a>.</p>`,
             true,
           );
         }
@@ -71,11 +72,12 @@ export const Route = createFileRoute("/api/public/notify/verify-email")({
           })
           .eq("wallet", row.wallet);
         if (error) {
-          return htmlPage("Server error", `<p>${error.message}</p>`, false);
+          console.error("[verify-email] update failed", error.message);
+          return htmlPage("Server error", "<p>Something went wrong. Please try the link again in a minute.</p>", false);
         }
         return htmlPage(
           "Verified",
-          `<p>${row.email} is now verified for wallet <code>${row.wallet}</code>. You'll get expiry alerts here.</p><p><a href="/manage">Back to Manage</a></p>`,
+          `<p>${escapeHtml(String(row.email ?? ""))} is now verified for wallet <code>${escapeHtml(String(row.wallet))}</code>. You'll get expiry alerts here.</p><p><a href="/manage">Back to Manage</a></p>`,
           true,
         );
       },
