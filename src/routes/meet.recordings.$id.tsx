@@ -82,8 +82,10 @@ function RecordingView() {
       await fn();
       if (ok) toast.success(ok);
       await qc.invalidateQueries({ queryKey: key });
+      return true;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong.");
+      return false;
     } finally {
       setBusy(null);
     }
@@ -241,7 +243,7 @@ function RecordingView() {
           variant="ghost" size="sm" className="text-destructive" disabled={!!busy}
           onClick={() => {
             if (confirm("Delete this recording, transcript and notes for good? A video already on your channel stays there.")) {
-              void act("del", () => del({ data: { id } }), "Recording deleted.").then(() => navigate({ to: "/meet" }));
+              void act("del", () => del({ data: { id } }), "Recording deleted.").then((ok) => { if (ok) void navigate({ to: "/meet" }); });
             }
           }}
         >
