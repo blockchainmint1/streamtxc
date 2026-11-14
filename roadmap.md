@@ -10,7 +10,7 @@
 - [x] M-1 Dropbox shortcut imports must be real Dropbox https links (tested)
 - [x] M-2 chat requires sign-in; comments/boosts credit only the signed-in wallet, else "anon"
 - [x] M-3 new channels get random keys; "Make a new stream key" button; no auto-created open groups
-- [ ] M-3 follow-up: replace Bobby's and TsNCJ…'s old "primary" keys. Blocker: Bobby must run the AWS command (adds key-change permission), then press the button and update StreamYard.
+- [ ] M-3 follow-up: replace Bobby's and TsNCJ…'s old "primary" keys. AWS permission done + tested. Waiting on Bobby: press the button on a non-stream day, update StreamYard.
 - [x] M-5 own SESSION_SECRET, server-side sessions (sign-out cancels, "Sign out everywhere"), import tokens off the service key, admin wallet in one place; revocation tested against the database
 - [x] M-7 site-wide headers (anti-framing except /embed, nosniff, referrer, HSTS); full script CSP / hm.js pinning not done (hm.js updates itself)
 - [x] M-10 link never returned, 1/min and 5/day per wallet, verify page escaped
