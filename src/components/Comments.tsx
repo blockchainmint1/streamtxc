@@ -532,7 +532,7 @@ function CommentItem({
           </div>
 
           {open && (
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-end">
               <div>
                 <Label className="font-mono text-[10px]">Amount (TXC)</Label>
                 <input

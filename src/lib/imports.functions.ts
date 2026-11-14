@@ -5,6 +5,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { resolveImport } from "./import-sources.server";
 import { signImportToken, IMPORT_MAX_BYTES } from "./imports.server";
+import { isDropboxDirectUrl } from "./security-limits";
 
 export const getDropboxAppKey = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -34,6 +35,11 @@ export const resolveImportUrl = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data }) => {
+    // The Chooser shortcut skips the resolver, so it must still be a real
+    // Dropbox download link — never an arbitrary URL.
+    if (data.prefetched && !isDropboxDirectUrl(data.url)) {
+      throw new Error("That Dropbox link doesn't come from Dropbox. Pick the file again.");
+    }
     const resolved = data.prefetched
       ? {
           source: data.prefetched.source,
