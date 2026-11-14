@@ -58,6 +58,7 @@ import { CheckCircle2, Film, Clock, ArrowUp, ArrowDown, ChevronsUpDown } from "l
 import { Captions } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationPrefs } from "@/components/NotificationPrefs";
+import { MeetingRoomsManager } from "@/components/meet/HostPanel";
 import { BranchSharePanel } from "@/components/BranchSharePanel";
 import { listBugReports } from "@/lib/bug-reports.functions";
 import {
@@ -853,6 +854,7 @@ function ManagePageInner() {
         {address && <LiveEligibilityAdminSection wallet={address} />}
         {address && <GoLiveAdminSection wallet={address} />}
         {address && <MyGoLiveSection wallet={address} />}
+        {address && <ConferenceSection />}
       </main>
       <Footer />
     </div>
@@ -860,6 +862,24 @@ function ManagePageInner() {
 }
 
 const ADMIN_WALLET = "TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m";
+
+// Conference — the same meeting rooms as /meet: make named rooms, edit them,
+// copy their team / view-only links and join.
+function ConferenceSection() {
+  return (
+    <section id="conference" className="mt-16 border-t border-border pt-8 scroll-mt-20">
+      <div className="font-mono text-xs text-primary mb-3">[ CONFERENCE ]</div>
+      <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
+        <Video className="h-5 w-5" /> Conference
+      </h2>
+      <p className="text-sm text-muted-foreground mb-6 max-w-2xl">
+        Your video meeting rooms. Each room has its own team link (talk, camera, screen share) and view-only link
+        (watch and listen). Create a room for each meeting you run, rename it any time, and hit Join to open it.
+      </p>
+      <MeetingRoomsManager />
+    </section>
+  );
+}
 
 function LiveEligibilityAdminSection({ wallet }: { wallet: string }) {
   const listFn = useServerFn(listLiveEligibleWallets);
