@@ -235,13 +235,11 @@ export async function processRecording(rec: RecordingRow): Promise<string> {
   const files = await finishedFiles(rec);
   const haveVideo = !rec.record_video || !!files.video;
   const haveTranscript = !rec.take_notes || !!files.transcript;
-  const stillWorking = concatStatus === "InProgress" || concatStatus === "Initializing" || concatStatus === "Stopping" || concatStatus === "NotStarted";
   const endedMs = Date.parse(rec.ended_at ?? rec.started_at);
   const timedOut = Date.now() - endedMs > PROCESSING_TIMEOUT_MS;
-
-  if ((!haveVideo || !haveTranscript) && (stillWorking || !timedOut) && concatStatus !== "Failed") {
-    return "waiting";
-  }
+  // AWS finished joining (or gave up) → use whatever files exist.
+  const done = concatStatus === "Stopped" || concatStatus === "Failed" || concatStatus === null || timedOut;
+  if ((!haveVideo || !haveTranscript) && !done) return "waiting";
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (files.video) {
     patch.video_key = files.video.key;
