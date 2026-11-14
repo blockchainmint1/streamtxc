@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+/// <reference types="bun" />
+import { describe, expect, it } from "bun:test";
 import { clockLabel, parseChimeTranscript, recordingMinuteUsd, transcriptToText } from "./meeting-rules";
 
 describe("recording & notes pricing (about 10x AWS cost)", () => {
