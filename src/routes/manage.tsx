@@ -53,6 +53,7 @@ import {
   Eye,
   EyeOff,
   CloudUpload,
+  Video,
 } from "lucide-react";
 import { CheckCircle2, Film, Clock, ArrowUp, ArrowDown, ChevronsUpDown } from "lucide-react";
 import { Captions } from "lucide-react";
