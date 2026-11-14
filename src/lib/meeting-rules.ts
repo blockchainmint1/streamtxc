@@ -112,3 +112,111 @@ export function needsApproval(
 export function cleanRoomTitle(raw: string): string {
   return raw.normalize("NFKC").replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim().slice(0, 80);
 }
+
+// ---------- Recording & meeting notes (about 10x our AWS cost) ----------
+// Video: 1080p composited capture $0.0125/min + joining the 5-second pieces
+// into one file (video + audio, $0.002/min each).
+export const AWS_USD_PER_VIDEO_RECORD_MINUTE = 0.0165;
+// Notes: Amazon Transcribe live $0.024/min + joining the transcript pieces $0.002/min.
+export const AWS_USD_PER_NOTES_MINUTE = 0.026;
+// Notes without video still need the meeting's sound captured: $0.0017 + $0.002 to join.
+export const AWS_USD_PER_AUDIO_CAPTURE_MINUTE = 0.0037;
+/** Private recordings are kept this long; the transcript and notes are kept forever. */
+export const RECORDING_KEEP_DAYS = 90;
+
+/** What one minute of recording and/or notes costs the host, in USD. */
+export function recordingMinuteUsd(video: boolean, notes: boolean): number {
+  let aws = 0;
+  if (video) aws += AWS_USD_PER_VIDEO_RECORD_MINUTE;
+  if (notes) aws += AWS_USD_PER_NOTES_MINUTE;
+  if (notes && !video) aws += AWS_USD_PER_AUDIO_CAPTURE_MINUTE;
+  return +(aws * MEETING_MARKUP).toFixed(6);
+}
+
+export interface TranscriptLine {
+  /** Milliseconds from the start of the recording. */
+  atMs: number;
+  speaker: string;
+  text: string;
+}
+
+function pick(o: any, ...keys: string[]): any {
+  for (const k of keys) if (o && o[k] !== undefined && o[k] !== null) return o[k];
+  return undefined;
+}
+
+/** Splits the joined transcript file into JSON objects (one per line, or glued together). */
+function transcriptObjects(raw: string): any[] {
+  const out: any[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const s = line.trim();
+    if (!s) continue;
+    try {
+      out.push(JSON.parse(s));
+    } catch {
+      for (const part of s.replace(/}\s*{/g, "}\n{").split("\n")) {
+        try { out.push(JSON.parse(part)); } catch { /* skip a damaged piece */ }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Turns Amazon's live-transcription file into "who said what" lines.
+ * Only final (not partial) results count; each result is credited to whoever
+ * spoke most of its words, and back-to-back lines by the same person are merged.
+ */
+export function parseChimeTranscript(raw: string, recordingStartMs: number): TranscriptLine[] {
+  const finals = new Map<string, { start: number; speaker: string; text: string }>();
+  for (const obj of transcriptObjects(raw)) {
+    const t = pick(obj, "transcript", "Transcript");
+    const results: any[] = pick(t, "results", "Results") ?? [];
+    for (const r of results) {
+      if (pick(r, "isPartial", "IsPartial") !== false) continue;
+      const alt = (pick(r, "alternatives", "Alternatives") ?? [])[0];
+      const text = String(pick(alt, "transcript", "Transcript") ?? "").trim();
+      if (!text) continue;
+      const votes = new Map<string, number>();
+      for (const it of pick(alt, "items", "Items") ?? []) {
+        const att = pick(it, "attendee", "Attendee") ?? {};
+        const ext = pick(att, "externalUserId", "ExternalUserId") ?? pick(it, "speakerExternalUserId", "SpeakerExternalUserId");
+        if (!ext) continue;
+        const name = decodeExternalUserId(ext).name;
+        votes.set(name, (votes.get(name) ?? 0) + 1);
+      }
+      const speaker = [...votes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Someone";
+      const start = Number(pick(r, "startTimeMs", "StartTimeMs", "startTime", "StartTime") ?? 0);
+      const id = String(pick(r, "resultId", "ResultId") ?? `${start}-${text.slice(0, 20)}`);
+      finals.set(id, { start, speaker, text });
+    }
+  }
+  const sorted = [...finals.values()].sort((a, b) => a.start - b.start);
+  // Amazon's times are wall-clock milliseconds; older payloads use seconds from the start.
+  const base = sorted.length && sorted[0].start > 1e12 ? recordingStartMs : 0;
+  const scale = sorted.length && sorted[sorted.length - 1].start < 1e7 && sorted.some((s) => s.start % 1 !== 0) ? 1000 : 1;
+  const lines: TranscriptLine[] = [];
+  for (const s of sorted) {
+    const atMs = Math.max(0, Math.round(s.start * scale - base));
+    const last = lines[lines.length - 1];
+    if (last && last.speaker === s.speaker && atMs - last.atMs < 60_000) {
+      last.text = `${last.text} ${s.text}`;
+    } else {
+      lines.push({ atMs, speaker: s.speaker, text: s.text });
+    }
+  }
+  return lines;
+}
+
+export function clockLabel(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = String(s % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
+}
+
+/** Plain-text transcript: "[12:05] Bobby: text". */
+export function transcriptToText(lines: TranscriptLine[]): string {
+  return lines.map((l) => `[${clockLabel(l.atMs)}] ${l.speaker}: ${l.text}`).join("\n");
+}
