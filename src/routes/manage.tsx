@@ -60,6 +60,8 @@ import { Captions } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationPrefs } from "@/components/NotificationPrefs";
 import { MeetingRoomsManager } from "@/components/meet/HostPanel";
+import { SignInSecuritySection } from "@/components/SignInSecurity";
+import { ADMIN_WALLET } from "@/lib/admin";
 import { BranchSharePanel } from "@/components/BranchSharePanel";
 import { listBugReports } from "@/lib/bug-reports.functions";
 import {
@@ -856,13 +858,13 @@ function ManagePageInner() {
         {address && <GoLiveAdminSection wallet={address} />}
         {address && <MyGoLiveSection wallet={address} />}
         {address && <ConferenceSection />}
+        {address && <SignInSecuritySection />}
       </main>
       <Footer />
     </div>
   );
 }
 
-const ADMIN_WALLET = "TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m";
 
 // Conference — the same meeting rooms as /meet: make named rooms, edit them,
 // copy their team / view-only links and join.

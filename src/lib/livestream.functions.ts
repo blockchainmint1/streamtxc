@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireWalletSession } from "./wallet-auth.functions";
 
-const ADMIN_WALLET = "TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m";
+import { ADMIN_WALLET } from "./admin";
 
 function assertAdmin(wallet: string | null | undefined) {
   if (!wallet || wallet !== ADMIN_WALLET) throw new Error("Forbidden");

@@ -26,7 +26,7 @@ import {
   RECORDING_KEEP_DAYS,
 } from "./meeting-rules";
 
-const ADMIN_WALLET = "TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m";
+import { ADMIN_WALLET } from "./admin";
 
 type Room = {
   id: string;
