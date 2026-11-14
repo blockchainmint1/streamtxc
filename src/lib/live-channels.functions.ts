@@ -6,6 +6,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireWalletSession } from "./wallet-auth.functions";
+import { newStreamKey, isWeakStreamKey } from "./security-limits";
 
 function parseRtmp(fullUrl: string): { serverUrl: string; streamKey: string } {
   const m = fullUrl.match(/^(rtmps?:\/\/[^/]+\/[^/]+)\/([^/?#]+)$/i);
@@ -59,6 +60,7 @@ export const getMyLiveChannel = createServerFn({ method: "POST" })
       status: row.status,
       rtmpUrl: row.rtmp_url,
       streamKey: row.stream_key,
+      weakStreamKey: isWeakStreamKey(row.stream_key),
       hlsUrl: row.hls_url,
       medialiveChannelId: row.medialive_channel_id,
       lastUsedAt: row.last_used_at,
@@ -154,7 +156,7 @@ export const provisionMyLiveChannel = createServerFn({ method: "POST" })
       const resolvedSg = await ensureInputSecurityGroup(sgId);
       const inp = await createRtmpInput({
         name: `${slug}-rtmp`,
-        streamName: `${slug}/primary`,
+        streamName: `${slug}/${newStreamKey()}`,
         securityGroupId: resolvedSg,
       });
       inputId = inp.inputId;
@@ -200,6 +202,29 @@ export const provisionMyLiveChannel = createServerFn({ method: "POST" })
       if (mpChannelId) await deleteMediaPackageChannel(mpChannelId).catch(() => null);
       throw err;
     }
+  });
+
+/** Replace this wallet's stream key with a new random one (channel must be off). */
+export const rotateMyStreamKey = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
+  .handler(async ({ context }) => {
+    const row = await getMyChannelRow(context.wallet);
+    if (!row?.medialive_input_id || !row?.medialive_channel_id) {
+      throw new Error("No live channel set up yet.");
+    }
+    const { rotateRtmpStreamKey } = await import("./aws-medialive.server");
+    const next = await rotateRtmpStreamKey({
+      inputId: row.medialive_input_id,
+      channelId: row.medialive_channel_id,
+      newKey: newStreamKey(),
+    });
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any)
+      .from("live_channels")
+      .update({ rtmp_url: next.serverUrl, stream_key: next.streamKey })
+      .eq("id", row.id);
+    if (error) throw new Error(error.message);
+    return { rtmpUrl: next.serverUrl, streamKey: next.streamKey };
   });
 
 // ---------- Start / stop ----------

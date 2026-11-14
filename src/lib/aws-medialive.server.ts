@@ -165,9 +165,18 @@ export async function rotateRtmpStreamKey(args: {
     const m = full.match(/^rtmps?:\/\/[^/]+\/([^/]+)\//i);
     return m?.[1] ?? "live";
   });
-  const raw = await call("PUT", `/prod/inputs/${args.inputId}`, {
-    destinations: apps.map((app) => ({ streamName: `${app}/${args.newKey}` })),
-  });
+  let raw: any;
+  try {
+    raw = await call("PUT", `/prod/inputs/${args.inputId}`, {
+      destinations: apps.map((app) => ({ streamName: `${app}/${args.newKey}` })),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/\[403\]/.test(msg)) {
+      throw new Error("Amazon hasn't allowed changing stream keys yet — the one-time AWS setup step still needs to be run.");
+    }
+    throw err;
+  }
   const input = raw?.input ?? raw;
   const urls: string[] = Array.isArray(input?.destinations)
     ? input.destinations.map((d: any) => String(d?.url ?? "")).filter(Boolean)
