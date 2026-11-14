@@ -505,6 +505,9 @@ export const joinMeeting = createServerFn({ method: "POST" })
     const role = found ? roleForCode(found, data.code, context.wallet) : null;
     if (!found || !role) throw new Error("This meeting link isn't valid anymore. Ask the host for a new one.");
     if (needsApproval(found, role)) {
+      if ((await freshWaiting([found.id])).length >= 50) {
+        throw new Error("Lots of people are already waiting. Please try again in a minute.");
+      }
       const token = [...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, "0")).join("");
       const sb = await db();
       const { data: req, error } = await sb
