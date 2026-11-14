@@ -54,19 +54,20 @@ export const listLiveChat = createServerFn({ method: "GET" })
 
 const PostChatSchema = z.object({
   streamId: z.string().uuid(),
-  wallet: z.string().min(4).max(120),
   body: z.string().trim().min(1).max(500),
 });
 
+// The poster is always the signed-in wallet — never a name the browser sends.
 export const postLiveChat = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input: unknown) => PostChatSchema.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const w = data.wallet;
+    const w = context.wallet;
     const displayName = w.length > 10 ? `${w.slice(0, 6)}…${w.slice(-4)}` : w;
     const { error } = await supabaseAdmin.from("live_chat_messages").insert({
       stream_id: data.streamId,
-      wallet: data.wallet,
+      wallet: w,
       display_name: displayName,
       body: data.body,
     });
