@@ -1407,6 +1407,8 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const archive = useServerFn(archiveLiveStream);
   const skipArchive = useServerFn(skipLiveArchive);
   const rtmpCfg = useServerFn(getRtmpConfig);
+  const rotateKey = useServerFn(rotateAdminStreamKey);
+  const [rotating, setRotating] = useState(false);
   const signalHealth = useServerFn(getLiveSignalHealth);
 
   const { data, isLoading, refetch } = useQuery({
@@ -1754,6 +1756,36 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
                 Backup: <code className="text-primary/70 select-all">{backup.serverUrl}</code> · key <code className="text-primary/70 select-all">{backup.streamKey}</code>
               </div>
             )}
+            {primary.streamKey.length < 32 && (
+              <div className="text-destructive pt-1">
+                This stream key is the old, easy-to-guess kind. Make a new one while you're not live, then paste it into StreamYard.
+              </div>
+            )}
+            <div className="pt-1">
+              <Button
+                size="sm"
+                variant="outline"
+                className="font-mono h-7"
+                disabled={rotating || channelState !== "IDLE"}
+                title={channelState !== "IDLE" ? "Stop the channel first" : undefined}
+                onClick={async () => {
+                  if (!window.confirm("Make a new stream key? The old one stops working right away, so you'll need to paste the new key into StreamYard before your next stream.")) return;
+                  setRotating(true);
+                  try {
+                    const r = await rotateKey();
+                    const full = `${r.serverUrl}/${r.streamKey}`;
+                    setRtmpEndpoints([{ serverUrl: r.serverUrl, streamKey: r.streamKey, fullUrl: full }]);
+                    toast.success("New stream key ready — paste it into StreamYard.");
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Couldn't make a new key");
+                  } finally {
+                    setRotating(false);
+                  }
+                }}
+              >
+                {rotating ? "Making new key…" : "Make a new stream key"}
+              </Button>
+            </div>
             <div className="text-muted-foreground pt-1">
               In StreamYard: Destinations → Custom RTMP → Server URL + Stream key
               go into their two separate fields. Channel must be <b>RUNNING</b>{" "}
