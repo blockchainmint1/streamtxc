@@ -875,7 +875,7 @@ function ConferenceSection() {
       </h2>
       <p className="text-sm text-muted-foreground mb-6 max-w-2xl">
         Your video meeting rooms. Each room has its own team link (talk, camera, screen share) and view-only link
-        (watch and listen). Create a room for each meeting you run, rename it any time, and hit Join to open it.
+        (watch and listen). Create a room for each meeting you run, rename it any time, and hit Start (or Join, once people are in) to open it.
       </p>
       <MeetingRoomsManager />
     </section>
