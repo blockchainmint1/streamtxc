@@ -192,12 +192,12 @@ export function parseChimeTranscript(raw: string, recordingStartMs: number): Tra
     }
   }
   const sorted = [...finals.values()].sort((a, b) => a.start - b.start);
-  // Amazon's times are wall-clock milliseconds; older payloads use seconds from the start.
-  const base = sorted.length && sorted[0].start > 1e12 ? recordingStartMs : 0;
-  const scale = sorted.length && sorted[sorted.length - 1].start < 1e7 && sorted.some((s) => s.start % 1 !== 0) ? 1000 : 1;
+  // Amazon's times are wall-clock milliseconds → measure from when recording began.
+  // If they ever come relative instead, measure from the first words.
+  const base = !sorted.length ? 0 : sorted[0].start > 1e12 ? recordingStartMs : sorted[0].start;
   const lines: TranscriptLine[] = [];
   for (const s of sorted) {
-    const atMs = Math.max(0, Math.round(s.start * scale - base));
+    const atMs = Math.max(0, Math.round(s.start - base));
     const last = lines[lines.length - 1];
     if (last && last.speaker === s.speaker && atMs - last.atMs < 60_000) {
       last.text = `${last.text} ${s.text}`;
