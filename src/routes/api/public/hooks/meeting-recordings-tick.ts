@@ -14,8 +14,7 @@ export const Route = createFileRoute("/api/public/hooks/meeting-recordings-tick"
           return new Response("Unauthorized", { status: 401 });
         }
         const { runMeetingRecordingTick } = await import("@/lib/meeting-recording.server");
-        const { canonicalOrigin } = await import("@/lib/site-origin");
-        const out = await runMeetingRecordingTick(canonicalOrigin(new URL(request.url).origin));
+        const out = await runMeetingRecordingTick(new URL(request.url).origin);
         return Response.json({ ok: true, ...out });
       },
     },

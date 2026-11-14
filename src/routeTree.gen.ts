@@ -50,6 +50,7 @@ import { Route as ApiPublicHooksFinalizeStuckHlsRouteImport } from './routes/api
 import { Route as ApiPublicHooksIpfsPinCompleteRouteImport } from './routes/api/public/hooks/ipfs-pin-complete'
 import { Route as ApiPublicHooksLiveBillingTickRouteImport } from './routes/api/public/hooks/live-billing-tick'
 import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
+import { Route as ApiPublicHooksMeetingRecordingsTickRouteImport } from './routes/api/public/hooks/meeting-recordings-tick'
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
 import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/hooks/telegram'
 import { Route as ApiPublicMeetLeaveRouteImport } from './routes/api/public/meet/leave'
@@ -280,6 +281,12 @@ const ApiPublicHooksMediaconvertRoute =
     path: '/public/hooks/mediaconvert',
     getParentRoute: () => ApiRoute,
   } as any)
+const ApiPublicHooksMeetingRecordingsTickRoute =
+  ApiPublicHooksMeetingRecordingsTickRouteImport.update({
+    id: '/public/hooks/meeting-recordings-tick',
+    path: '/public/hooks/meeting-recordings-tick',
+    getParentRoute: () => ApiRoute,
+  } as any)
 const ApiPublicHooksPaymentWatcherRoute =
   ApiPublicHooksPaymentWatcherRouteImport.update({
     id: '/public/hooks/payment-watcher',
@@ -366,6 +373,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/live-billing-tick': typeof ApiPublicHooksLiveBillingTickRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
+  '/api/public/hooks/meeting-recordings-tick': typeof ApiPublicHooksMeetingRecordingsTickRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
   '/api/public/meet/leave': typeof ApiPublicMeetLeaveRoute
@@ -417,6 +425,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/live-billing-tick': typeof ApiPublicHooksLiveBillingTickRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
+  '/api/public/hooks/meeting-recordings-tick': typeof ApiPublicHooksMeetingRecordingsTickRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
   '/api/public/meet/leave': typeof ApiPublicMeetLeaveRoute
@@ -469,6 +478,7 @@ export interface FileRoutesById {
   '/api/public/hooks/ipfs-pin-complete': typeof ApiPublicHooksIpfsPinCompleteRoute
   '/api/public/hooks/live-billing-tick': typeof ApiPublicHooksLiveBillingTickRoute
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
+  '/api/public/hooks/meeting-recordings-tick': typeof ApiPublicHooksMeetingRecordingsTickRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
   '/api/public/meet/leave': typeof ApiPublicMeetLeaveRoute
@@ -522,6 +532,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/live-billing-tick'
     | '/api/public/hooks/mediaconvert'
+    | '/api/public/hooks/meeting-recordings-tick'
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
     | '/api/public/meet/leave'
@@ -573,6 +584,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/live-billing-tick'
     | '/api/public/hooks/mediaconvert'
+    | '/api/public/hooks/meeting-recordings-tick'
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
     | '/api/public/meet/leave'
@@ -624,6 +636,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/ipfs-pin-complete'
     | '/api/public/hooks/live-billing-tick'
     | '/api/public/hooks/mediaconvert'
+    | '/api/public/hooks/meeting-recordings-tick'
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
     | '/api/public/meet/leave'
@@ -947,6 +960,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksMediaconvertRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/public/hooks/meeting-recordings-tick': {
+      id: '/api/public/hooks/meeting-recordings-tick'
+      path: '/public/hooks/meeting-recordings-tick'
+      fullPath: '/api/public/hooks/meeting-recordings-tick'
+      preLoaderRoute: typeof ApiPublicHooksMeetingRecordingsTickRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/public/hooks/payment-watcher': {
       id: '/api/public/hooks/payment-watcher'
       path: '/public/hooks/payment-watcher'
@@ -1039,6 +1059,7 @@ interface ApiRouteChildren {
   ApiPublicHooksIpfsPinCompleteRoute: typeof ApiPublicHooksIpfsPinCompleteRoute
   ApiPublicHooksLiveBillingTickRoute: typeof ApiPublicHooksLiveBillingTickRoute
   ApiPublicHooksMediaconvertRoute: typeof ApiPublicHooksMediaconvertRoute
+  ApiPublicHooksMeetingRecordingsTickRoute: typeof ApiPublicHooksMeetingRecordingsTickRoute
   ApiPublicHooksPaymentWatcherRoute: typeof ApiPublicHooksPaymentWatcherRoute
   ApiPublicHooksTelegramRoute: typeof ApiPublicHooksTelegramRoute
   ApiPublicMeetLeaveRoute: typeof ApiPublicMeetLeaveRoute
@@ -1070,6 +1091,8 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiPublicHooksIpfsPinCompleteRoute: ApiPublicHooksIpfsPinCompleteRoute,
   ApiPublicHooksLiveBillingTickRoute: ApiPublicHooksLiveBillingTickRoute,
   ApiPublicHooksMediaconvertRoute: ApiPublicHooksMediaconvertRoute,
+  ApiPublicHooksMeetingRecordingsTickRoute:
+    ApiPublicHooksMeetingRecordingsTickRoute,
   ApiPublicHooksPaymentWatcherRoute: ApiPublicHooksPaymentWatcherRoute,
   ApiPublicHooksTelegramRoute: ApiPublicHooksTelegramRoute,
   ApiPublicMeetLeaveRoute: ApiPublicMeetLeaveRoute,
