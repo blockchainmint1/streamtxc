@@ -7,11 +7,11 @@ import { verifyMessage } from "./txc.server";
 
 const owner = "TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m";
 const other = "TgCKcnxHJiLrBgDXHNx8jM4FBuNK7k63Jd";
-const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const secret = process.env.SESSION_SECRET;
 const rpcUrl = process.env.TXC_RPC_URL;
 afterEach(() => {
-  if (secret === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-  else process.env.SUPABASE_SERVICE_ROLE_KEY = secret;
+  if (secret === undefined) delete process.env.SESSION_SECRET;
+  else process.env.SESSION_SECRET = secret;
   if (rpcUrl === undefined) delete process.env.TXC_RPC_URL;
   else process.env.TXC_RPC_URL = rpcUrl;
 });
@@ -38,7 +38,7 @@ test("nonce alone is insufficient; only the issued message is accepted", () => {
   expect(matchesSignableMessage(expected.replace(/\n/g, "\r\n"), expected)).toBe(true);
 });
 test("browser proof is bound to one challenge and expires", async () => {
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-only-signing-secret";
+  process.env.SESSION_SECRET = "test-only-signing-secret";
   const proof = await issueWalletBrowserProof("first", new Date(Date.now() + 60_000).toISOString());
   expect(await verifyWalletBrowserProof(proof, "first")).toBe(true);
   expect(await verifyWalletBrowserProof(proof, "second")).toBe(false);
