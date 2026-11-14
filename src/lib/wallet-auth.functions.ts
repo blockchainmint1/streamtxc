@@ -6,6 +6,7 @@ import {
   issueSessionToken,
   verifyChallengeToken,
   verifySessionToken,
+  revokeAllSessions,
 } from "./wallet-auth.server";
 import { verifyMessage } from "./txc.server";
 
@@ -114,7 +115,7 @@ export const completeWalletLogin = createServerFn({ method: "POST" })
         "Signature did not verify against this address. In your wallet's 'Sign message' panel, make sure the address matches and re-paste the signature.",
       );
     }
-    const session = await issueSessionToken(claims.wallet);
+    const session = await issueSessionToken(claims.wallet, getRequestHeader("user-agent"));
     return {
       wallet: claims.wallet,
       token: session.token,
@@ -167,7 +168,15 @@ export const requireWalletSession = createMiddleware({ type: "function" })
     if (blocked && blocked.length) {
       throw new Error("This account can't sign in. Contact support@honest.money.");
     }
-    return next({ context: { wallet: claims.wallet } });
+    return next({ context: { wallet: claims.wallet, sessionId: claims.sid } });
+  });
+
+/** Cancel every sign-in for this wallet on every device (lost/stolen phone). */
+export const signOutEverywhere = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
+  .handler(async ({ context }) => {
+    const count = await revokeAllSessions(context.wallet);
+    return { ok: true, signedOut: count };
   });
 /**
  * Like requireWalletSession but never throws: context.wallet is the verified

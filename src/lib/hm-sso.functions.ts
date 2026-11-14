@@ -45,7 +45,7 @@ export const completeHmSso = createServerFn({ method: "POST" })
         .update({ last_login_at: new Date().toISOString(), email: t.email ?? null })
         .eq("member_id", memberId);
       if (updateError) throw new Error("Could not finish sign-in — try again.");
-      const s = await issueSessionToken(wallet);
+      const s = await issueSessionToken(wallet, getRequestHeader("user-agent"));
       return { kind: "signed-in" as const, wallet, token: s.token, expiresAt: s.expiresAt, redirect };
     }
     return {
