@@ -651,6 +651,54 @@ export type Database = {
           },
         ]
       }
+      meeting_rooms: {
+        Row: {
+          broadcast_pipeline_id: string | null
+          broadcast_started_at: string | null
+          chime_meeting: Json | null
+          chime_meeting_id: string | null
+          created_at: string
+          id: string
+          join_code: string
+          last_joined_at: string | null
+          meeting_generation: number
+          owner_wallet: string
+          title: string
+          updated_at: string
+          view_code: string
+        }
+        Insert: {
+          broadcast_pipeline_id?: string | null
+          broadcast_started_at?: string | null
+          chime_meeting?: Json | null
+          chime_meeting_id?: string | null
+          created_at?: string
+          id?: string
+          join_code: string
+          last_joined_at?: string | null
+          meeting_generation?: number
+          owner_wallet: string
+          title?: string
+          updated_at?: string
+          view_code: string
+        }
+        Update: {
+          broadcast_pipeline_id?: string | null
+          broadcast_started_at?: string | null
+          chime_meeting?: Json | null
+          chime_meeting_id?: string | null
+          created_at?: string
+          id?: string
+          join_code?: string
+          last_joined_at?: string | null
+          meeting_generation?: number
+          owner_wallet?: string
+          title?: string
+          updated_at?: string
+          view_code?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           created_at: string
