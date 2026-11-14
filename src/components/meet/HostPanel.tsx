@@ -440,7 +440,7 @@ function PriceBox({ billing: b }: { billing: Billing }) {
   if (!b.billable) {
     return (
       <div className="border border-border bg-card rounded-sm p-3 text-sm text-muted-foreground">
-        Your meeting rooms are free — they aren't charged.
+        Your meeting rooms are free — including recording and notes. They aren't charged.
       </div>
     );
   }

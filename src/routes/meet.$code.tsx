@@ -168,6 +168,11 @@ function JoinPage() {
                 </Button>
               </div>
             )}
+            {d.recordingNotice && (
+              <p className="text-sm text-muted-foreground">
+                ● This meeting may be recorded and transcribed. You'll see a notice at the top while it is.
+              </p>
+            )}
             {d.needsApproval && (
               <p className="text-sm text-muted-foreground">The host lets each person in. After you click join, you'll wait a moment for them.</p>
             )}

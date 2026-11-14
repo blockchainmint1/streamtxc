@@ -1,8 +1,10 @@
 // Live meeting screen. amazon-chime-sdk-js is browser-only, so it is loaded
 // with a dynamic import inside an effect (never at module scope).
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
-  Mic, MicOff, Video, VideoOff, MonitorUp, MonitorX, PhoneOff, Users, Eye, Volume2, Bell, BellOff,
+  Mic, MicOff, Video, VideoOff, MonitorUp, MonitorX, PhoneOff, Users, Eye, Volume2, Bell, BellOff, FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -10,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { decodeExternalUserId, type MeetingRole } from "@/lib/meeting-rules";
 import { InMeetingHostBar } from "./HostPanel";
 import { playMeetSound, setSoundsMutedLocally, soundsMutedLocally } from "@/lib/meet-sound";
+import { getMeetingRecordingState } from "@/lib/meetings.functions";
 
 export interface JoinResult {
   role: MeetingRole;
@@ -40,10 +43,22 @@ interface Person { attendeeId: string; name: string; role: MeetingRole; muted: b
 
 type Status = "connecting" | "live" | "ended" | "left" | "replaced" | "failed";
 
+/** Everyone sees when the meeting is being recorded or transcribed. */
+function useRecordingState(code: string) {
+  const fetchState = useServerFn(getMeetingRecordingState);
+  return useQuery({
+    queryKey: ["meeting-recording-state", code],
+    queryFn: () => fetchState({ data: { code } }),
+    refetchInterval: 10_000,
+    retry: false,
+  }).data;
+}
+
 export function MeetingRoom({
-  join, startMic, startCam, onExit,
-}: { join: JoinResult; startMic: boolean; startCam: boolean; onExit: () => void }) {
+  join, code, startMic, startCam, onExit,
+}: { join: JoinResult; code: string; startMic: boolean; startCam: boolean; onExit: () => void }) {
   const viewer = join.role === "viewer";
+  const rec = useRecordingState(code);
   const selfId = join.attendee.AttendeeId;
   const avRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -337,6 +352,16 @@ export function MeetingRoom({
             >
               {soundsOff ? <BellOff className="h-3.5 w-3.5" /> : <Bell className="h-3.5 w-3.5" />}
             </button>
+          )}
+          {rec?.video && (
+            <span className="inline-flex items-center gap-1 rounded-sm bg-destructive px-1.5 py-0.5 font-bold text-destructive-foreground" role="status">
+              ● REC
+            </span>
+          )}
+          {rec?.notes && (
+            <span className="inline-flex items-center gap-1 rounded-sm border border-primary px-1.5 py-0.5 text-primary" role="status" title="A transcript and AI notes are being made">
+              <FileText className="h-3 w-3" /> notes on
+            </span>
           )}
           {status === "connecting" && <span className="text-primary">connecting…</span>}
         </div>
