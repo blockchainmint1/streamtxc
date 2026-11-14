@@ -37,19 +37,54 @@ export const Route = createFileRoute("/api/public/hooks/ipfs-pin-complete")({
           cid?: string | null;
           totalBytes?: number;
           error?: string | null;
-          meta?: { cid?: string; liveStreamId?: string; jobId?: string; prefix?: string };
+          meta?: { cid?: string; liveStreamId?: string; meetingRecordingId?: string; jobId?: string; prefix?: string };
         };
         try { event = JSON.parse(body); } catch { return new Response("Bad JSON", { status: 400 }); }
 
         const videoCid = event.meta?.cid;
         const liveStreamId = event.meta?.liveStreamId;
+        const meetingRecordingId = event.meta?.meetingRecordingId;
         const jobId = event.meta?.jobId;
         const prefix = event.meta?.prefix;
-        if ((!videoCid && !liveStreamId) || !jobId || !prefix) {
+        if ((!videoCid && !liveStreamId && !meetingRecordingId) || !jobId || !prefix) {
           return new Response("Missing meta", { status: 400 });
         }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+        if (meetingRecordingId) {
+          const sb = supabaseAdmin as any;
+          if (event.error || !event.cid) {
+            await sb.from("meeting_recordings")
+              .update({ publish_status: "failed", error: "Saving the video to IPFS failed." })
+              .eq("id", meetingRecordingId).eq("publish_job_id", jobId);
+            return Response.json({ ok: false, error: event.error ?? "pin failed" });
+          }
+          const { data: rec } = await sb
+            .from("meeting_recordings")
+            .select("id, owner_wallet, title, started_at, summary, transcript_text")
+            .eq("id", meetingRecordingId)
+            .eq("publish_job_id", jobId)
+            .maybeSingle();
+          if (!rec) return new Response("Recording not found", { status: 404 });
+          const day = new Date(rec.started_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+          const { createChannelVideoFromPin } = await import("@/lib/archive-video.server");
+          await createChannelVideoFromPin({
+            hlsCid: event.cid,
+            totalBytes: event.totalBytes ?? 0,
+            jobId,
+            prefix,
+            ownerWallet: rec.owner_wallet,
+            title: `${rec.title} — ${day}`,
+            description: rec.summary ?? "",
+            transcriptText: rec.transcript_text ?? null,
+            source: "meeting",
+          });
+          await sb.from("meeting_recordings")
+            .update({ publish_status: "published", published_cid: event.cid, error: null })
+            .eq("id", meetingRecordingId);
+          return Response.json({ ok: true, meetingRecordingId, cid: event.cid });
+        }
 
         if (liveStreamId) {
           if (event.error || !event.cid) {

@@ -59,6 +59,9 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
           return new Response("Missing fields", { status: 400 });
         }
 
+        // Meeting-recording publishes are finished by the meeting-recordings tick.
+        if (cid.startsWith("meet:")) return new Response("ok");
+
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         // Audio-only backfill jobs: skip HLS pinning entirely; the only

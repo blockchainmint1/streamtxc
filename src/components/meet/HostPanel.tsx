@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Bell, Check, Pencil, PhoneOff, Plus, Radio, RefreshCw, Square, Trash2, UserCheck, Video, X } from "lucide-react";
+import { Bell, Check, Circle, FileText, Pencil, PhoneOff, Plus, Radio, RefreshCw, Square, Trash2, UserCheck, Video, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -12,7 +12,7 @@ import { publicOrigin } from "@/lib/site-origin";
 import { playMeetSound } from "@/lib/meet-sound";
 import {
   createMeetingRoom, decideJoinRequest, deleteMeetingRoom, endMeeting, listJoinRequests, listMyMeetingRooms,
-  startMeetingBroadcast, stopMeetingBroadcast, updateMeetingRoom,
+  startMeetingBroadcast, stopMeetingBroadcast, updateMeetingRoom, startMeetingRecording, stopMeetingRecording,
 } from "@/lib/meetings.functions";
 
 export const MY_ROOMS_KEY = ["my-meeting-rooms"] as const;
@@ -116,7 +116,7 @@ function RoomCard({ room: r, canDelete }: { room: RoomData; canDelete: boolean }
   const origin = publicOrigin();
   const approvals = r.approveTeam || r.approveViewers;
 
-  const setting = (patch: Partial<{ joinSound: boolean; approveTeam: boolean; approveViewers: boolean }>) =>
+  const setting = (patch: Partial<{ joinSound: boolean; approveTeam: boolean; approveViewers: boolean; autoRecord: boolean; autoNotes: boolean }>) =>
     run("setting", () => update({ data: { roomId: r.id, ...patch } }));
 
   return (
@@ -149,6 +149,7 @@ function RoomCard({ room: r, canDelete }: { room: RoomData; canDelete: boolean }
             <p className="font-mono text-xs text-muted-foreground mt-1">
               {r.live ? "● open right now" : "○ nobody's in — it opens when the first person joins"}
               {r.broadcasting && " · on the live stream"}
+              {r.recording && <span className="text-destructive">{` · ● ${recLabel(r.recording)}`}</span>}
             </p>
           </div>
         )}
@@ -179,11 +180,24 @@ function RoomCard({ room: r, canDelete }: { room: RoomData; canDelete: boolean }
           hint="Off: watchers get in automatically."
           checked={r.approveViewers} disabled={!!working} onChange={(v) => setting({ approveViewers: v })}
         />
+        <SettingRow
+          label="Record every meeting automatically"
+          hint="Starts recording the video as soon as the meeting opens. Recordings stay private until you publish them."
+          checked={r.autoRecord} disabled={!!working} onChange={(v) => setting({ autoRecord: v })}
+        />
+        <SettingRow
+          label="Take meeting notes automatically"
+          hint="A word-for-word transcript of who said what, plus an AI summary, decisions and to-do list."
+          checked={r.autoNotes} disabled={!!working} onChange={(v) => setting({ autoNotes: v })}
+        />
       </div>
 
       {(approvals || r.waitingCount > 0) && <WaitingList roomId={r.id} sound={r.joinSound} />}
 
+      {r.recordings.length > 0 && <RecordingsList recordings={r.recordings} />}
+
       <div className="flex flex-wrap gap-2">
+        {r.live && <RecordControls room={r} />}
         <BroadcastButton room={r} />
         <Button
           variant="ghost" size="sm" disabled={!!working}
@@ -239,6 +253,81 @@ function BroadcastButton({ room: r }: { room: RoomData }) {
     <Button variant="outline" size="sm" disabled={!!working || !r.live} onClick={() => run("bc", () => startBc({ data: { roomId: r.id } }), "Sending the meeting to your live stream — it shows on /live in about a minute.")}>
       <Radio /> Send to live stream
     </Button>
+  );
+}
+
+function recLabel(rec: { video: boolean; notes: boolean }) {
+  return rec.video && rec.notes ? "recording + notes" : rec.video ? "recording" : "taking notes";
+}
+
+/** Record / Notes toggles for an open meeting. Changing what's captured starts a fresh recording. */
+function RecordControls({ room: r }: { room: RoomData }) {
+  const start = useServerFn(startMeetingRecording);
+  const stop = useServerFn(stopMeetingRecording);
+  const { working, run } = useRunner();
+  const video = !!r.recording?.video;
+  const notes = !!r.recording?.notes;
+  function set(nextVideo: boolean, nextNotes: boolean, ok: string) {
+    if (!nextVideo && !nextNotes) return run("rec", () => stop({ data: { roomId: r.id } }), "Stopped. The files will be ready in a few minutes.");
+    return run("rec", () => start({ data: { roomId: r.id, video: nextVideo, notes: nextNotes } }), ok);
+  }
+  return (
+    <>
+      <Button
+        variant={video ? "destructive" : "outline"} size="sm" disabled={!!working || !r.live}
+        onClick={() => set(!video, notes, "Recording. Everyone in the meeting sees a recording notice.")}
+        aria-pressed={video}
+      >
+        {video ? <Square /> : <Circle />} {video ? "Stop recording" : "Record"}
+      </Button>
+      <Button
+        variant={notes ? "secondary" : "outline"} size="sm" disabled={!!working || !r.live}
+        onClick={() => set(video, !notes, "Taking notes. Everyone in the meeting sees a notice.")}
+        aria-pressed={notes}
+      >
+        <FileText /> {notes ? "Stop notes" : "Take notes"}
+      </Button>
+    </>
+  );
+}
+
+function RecordingsList({ recordings }: { recordings: RoomData["recordings"] }) {
+  return (
+    <div className="border border-border bg-card rounded-sm p-3 space-y-2">
+      <div className="text-sm font-medium">Recordings &amp; notes</div>
+      <ul className="space-y-1">
+        {recordings.map((rec) => {
+          const when = new Date(rec.startedAt);
+          const mins = rec.endedAt ? Math.max(1, Math.round((Date.parse(rec.endedAt) - when.getTime()) / 60000)) : null;
+          const status =
+            rec.status === "recording" ? "● recording now"
+            : rec.status === "processing" ? "finishing up…"
+            : rec.status === "failed" ? "didn't work"
+            : rec.publishStatus === "published" ? "on your channel"
+            : rec.publishStatus === "transcoding" || rec.publishStatus === "pinning" ? "publishing…"
+            : rec.notes && rec.notesStatus === "failed" ? "notes need a retry"
+            : "ready";
+          return (
+            <li key={rec.id}>
+              <Link
+                to="/meet/recordings/$id" params={{ id: rec.id }}
+                className="flex items-center justify-between gap-3 text-sm hover:text-primary"
+              >
+                <span className="truncate">
+                  {when.toLocaleDateString(undefined, { month: "short", day: "numeric" })}{" "}
+                  {when.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                  {mins ? ` · ${mins} min` : ""}
+                  <span className="text-muted-foreground">
+                    {" · "}{rec.video && rec.notes ? "video + notes" : rec.video ? "video" : "notes"}
+                  </span>
+                </span>
+                <span className="font-mono text-xs text-muted-foreground shrink-0">{status}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -318,6 +407,7 @@ export function InMeetingHostBar({ roomId }: { roomId: string }) {
       <div className="flex flex-wrap items-center justify-center gap-2 border-t border-border px-4 py-2 font-mono text-xs">
         <CopyLinkButton value={`${origin}/meet/${r.joinCode}`} label="copy join link" successMessage="Join link copied" />
         <CopyLinkButton value={`${origin}/meet/${r.viewCode}`} label="copy view-only link" successMessage="View-only link copied" />
+        <RecordControls room={r} />
         <BroadcastButton room={r} />
         {r.broadcasting && <span className="inline-flex items-center gap-1 text-destructive"><Radio className="h-3 w-3" /> on the live stream</span>}
         <Button
@@ -350,7 +440,7 @@ function PriceBox({ billing: b }: { billing: Billing }) {
   if (!b.billable) {
     return (
       <div className="border border-border bg-card rounded-sm p-3 text-sm text-muted-foreground">
-        Your meeting rooms are free — they aren't charged.
+        Your meeting rooms are free — including recording and notes. They aren't charged.
       </div>
     );
   }
@@ -364,6 +454,11 @@ function PriceBox({ billing: b }: { billing: Billing }) {
       </div>
       <div className="text-muted-foreground">
         "Send to live stream" adds {fmt(b.broadcastMinuteTxc, 2)} TXC (${b.broadcastMinuteUsd.toFixed(2)}) per minute.
+      </div>
+      <div className="text-muted-foreground">
+        Recording adds {fmt(b.recordMinuteTxc, 2)} TXC (${b.recordMinuteUsd.toFixed(3)}) per minute. Notes add{" "}
+        {fmt(b.notesMinuteTxc, 2)} TXC (${b.notesMinuteUsd.toFixed(3)}) per minute. Both together:{" "}
+        {fmt(b.bothMinuteTxc, 2)} TXC (${b.bothMinuteUsd.toFixed(3)}) per minute.
       </div>
       <div className={low ? "text-destructive" : "text-foreground"}>
         Your balance: {fmt(b.balanceTxc)} TXC{low ? " — add TXC on the Manage page before starting." : ""}

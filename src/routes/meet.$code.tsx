@@ -98,6 +98,7 @@ function JoinPage() {
     return (
       <MeetingRoom
         join={joined}
+        code={code}
         startMic={mic}
         startCam={cam}
         onExit={() => { setJoined(null); void info.refetch(); }}
@@ -167,6 +168,11 @@ function JoinPage() {
                   {cam ? <Video /> : <VideoOff />} {cam ? "Camera on" : "Camera off"}
                 </Button>
               </div>
+            )}
+            {d.recordingNotice && (
+              <p className="text-sm text-muted-foreground">
+                ● This meeting may be recorded and transcribed. You'll see a notice at the top while it is.
+              </p>
             )}
             {d.needsApproval && (
               <p className="text-sm text-muted-foreground">The host lets each person in. After you click join, you'll wait a moment for them.</p>

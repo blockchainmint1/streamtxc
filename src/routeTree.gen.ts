@@ -34,6 +34,7 @@ import { Route as ApiPublicTxcVerifyMessageRouteImport } from './routes/api/publ
 import { Route as ApiPublicUploadRouteImport } from './routes/api/public/upload'
 import { Route as ApiStreamCidRouteImport } from './routes/api/stream.$cid'
 import { Route as EmbedLiveStreamIdRouteImport } from './routes/embed.live.$streamId'
+import { Route as MeetRecordingsIdRouteImport } from './routes/meet.recordings.$id'
 import { Route as VCidRestoreRouteImport } from './routes/v.$cid.restore'
 import { Route as ApiPublicAdminBackfillHlsRouteImport } from './routes/api/public/admin/backfill-hls'
 import { Route as ApiPublicAdminBackfillSelfPinsRouteImport } from './routes/api/public/admin/backfill-self-pins'
@@ -183,6 +184,11 @@ const ApiStreamCidRoute = ApiStreamCidRouteImport.update({
 const EmbedLiveStreamIdRoute = EmbedLiveStreamIdRouteImport.update({
   id: '/embed/live/$streamId',
   path: '/embed/live/$streamId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MeetRecordingsIdRoute = MeetRecordingsIdRouteImport.update({
+  id: '/meet/recordings/$id',
+  path: '/meet/recordings/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VCidRestoreRoute = VCidRestoreRouteImport.update({
@@ -350,6 +356,7 @@ export interface FileRoutesByFullPath {
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
   '/embed/live/$streamId': typeof EmbedLiveStreamIdRoute
+  '/meet/recordings/$id': typeof MeetRecordingsIdRoute
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/backfill-hls': typeof ApiPublicAdminBackfillHlsRoute
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
@@ -401,6 +408,7 @@ export interface FileRoutesByTo {
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
   '/embed/live/$streamId': typeof EmbedLiveStreamIdRoute
+  '/meet/recordings/$id': typeof MeetRecordingsIdRoute
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/backfill-hls': typeof ApiPublicAdminBackfillHlsRoute
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
@@ -453,6 +461,7 @@ export interface FileRoutesById {
   '/api/public/upload': typeof ApiPublicUploadRoute
   '/api/stream/$cid': typeof ApiStreamCidRouteWithChildren
   '/embed/live/$streamId': typeof EmbedLiveStreamIdRoute
+  '/meet/recordings/$id': typeof MeetRecordingsIdRoute
   '/v/$cid/restore': typeof VCidRestoreRoute
   '/api/public/admin/backfill-hls': typeof ApiPublicAdminBackfillHlsRoute
   '/api/public/admin/backfill-self-pins': typeof ApiPublicAdminBackfillSelfPinsRoute
@@ -506,6 +515,7 @@ export interface FileRouteTypes {
     | '/api/public/upload'
     | '/api/stream/$cid'
     | '/embed/live/$streamId'
+    | '/meet/recordings/$id'
     | '/v/$cid/restore'
     | '/api/public/admin/backfill-hls'
     | '/api/public/admin/backfill-self-pins'
@@ -557,6 +567,7 @@ export interface FileRouteTypes {
     | '/api/public/upload'
     | '/api/stream/$cid'
     | '/embed/live/$streamId'
+    | '/meet/recordings/$id'
     | '/v/$cid/restore'
     | '/api/public/admin/backfill-hls'
     | '/api/public/admin/backfill-self-pins'
@@ -608,6 +619,7 @@ export interface FileRouteTypes {
     | '/api/public/upload'
     | '/api/stream/$cid'
     | '/embed/live/$streamId'
+    | '/meet/recordings/$id'
     | '/v/$cid/restore'
     | '/api/public/admin/backfill-hls'
     | '/api/public/admin/backfill-self-pins'
@@ -655,6 +667,7 @@ export interface RootRouteChildren {
   LiveIndexRoute: typeof LiveIndexRoute
   MeetIndexRoute: typeof MeetIndexRoute
   EmbedLiveStreamIdRoute: typeof EmbedLiveStreamIdRoute
+  MeetRecordingsIdRoute: typeof MeetRecordingsIdRoute
   EmbedLiveByWalletWalletRoute: typeof EmbedLiveByWalletWalletRoute
 }
 
@@ -833,6 +846,13 @@ declare module '@tanstack/react-router' {
       path: '/embed/live/$streamId'
       fullPath: '/embed/live/$streamId'
       preLoaderRoute: typeof EmbedLiveStreamIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/meet/recordings/$id': {
+      id: '/meet/recordings/$id'
+      path: '/meet/recordings/$id'
+      fullPath: '/meet/recordings/$id'
+      preLoaderRoute: typeof MeetRecordingsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v/$cid/restore': {
@@ -1111,6 +1131,7 @@ const rootRouteChildren: RootRouteChildren = {
   LiveIndexRoute: LiveIndexRoute,
   MeetIndexRoute: MeetIndexRoute,
   EmbedLiveStreamIdRoute: EmbedLiveStreamIdRoute,
+  MeetRecordingsIdRoute: MeetRecordingsIdRoute,
   EmbedLiveByWalletWalletRoute: EmbedLiveByWalletWalletRoute,
 }
 export const routeTree = rootRouteImport
