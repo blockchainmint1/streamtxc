@@ -123,9 +123,10 @@ export async function createRtmpInput(args: {
   return { inputId: String(input?.id), destinations };
 }
 
-// Resolves the configured InputSecurityGroup id; if it's missing or invalid,
-// finds an existing open (0.0.0.0/0) SG or creates a new one so provisioning
-// keeps working even after AWS SGs get manually deleted.
+// Resolves the input security group for new inputs. Uses the configured id
+// when it exists, otherwise the group our existing inputs already use. It
+// never creates a new open-to-the-world group on its own: stream keys are
+// random and secret, and any change to who may connect is a deliberate step.
 export async function ensureInputSecurityGroup(preferredId?: string): Promise<string> {
   if (preferredId) {
     try {
@@ -134,27 +135,49 @@ export async function ensureInputSecurityGroup(preferredId?: string): Promise<st
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (!/not found|404/i.test(msg)) throw err;
-      console.warn(`[medialive] InputSecurityGroup ${preferredId} not found; falling back`);
+      console.warn(`[medialive] InputSecurityGroup ${preferredId} not found; using the one in use`);
     }
   }
-  try {
-    const list = await call("GET", `/prod/inputSecurityGroups`);
-    const groups: any[] = Array.isArray(list?.inputSecurityGroups) ? list.inputSecurityGroups : [];
-    const open = groups.find((g) =>
-      Array.isArray(g?.whitelistRules) &&
-      g.whitelistRules.some((r: any) => String(r?.cidr) === "0.0.0.0/0"),
-    );
-    if (open?.id) return String(open.id);
-  } catch {
-    // fall through to create
+  const list = await call("GET", `/prod/inputSecurityGroups`);
+  const groups: any[] = Array.isArray(list?.inputSecurityGroups) ? list.inputSecurityGroups : [];
+  const inUse = groups.find((g) => Array.isArray(g?.inputs) && g.inputs.length > 0) ?? groups[0];
+  if (inUse?.id) return String(inUse.id);
+  throw new Error("No MediaLive input security group exists yet — set one up in AWS first.");
+}
+
+/**
+ * Give an RTMP input a brand-new random stream key (keeps the same server
+ * address). Only allowed while its channel is stopped, because a running
+ * encoder would be cut off mid-stream.
+ */
+export async function rotateRtmpStreamKey(args: {
+  inputId: string;
+  channelId: string;
+  newKey: string;
+}): Promise<{ serverUrl: string; streamKey: string }> {
+  const ch = await describeChannel(args.channelId);
+  if (ch.state !== "IDLE") {
+    throw new Error("Stop the live channel first (it must be fully off) before making a new stream key.");
   }
-  const created = await call("POST", `/prod/inputSecurityGroups`, {
-    whitelistRules: [{ cidr: "0.0.0.0/0" }],
+  const { destinations } = await describeInput(args.inputId);
+  if (!destinations.length) throw new Error("This live input has no RTMP address to update.");
+  const apps = destinations.map((full) => {
+    const m = full.match(/^rtmps?:\/\/[^/]+\/([^/]+)\//i);
+    return m?.[1] ?? "live";
   });
-  const sg = created?.securityGroup ?? created;
-  const id = String(sg?.id ?? "");
-  if (!id) throw new Error("Failed to create MediaLive InputSecurityGroup");
-  return id;
+  const raw = await call("PUT", `/prod/inputs/${args.inputId}`, {
+    destinations: apps.map((app) => ({ streamName: `${app}/${args.newKey}` })),
+  });
+  const input = raw?.input ?? raw;
+  const urls: string[] = Array.isArray(input?.destinations)
+    ? input.destinations.map((d: any) => String(d?.url ?? "")).filter(Boolean)
+    : [];
+  const first = urls[0] ?? "";
+  const idx = first.lastIndexOf("/");
+  if (idx < 0 || first.slice(idx + 1) !== args.newKey) {
+    throw new Error("AWS didn't accept the new stream key — nothing was changed.");
+  }
+  return { serverUrl: first.slice(0, idx), streamKey: args.newKey };
 }
 
 export async function deleteInput(inputId: string) {
