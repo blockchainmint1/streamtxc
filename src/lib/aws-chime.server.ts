@@ -150,3 +150,133 @@ export async function deleteAttendee(meetingId: string, attendeeId: string): Pro
     throw err;
   }
 }
+
+// ---------- Recording (media capture + concatenation) and live transcription ----------
+
+/** Private bucket for meeting recordings (created by the AWS setup script). */
+export function recordingsBucket(): string {
+  return process.env.MEETING_RECORDINGS_BUCKET?.trim() || "streamtxc-meetings-150646524089";
+}
+
+/** Turns on Amazon Transcribe for the meeting — every word is credited to the person who said it. */
+export async function startMeetingTranscription(meetingId: string): Promise<void> {
+  try {
+    await call("meetings", "POST", `/meetings/${encodeURIComponent(meetingId)}/transcription?operation=start`, {
+      TranscriptionConfiguration: {
+        EngineTranscribeSettings: { LanguageCode: "en-US" },
+      },
+    });
+  } catch (err) {
+    // 409 = already running for this meeting; that's fine.
+    if (err instanceof ChimeError && err.status === 409) return;
+    throw err;
+  }
+}
+
+export async function stopMeetingTranscription(meetingId: string): Promise<void> {
+  try {
+    await call("meetings", "POST", `/meetings/${encodeURIComponent(meetingId)}/transcription?operation=stop`, {});
+  } catch (err) {
+    if (err instanceof ChimeError && (err.status === 404 || err.status === 409 || err.status === 400)) return;
+    throw err;
+  }
+}
+
+/**
+ * Starts saving the meeting to S3 in 5-second pieces. With video on, it records
+ * the same grid + shared screen view as the live stream; without video it keeps
+ * only the sound (needed so the transcript pieces are saved too).
+ */
+export async function createCapturePipeline(args: {
+  meetingArn: string;
+  prefix: string;
+  video: boolean;
+  token: string;
+}): Promise<{ pipelineId: string; pipelineArn: string }> {
+  const bucket = recordingsBucket();
+  const raw = await call("pipelines", "POST", "/sdk-media-capture-pipelines", {
+    ClientRequestToken: args.token,
+    SourceType: "ChimeSdkMeeting",
+    SourceArn: args.meetingArn,
+    SinkType: "S3Bucket",
+    SinkArn: `arn:aws:s3:::${bucket}/${args.prefix}`,
+    ChimeSdkMeetingConfiguration: {
+      ArtifactsConfiguration: args.video
+        ? {
+            Audio: { MuxType: "AudioWithCompositedVideo" },
+            Video: { State: "Disabled" },
+            Content: { State: "Disabled" },
+            CompositedVideo: {
+              Layout: "GridView",
+              Resolution: "FHD",
+              GridViewConfiguration: { ContentShareLayout: "PresenterOnly" },
+            },
+          }
+        : {
+            Audio: { MuxType: "AudioOnly" },
+            Video: { State: "Disabled" },
+            Content: { State: "Disabled" },
+          },
+    },
+  });
+  const p = raw.MediaCapturePipeline ?? raw;
+  return { pipelineId: String(p.MediaPipelineId), pipelineArn: String(p.MediaPipelineArn) };
+}
+
+/**
+ * Joins the 5-second pieces into one video file and one transcript file once
+ * capture stops. Created up front — AWS waits for the capture to finish.
+ */
+export async function createConcatPipeline(args: {
+  capturePipelineArn: string;
+  prefix: string;
+  video: boolean;
+  notes: boolean;
+  token: string;
+}): Promise<{ pipelineId: string }> {
+  const bucket = recordingsBucket();
+  const on = (b: boolean) => ({ State: b ? "Enabled" : "Disabled" });
+  const raw = await call("pipelines", "POST", "/sdk-media-concatenation-pipelines", {
+    ClientRequestToken: args.token,
+    Sources: [
+      {
+        Type: "MediaCapturePipeline",
+        MediaCapturePipelineSourceConfiguration: {
+          MediaPipelineArn: args.capturePipelineArn,
+          ChimeSdkMeetingConfiguration: {
+            ArtifactsConfiguration: {
+              Audio: { State: "Enabled" },
+              Video: on(false),
+              Content: on(false),
+              DataChannel: on(false),
+              TranscriptionMessages: on(args.notes),
+              MeetingEvents: on(false),
+              CompositedVideo: on(args.video),
+            },
+          },
+        },
+      },
+    ],
+    Sinks: [
+      {
+        Type: "S3Bucket",
+        S3BucketSinkConfiguration: { Destination: `arn:aws:s3:::${bucket}/${args.prefix}` },
+      },
+    ],
+  });
+  const p = raw.MediaConcatenationPipeline ?? raw;
+  return { pipelineId: String(p.MediaPipelineId) };
+}
+
+/** Status of any media pipeline ("InProgress", "Stopped", "Failed", …) or null if AWS no longer knows it. */
+export async function getMediaPipelineStatus(id: string): Promise<string | null> {
+  try {
+    const raw = await call("pipelines", "GET", `/sdk-media-pipelines/${encodeURIComponent(id)}`);
+    const mp = raw.MediaPipeline ?? {};
+    const inner = mp.MediaConcatenationPipeline ?? mp.MediaCapturePipeline ?? mp.MediaLiveConnectorPipeline ?? {};
+    return inner.Status ? String(inner.Status) : null;
+  } catch (err) {
+    if (err instanceof ChimeError && err.status === 404) return null;
+    throw err;
+  }
+}
