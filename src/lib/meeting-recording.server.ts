@@ -240,6 +240,17 @@ export async function processRecording(rec: RecordingRow): Promise<string> {
   // AWS finished joining (or gave up) → use whatever files exist.
   const done = concatStatus === "Stopped" || concatStatus === "Failed" || concatStatus === null || timedOut;
   if ((!haveVideo || !haveTranscript) && !done) return "waiting";
+  // Claim it so an overlapping tick doesn't write the notes twice.
+  const claimAt = new Date().toISOString();
+  const { data: claimed } = await sb
+    .from("meeting_recordings")
+    .update({ updated_at: claimAt })
+    .eq("id", rec.id)
+    .eq("status", "processing")
+    .eq("updated_at", (rec as any).updated_at)
+    .select("id")
+    .maybeSingle();
+  if (!claimed) return "claimed-elsewhere";
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (files.video) {
     patch.video_key = files.video.key;
