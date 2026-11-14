@@ -127,3 +127,26 @@ export async function stopMediaPipeline(id: string): Promise<void> {
     throw err;
   }
 }
+
+/** Seats currently held in a meeting (people who left via the Leave button are removed). */
+export async function countAttendees(meetingId: string): Promise<number> {
+  let total = 0;
+  let next: string | undefined;
+  for (let page = 0; page < 10; page++) {
+    const qs = `?max-results=100${next ? `&next-token=${encodeURIComponent(next)}` : ""}`;
+    const raw = await call("meetings", "GET", `/meetings/${encodeURIComponent(meetingId)}/attendees${qs}`);
+    total += (raw.Attendees ?? []).length;
+    next = raw.NextToken;
+    if (!next) break;
+  }
+  return total;
+}
+
+export async function deleteAttendee(meetingId: string, attendeeId: string): Promise<void> {
+  try {
+    await call("meetings", "DELETE", `/meetings/${encodeURIComponent(meetingId)}/attendees/${encodeURIComponent(attendeeId)}`);
+  } catch (err) {
+    if (err instanceof ChimeError && err.status === 404) return;
+    throw err;
+  }
+}
