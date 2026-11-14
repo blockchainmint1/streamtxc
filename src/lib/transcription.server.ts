@@ -1,14 +1,13 @@
 // Post-transcode transcription: take the MediaConvert audio-only output
 // from S3, send it to Lovable AI gateway's OpenAI-compatible
-// /audio/transcriptions endpoint, pin the resulting WebVTT to IPFS, and
-// stamp the transcript CID on the videos row.
+// /audio/transcriptions endpoint and store the transcript text on the
+// videos row (shown in the watch page's transcript panel).
 //
 // Runs for every finished transcode so every video gets closed
 // captions. Idempotent: skips work if transcript_cid is already set.
 
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { getObjectBlob } from "./aws-s3.server";
-import { pinFileToIPFS } from "./ipfs.server";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1";
 const TRANSCRIBE_MODEL = "openai/gpt-4o-mini-transcribe";
@@ -16,7 +15,8 @@ const MAX_AUDIO_BYTES = 25 * 1024 * 1024; // OpenAI transcription hard limit
 
 export interface TranscribeResult {
   transcriptText: string;
-  transcriptCid: string;
+  /** Timed caption file on IPFS. Null: the AI service returns text only, no timings. */
+  transcriptCid: string | null;
   vttBytes: number;
 }
 
@@ -30,12 +30,13 @@ export async function maybeTranscribeVideo(
 ): Promise<TranscribeResult | null> {
   const { data: row, error } = await supabaseAdmin
     .from("videos")
-    .select("cid, transcript_cid")
+    .select("cid, transcript_cid, transcript_text")
     .eq("cid", cid)
     .maybeSingle();
   if (error) throw error;
   if (!row) return null;
   if (row.transcript_cid) return null;
+  if (row.transcript_text && !row.transcript_text.startsWith("[Transcript skipped")) return null;
 
   const key = await pickAudioKey(cid);
   if (!key) {
@@ -69,13 +70,13 @@ export async function maybeTranscribeVideo(
     return null;
   }
 
-  // OpenAI-compatible multipart form. response_format=vtt returns WebVTT
-  // (already cue-timed) which we both pin and parse into plain text for
-  // the watch page transcript panel.
+  // The gateway's transcription endpoint returns plain text only (json/text
+  // formats; no caption timings), so we store the transcript for the watch
+  // page panel. Timed captions (.vtt) need a timing-capable service.
   const form = new FormData();
   form.append("file", blob, "audio.mp4");
   form.append("model", TRANSCRIBE_MODEL);
-  form.append("response_format", "vtt");
+  form.append("response_format", "json");
 
   const res = await fetch(`${GATEWAY_URL}/audio/transcriptions`, {
     method: "POST",
@@ -92,30 +93,22 @@ export async function maybeTranscribeVideo(
     }
     throw new Error(`Transcription failed [${res.status}]: ${text.slice(0, 400)}`);
   }
-  const vtt = await res.text();
-  if (!vtt.trim()) {
+  const body = (await res.json().catch(() => null)) as { text?: string } | null;
+  const plain = (body?.text ?? "").replace(/\s+/g, " ").trim();
+  if (!plain) {
     console.warn(`[transcribe ${cid}] empty transcript`);
     return null;
   }
 
-  // Pin the .vtt to IPFS so the on-chain metadata can point at it.
-  const vttBlob = new Blob([vtt], { type: "text/vtt" });
-  const pin = await pinFileToIPFS(vttBlob, `${cid}.transcript.vtt`);
-
-  const plain = vttToPlainText(vtt);
-
   await supabaseAdmin
     .from("videos")
-    .update({
-      transcript_cid: pin.cid,
-      transcript_text: plain,
-    })
+    .update({ transcript_text: plain })
     .eq("cid", cid);
 
   return {
     transcriptText: plain,
-    transcriptCid: pin.cid,
-    vttBytes: vtt.length,
+    transcriptCid: null,
+    vttBytes: 0,
   };
 }
 
@@ -131,24 +124,4 @@ async function pickAudioKey(cid: string): Promise<string | null> {
     keys.find((k) => /\.(mp4|m4a|mp3)$/i.test(k)) ??
     keys[0]
   );
-}
-
-/**
- * WebVTT → plain text. Drops cue timings and just concatenates text.
- * Good enough for a transcript panel; full VTT remains the IPFS source
- * of truth.
- */
-function vttToPlainText(vtt: string): string {
-  const lines = vtt.split(/\r?\n/);
-  const out: string[] = [];
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (!line) continue;
-    if (line === "WEBVTT") continue;
-    if (/^\d+$/.test(line)) continue; // cue number
-    if (/-->/.test(line)) continue; // timestamps
-    if (/^NOTE\b/.test(line)) continue;
-    out.push(line);
-  }
-  return out.join(" ").replace(/\s+/g, " ").trim();
 }
