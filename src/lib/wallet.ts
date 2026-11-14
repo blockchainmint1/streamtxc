@@ -92,6 +92,15 @@ export function getWalletToken(): string | null {
 }
 
 export function disconnectWallet() {
+  // Cancel the sign-in on the server too, so a copied token stops working.
+  const token = read()?.token;
+  if (token && typeof fetch !== "undefined") {
+    void fetch("/api/public/auth/logout", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      keepalive: true,
+    }).catch(() => null);
+  }
   write(null);
 }
 

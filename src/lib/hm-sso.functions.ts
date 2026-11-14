@@ -2,6 +2,7 @@
 // back to /sso (see honest.money/api section 1). streamTXC accounts are TXC
 // wallets, so each member links a wallet once; later logins map member → wallet.
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireWalletSession } from "./wallet-auth.functions";
 import { sendHubEvent } from "./hm-hub.server";
