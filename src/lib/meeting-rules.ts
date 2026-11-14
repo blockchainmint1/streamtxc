@@ -61,3 +61,36 @@ export function decodeExternalUserId(ext: string | null | undefined): { role: Me
   const role: MeetingRole = prefix === "h" ? "host" : prefix === "v" ? "viewer" : "participant";
   return { role, name: bar >= 0 ? s.slice(bar + 1) || "Guest" : "Guest" };
 }
+
+// ---------- Pricing (about 10x our AWS cost) ----------
+// AWS Chime SDK: $0.0017 per connected seat per minute (view-only seats count too).
+// Live connector ("Send to live stream"): $0.09 per minute.
+export const AWS_USD_PER_SEAT_MINUTE = 0.0017;
+export const AWS_USD_PER_BROADCAST_MINUTE = 0.09;
+export const MEETING_MARKUP = 10;
+export const PRICE_USD_PER_SEAT_MINUTE = +(AWS_USD_PER_SEAT_MINUTE * MEETING_MARKUP).toFixed(6);
+export const PRICE_USD_PER_BROADCAST_MINUTE = +(AWS_USD_PER_BROADCAST_MINUTE * MEETING_MARKUP).toFixed(6);
+/** A host needs enough balance for 2 people × 5 minutes before a paid room opens. */
+export const MIN_START_SEAT_MINUTES = 10;
+
+/** What one minute of a meeting costs the host, in USD. */
+export function meetingMinuteUsd(seats: number, broadcasting: boolean): number {
+  const n = Math.max(0, Math.floor(seats));
+  return +(n * PRICE_USD_PER_SEAT_MINUTE + (broadcasting ? PRICE_USD_PER_BROADCAST_MINUTE : 0)).toFixed(6);
+}
+
+/** USD → TXC at a spot price, rounded to 8 decimals (TXC's smallest unit). */
+export function usdToTxc8(usd: number, txcUsd: number): number {
+  if (!(txcUsd > 0) || usd <= 0) return 0;
+  return +(usd / txcUsd).toFixed(8);
+}
+
+/** Bobby's own team room is paid by the company, never charged. */
+export function isMeetingBillable(ownerWallet: string, adminWallet: string): boolean {
+  return ownerWallet !== adminWallet;
+}
+
+/** After charging a minute, should the meeting close because the host can't cover the next one? */
+export function shouldEndForCredit(balanceTxc: number, nextMinuteTxc: number): boolean {
+  return nextMinuteTxc > 0 && balanceTxc < nextMinuteTxc;
+}

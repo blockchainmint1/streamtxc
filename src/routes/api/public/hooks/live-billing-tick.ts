@@ -139,7 +139,15 @@ export const Route = createFileRoute("/api/public/hooks/live-billing-tick")({
         } catch (err) {
           warmup = { error: err instanceof Error ? err.message : String(err) };
         }
-        return Response.json({ ok: true, considered: channels?.length ?? 0, results, warmup });
+        // Team meetings (/meet): charge open paid rooms per minute.
+        let meetings: Record<string, unknown> = {};
+        try {
+          const { runMeetingBillingTick } = await import("@/lib/meeting-billing.server");
+          meetings = await runMeetingBillingTick();
+        } catch (err) {
+          meetings = { error: err instanceof Error ? err.message : String(err) };
+        }
+        return Response.json({ ok: true, considered: channels?.length ?? 0, results, warmup, meetings });
       },
     },
   },

@@ -16,4 +16,7 @@
 - [x] M-11 diagnostic tools now return only status/progress; raw errors owner-only; tests added
 # Team meetings (/meet)
 - [x] Build /meet host page, team link + view-only link, meeting screen (mic, camera, screen share, leave, end for all), send-to-live-stream button; 6 link-rule tests pass.
-- [ ] Live meeting test with real audio/video. Blocker: AWS user `streamtxc` lacks Chime permission — Bobby must run the CloudShell command.
+- [x] AWS Chime permission granted; room join/roles verified in browser.
+- [ ] Live meeting test with real audio/video. Blocker: needs Bobby on real devices after publishing (test browser can't place calls).
+- [x] Charge hosts ~10x AWS cost from prepaid TXC balance (admin room free); seat freed on leave; real AWS seat count test passed.
+- [ ] Discuss with Bobby how people pay in TXC (top-up flow, pay-per-meeting, plans). Blocker: Bobby's decision.

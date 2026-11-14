@@ -52,6 +52,7 @@ import { Route as ApiPublicHooksLiveBillingTickRouteImport } from './routes/api/
 import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
 import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/hooks/telegram'
+import { Route as ApiPublicMeetLeaveRouteImport } from './routes/api/public/meet/leave'
 import { Route as ApiPublicMinehmeProfileUpdateRouteImport } from './routes/api/public/minehme/profile-update'
 import { Route as ApiPublicNotifyVerifyEmailRouteImport } from './routes/api/public/notify/verify-email'
 import { Route as ApiPublicV1WalletLinkRouteImport } from './routes/api/public/v1/wallet-link'
@@ -290,6 +291,11 @@ const ApiPublicHooksTelegramRoute = ApiPublicHooksTelegramRouteImport.update({
   path: '/public/hooks/telegram',
   getParentRoute: () => ApiRoute,
 } as any)
+const ApiPublicMeetLeaveRoute = ApiPublicMeetLeaveRouteImport.update({
+  id: '/public/meet/leave',
+  path: '/public/meet/leave',
+  getParentRoute: () => ApiRoute,
+} as any)
 const ApiPublicMinehmeProfileUpdateRoute =
   ApiPublicMinehmeProfileUpdateRouteImport.update({
     id: '/public/minehme/profile-update',
@@ -362,6 +368,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
+  '/api/public/meet/leave': typeof ApiPublicMeetLeaveRoute
   '/api/public/minehme/profile-update': typeof ApiPublicMinehmeProfileUpdateRoute
   '/api/public/notify/verify-email': typeof ApiPublicNotifyVerifyEmailRoute
   '/api/public/v1/wallet-link': typeof ApiPublicV1WalletLinkRoute
@@ -412,6 +419,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
+  '/api/public/meet/leave': typeof ApiPublicMeetLeaveRoute
   '/api/public/minehme/profile-update': typeof ApiPublicMinehmeProfileUpdateRoute
   '/api/public/notify/verify-email': typeof ApiPublicNotifyVerifyEmailRoute
   '/api/public/v1/wallet-link': typeof ApiPublicV1WalletLinkRoute
@@ -463,6 +471,7 @@ export interface FileRoutesById {
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
+  '/api/public/meet/leave': typeof ApiPublicMeetLeaveRoute
   '/api/public/minehme/profile-update': typeof ApiPublicMinehmeProfileUpdateRoute
   '/api/public/notify/verify-email': typeof ApiPublicNotifyVerifyEmailRoute
   '/api/public/v1/wallet-link': typeof ApiPublicV1WalletLinkRoute
@@ -515,6 +524,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
+    | '/api/public/meet/leave'
     | '/api/public/minehme/profile-update'
     | '/api/public/notify/verify-email'
     | '/api/public/v1/wallet-link'
@@ -565,6 +575,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
+    | '/api/public/meet/leave'
     | '/api/public/minehme/profile-update'
     | '/api/public/notify/verify-email'
     | '/api/public/v1/wallet-link'
@@ -615,6 +626,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
+    | '/api/public/meet/leave'
     | '/api/public/minehme/profile-update'
     | '/api/public/notify/verify-email'
     | '/api/public/v1/wallet-link'
@@ -949,6 +961,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksTelegramRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/public/meet/leave': {
+      id: '/api/public/meet/leave'
+      path: '/public/meet/leave'
+      fullPath: '/api/public/meet/leave'
+      preLoaderRoute: typeof ApiPublicMeetLeaveRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/public/minehme/profile-update': {
       id: '/api/public/minehme/profile-update'
       path: '/public/minehme/profile-update'
@@ -1022,6 +1041,7 @@ interface ApiRouteChildren {
   ApiPublicHooksMediaconvertRoute: typeof ApiPublicHooksMediaconvertRoute
   ApiPublicHooksPaymentWatcherRoute: typeof ApiPublicHooksPaymentWatcherRoute
   ApiPublicHooksTelegramRoute: typeof ApiPublicHooksTelegramRoute
+  ApiPublicMeetLeaveRoute: typeof ApiPublicMeetLeaveRoute
   ApiPublicMinehmeProfileUpdateRoute: typeof ApiPublicMinehmeProfileUpdateRoute
   ApiPublicNotifyVerifyEmailRoute: typeof ApiPublicNotifyVerifyEmailRoute
   ApiPublicV1WalletLinkRoute: typeof ApiPublicV1WalletLinkRoute
@@ -1052,6 +1072,7 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiPublicHooksMediaconvertRoute: ApiPublicHooksMediaconvertRoute,
   ApiPublicHooksPaymentWatcherRoute: ApiPublicHooksPaymentWatcherRoute,
   ApiPublicHooksTelegramRoute: ApiPublicHooksTelegramRoute,
+  ApiPublicMeetLeaveRoute: ApiPublicMeetLeaveRoute,
   ApiPublicMinehmeProfileUpdateRoute: ApiPublicMinehmeProfileUpdateRoute,
   ApiPublicNotifyVerifyEmailRoute: ApiPublicNotifyVerifyEmailRoute,
   ApiPublicV1WalletLinkRoute: ApiPublicV1WalletLinkRoute,

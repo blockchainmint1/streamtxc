@@ -102,6 +102,7 @@ export function HostPanel({ compact = false }: { compact?: boolean }) {
           </Button>
         )}
       </div>
+      <PriceBox billing={r.billing} />
       <p className="font-mono text-xs text-muted-foreground">
         {r.live ? "● The meeting is open right now." : "○ Nobody's in the meeting. It opens when the first person joins."}
         {" "}"Send to live stream" works while the meeting is open and your live stream light on the Manage page is green.
@@ -117,6 +118,41 @@ function LinkRow({ label, url }: { label: string; url: string }) {
       <div className="flex items-center gap-2">
         <code className="flex-1 truncate font-mono text-xs text-primary">{url}</code>
         <CopyLinkButton value={url} />
+      </div>
+    </div>
+  );
+}
+
+type Billing = {
+  billable: boolean; balanceTxc: number; txcUsd: number;
+  seatMinuteUsd: number; broadcastMinuteUsd: number;
+  seatMinuteTxc: number; broadcastMinuteTxc: number; minStartTxc: number;
+};
+
+const fmt = (n: number, d = 4) => n.toLocaleString(undefined, { maximumFractionDigits: d });
+
+function PriceBox({ billing: b }: { billing: Billing }) {
+  const tenHourTxc = b.seatMinuteTxc * 10 * 60;
+  if (!b.billable) {
+    return (
+      <div className="border border-border bg-card rounded-sm p-3 text-sm text-muted-foreground">
+        Your team room is free — it isn't charged.
+      </div>
+    );
+  }
+  const low = b.balanceTxc < b.minStartTxc;
+  return (
+    <div className="border border-border bg-card rounded-sm p-3 text-sm space-y-1">
+      <div className="font-medium">Meeting price</div>
+      <div className="text-muted-foreground">
+        {fmt(b.seatMinuteTxc)} TXC (${b.seatMinuteUsd.toFixed(3)}) per person, per minute — view-only watchers count too.
+        {" "}A 10-person, 1-hour meeting is about {fmt(tenHourTxc, 2)} TXC (${(b.seatMinuteUsd * 600).toFixed(2)}).
+      </div>
+      <div className="text-muted-foreground">
+        "Send to live stream" adds {fmt(b.broadcastMinuteTxc, 2)} TXC (${b.broadcastMinuteUsd.toFixed(2)}) per minute.
+      </div>
+      <div className={low ? "text-destructive" : "text-foreground"}>
+        Your balance: {fmt(b.balanceTxc)} TXC{low ? " — add TXC on the Manage page before starting." : ""}
       </div>
     </div>
   );

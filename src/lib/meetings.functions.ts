@@ -12,6 +12,11 @@ import {
   encodeExternalUserId,
   newMeetingCode,
   roleForCode,
+  isMeetingBillable,
+  usdToTxc8,
+  MIN_START_SEAT_MINUTES,
+  PRICE_USD_PER_SEAT_MINUTE,
+  PRICE_USD_PER_BROADCAST_MINUTE,
 } from "./meeting-rules";
 
 const ADMIN_WALLET = "TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m";
@@ -65,9 +70,34 @@ async function roomForOwner(wallet: string): Promise<Room | null> {
 }
 
 class NotStartedError extends Error {}
+class NoCreditError extends Error {}
+
+/** Host's prepaid TXC balance (same balance as live streaming) and today's meeting prices in TXC. */
+async function meetingBilling(wallet: string) {
+  const { getTxcUsdPrice } = await import("./txc-price.server");
+  const price = await getTxcUsdPrice();
+  const billable = isMeetingBillable(wallet, ADMIN_WALLET);
+  let balanceTxc = 0;
+  if (billable) {
+    const credits = await import("./live-credits.functions");
+    await credits.syncDepositsForWallet(wallet).catch(() => null);
+    balanceTxc = await credits.computeBalance(wallet);
+  }
+  return {
+    billable,
+    balanceTxc: +balanceTxc.toFixed(8),
+    txcUsd: price.usd,
+    seatMinuteUsd: PRICE_USD_PER_SEAT_MINUTE,
+    broadcastMinuteUsd: PRICE_USD_PER_BROADCAST_MINUTE,
+    seatMinuteTxc: usdToTxc8(PRICE_USD_PER_SEAT_MINUTE, price.usd),
+    broadcastMinuteTxc: usdToTxc8(PRICE_USD_PER_BROADCAST_MINUTE, price.usd),
+    minStartTxc: usdToTxc8(MIN_START_SEAT_MINUTES * PRICE_USD_PER_SEAT_MINUTE, price.usd),
+  };
+}
 
 function friendly(err: unknown): string {
   if (err instanceof NotStartedError) return "The meeting hasn't started yet. This page will let you in as soon as it does.";
+  if (err instanceof NoCreditError) return err.message;
   const msg = err instanceof Error ? err.message : "";
   if (/permission is missing/i.test(msg)) return "Meetings aren't switched on yet — the host still needs to finish the AWS setup.";
   return "The meeting service didn't respond. Please try again in a moment.";
@@ -81,6 +111,12 @@ async function ensureMeeting(room: Room, allowCreate: boolean): Promise<Room> {
     if (live) return { ...room, chime_meeting: live };
   }
   if (!allowCreate) throw new NotStartedError();
+  if (isMeetingBillable(room.owner_wallet, ADMIN_WALLET)) {
+    const b = await meetingBilling(room.owner_wallet);
+    if (b.balanceTxc < b.minStartTxc) {
+      throw new NoCreditError("The host's meeting balance is empty. The host can add TXC on the Manage page, then try again.");
+    }
+  }
   const gen = room.meeting_generation + 1;
   // Same token for everyone racing to restart this generation → AWS returns one meeting.
   const meeting = await chime.createMeeting({
@@ -117,8 +153,9 @@ async function isMeetingLive(room: Room): Promise<boolean> {
   }
 }
 
-function hostView(room: Room, live: boolean) {
+async function hostView(room: Room, live: boolean) {
   return {
+    billing: await meetingBilling(room.owner_wallet),
     title: room.title,
     joinCode: room.join_code,
     viewCode: room.view_code,
@@ -145,7 +182,7 @@ export const getMyMeetingRoom = createServerFn({ method: "POST" })
       if (error) throw new Error("Could not create your meeting room.");
       room = data as Room;
     }
-    return hostView(room, await isMeetingLive(room));
+    return await hostView(room, await isMeetingLive(room));
   });
 
 export const updateMyMeetingRoom = createServerFn({ method: "POST" })
@@ -169,7 +206,7 @@ export const updateMyMeetingRoom = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw new Error("Could not update your meeting room.");
-    return hostView(row as Room, await isMeetingLive(row as Room));
+    return await hostView(row as Room, await isMeetingLive(row as Room));
   });
 
 export const endMyMeeting = createServerFn({ method: "POST" })
@@ -297,7 +334,11 @@ export const joinMeeting = createServerFn({ method: "POST" })
       const sb = await db();
       await sb.from("meeting_rooms").update({ last_joined_at: new Date().toISOString() }).eq("id", room.id);
       const m = room.chime_meeting;
+      const { signLeaveToken } = await import("./meeting-leave");
+      const leaveSecret = process.env.MEETING_LEAVE_SECRET;
+      const leaveToken = leaveSecret ? await signLeaveToken(leaveSecret, m.MeetingId, attendee.AttendeeId) : null;
       return {
+        leaveToken,
         role,
         title: room.title,
         meeting: { MeetingId: m.MeetingId, MediaRegion: m.MediaRegion, MediaPlacement: m.MediaPlacement, ExternalMeetingId: m.ExternalMeetingId },
