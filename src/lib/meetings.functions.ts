@@ -189,7 +189,7 @@ async function hostRtmpTarget(wallet: string): Promise<{ url: string; channelId?
   const ml = await import("./aws-medialive.server");
   if (wallet === ADMIN_WALLET) {
     const info = await ml.describeInput().catch(() => ({ destinations: [] as string[] }));
-    let url = info.destinations[0];
+    let url: string | undefined = info.destinations[0];
     if (!url) {
       const envUrl = process.env.LIVE_RTMP_URL?.trim();
       const envKey = process.env.LIVE_STREAM_KEY?.trim();

@@ -50,7 +50,7 @@ export async function verifyHmeTicket(token: string, secret: string, now = Date.
 }
 
 // Only honor landing pages that actually exist on streamTXC; HME may send its own paths (e.g. "/my").
-const HME_REDIRECT_PAGES = ["about", "brand", "embed", "live", "manage", "manifesto", "privacy", "terms", "u", "upload", "v"];
+const HME_REDIRECT_PAGES = ["about", "brand", "embed", "live", "manage", "manifesto", "meet", "privacy", "terms", "u", "upload", "v"];
 
 export function hmeRedirect(redirect?: string): string | null {
   if (!redirect || !redirect.startsWith("/") || redirect.startsWith("//") || /[\\\u0000-\u001f]/.test(redirect)) return null;
