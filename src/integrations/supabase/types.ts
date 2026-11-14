@@ -695,11 +695,120 @@ export type Database = {
           },
         ]
       }
+      meeting_recordings: {
+        Row: {
+          action_items: Json | null
+          capture_pipeline_arn: string | null
+          capture_pipeline_id: string | null
+          chime_meeting_id: string
+          concat_pipeline_id: string | null
+          created_at: string
+          decisions: Json | null
+          deleted_at: string | null
+          ended_at: string | null
+          error: string | null
+          id: string
+          key_points: Json | null
+          notes_status: string
+          owner_wallet: string
+          publish_job_id: string | null
+          publish_status: string
+          published_cid: string | null
+          record_video: boolean
+          room_id: string
+          started_at: string
+          status: string
+          summary: string | null
+          take_notes: boolean
+          title: string
+          transcript: Json | null
+          transcript_text: string | null
+          transcription_started: boolean
+          updated_at: string
+          video_bytes: number | null
+          video_key: string | null
+        }
+        Insert: {
+          action_items?: Json | null
+          capture_pipeline_arn?: string | null
+          capture_pipeline_id?: string | null
+          chime_meeting_id: string
+          concat_pipeline_id?: string | null
+          created_at?: string
+          decisions?: Json | null
+          deleted_at?: string | null
+          ended_at?: string | null
+          error?: string | null
+          id?: string
+          key_points?: Json | null
+          notes_status?: string
+          owner_wallet: string
+          publish_job_id?: string | null
+          publish_status?: string
+          published_cid?: string | null
+          record_video?: boolean
+          room_id: string
+          started_at?: string
+          status?: string
+          summary?: string | null
+          take_notes?: boolean
+          title: string
+          transcript?: Json | null
+          transcript_text?: string | null
+          transcription_started?: boolean
+          updated_at?: string
+          video_bytes?: number | null
+          video_key?: string | null
+        }
+        Update: {
+          action_items?: Json | null
+          capture_pipeline_arn?: string | null
+          capture_pipeline_id?: string | null
+          chime_meeting_id?: string
+          concat_pipeline_id?: string | null
+          created_at?: string
+          decisions?: Json | null
+          deleted_at?: string | null
+          ended_at?: string | null
+          error?: string | null
+          id?: string
+          key_points?: Json | null
+          notes_status?: string
+          owner_wallet?: string
+          publish_job_id?: string | null
+          publish_status?: string
+          published_cid?: string | null
+          record_video?: boolean
+          room_id?: string
+          started_at?: string
+          status?: string
+          summary?: string | null
+          take_notes?: boolean
+          title?: string
+          transcript?: Json | null
+          transcript_text?: string | null
+          transcription_started?: boolean
+          updated_at?: string
+          video_bytes?: number | null
+          video_key?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_recordings_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_rooms: {
         Row: {
           approve_team: boolean
           approve_viewers: boolean
           archived_at: string | null
+          auto_notes: boolean
+          auto_record: boolean
           broadcast_pipeline_id: string | null
           broadcast_started_at: string | null
           chime_meeting: Json | null
@@ -720,6 +829,8 @@ export type Database = {
           approve_team?: boolean
           approve_viewers?: boolean
           archived_at?: string | null
+          auto_notes?: boolean
+          auto_record?: boolean
           broadcast_pipeline_id?: string | null
           broadcast_started_at?: string | null
           chime_meeting?: Json | null
@@ -740,6 +851,8 @@ export type Database = {
           approve_team?: boolean
           approve_viewers?: boolean
           archived_at?: string | null
+          auto_notes?: boolean
+          auto_record?: boolean
           broadcast_pipeline_id?: string | null
           broadcast_started_at?: string | null
           chime_meeting?: Json | null
