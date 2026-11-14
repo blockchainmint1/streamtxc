@@ -3,7 +3,7 @@
 // from the host's prepaid balance (the same balance live streaming uses).
 // When the host can't cover the next minute, the meeting is closed for everyone.
 
-import { isMeetingBillable, meetingMinuteUsd, shouldEndForCredit, usdToTxc8 } from "./meeting-rules";
+import { isMeetingBillable, meetingMinuteUsd, recordingMinuteUsd, shouldEndForCredit, usdToTxc8 } from "./meeting-rules";
 
 const ADMIN_WALLET = "TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m";
 
@@ -13,6 +13,7 @@ export async function runMeetingBillingTick() {
   const chime = await import("./aws-chime.server");
   const credits = await import("./live-credits.functions");
   const { getTxcUsdPrice } = await import("./txc-price.server");
+  const recording = await import("./meeting-recording.server");
 
   const { data: rooms, error } = await sb
     .from("meeting_rooms")
@@ -27,6 +28,7 @@ export async function runMeetingBillingTick() {
     try {
       const live = await chime.getMeeting(room.chime_meeting_id);
       if (!live) {
+        await recording.stopRoomRecordings(room.id).catch(() => {});
         await sb.from("meeting_rooms")
           .update({ chime_meeting_id: null, chime_meeting: null, broadcast_pipeline_id: null, broadcast_started_at: null })
           .eq("id", room.id);
@@ -55,7 +57,9 @@ export async function runMeetingBillingTick() {
 
       const seats = await chime.countAttendees(room.chime_meeting_id);
       const broadcasting = !!room.broadcast_pipeline_id;
-      const minuteTxc = usdToTxc8(meetingMinuteUsd(seats, broadcasting), txcUsd);
+      const rec = await recording.activeRecording(room.id);
+      const recUsd = rec ? recordingMinuteUsd(rec.record_video, rec.take_notes) : 0;
+      const minuteTxc = usdToTxc8(meetingMinuteUsd(seats, broadcasting) + recUsd, txcUsd);
       await credits.syncDepositsForWallet(room.owner_wallet).catch(() => null);
       if (minuteTxc > 0) {
         await sb.from("live_credit_ledger").insert({
@@ -68,13 +72,14 @@ export async function runMeetingBillingTick() {
       const balance = await credits.computeBalance(room.owner_wallet);
       if (shouldEndForCredit(balance, minuteTxc)) {
         if (room.broadcast_pipeline_id) await chime.stopMediaPipeline(room.broadcast_pipeline_id).catch(() => {});
+        await recording.stopRoomRecordings(room.id).catch(() => {});
         await chime.deleteMeeting(room.chime_meeting_id).catch(() => {});
         await sb.from("meeting_rooms")
           .update({ chime_meeting_id: null, chime_meeting: null, broadcast_pipeline_id: null, broadcast_started_at: null })
           .eq("id", room.id);
         results.push({ room: room.id, action: "ended_out_of_credit", seats, balance });
       } else {
-        results.push({ room: room.id, action: "billed", seats, broadcasting, minuteTxc, balance });
+        results.push({ room: room.id, action: "billed", seats, broadcasting, recording: !!rec, minuteTxc, balance });
       }
     } catch (err) {
       results.push({ room: room.id, action: "error", error: err instanceof Error ? err.message : String(err) });
