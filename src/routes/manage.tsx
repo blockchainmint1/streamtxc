@@ -380,19 +380,19 @@ function ForceCaptionsButton({
       size="icon"
       variant="outline"
       className="font-mono h-7 w-7"
-      title={hasTranscript ? "Regenerate closed captions" : "Generate closed captions"}
-      aria-label="Generate closed captions"
+      title={hasTranscript ? "Transcript ready" : "Make a transcript"}
+      aria-label="Make a transcript"
       disabled={busy}
       onClick={async () => {
         setBusy(true);
         try {
           const res = await run({ data: { wallet, cid } });
           if (res.action === "already_transcribed") {
-            toast.success("Captions already exist");
+            toast.success("Transcript already exists");
           } else if (res.action === "transcribed_from_existing_audio") {
-            toast.success("Captions generated");
+            toast.success("Transcript ready — it shows under the video");
           } else if (res.action === "audio_job_queued") {
-            toast.success("Audio job queued — captions will appear shortly");
+            toast.success("Working on it — the transcript will appear in a few minutes");
           } else if (res.action === "skipped_no_input") {
             toast.error("Source video unavailable");
           } else if (res.action === "skipped_too_large") {
@@ -777,7 +777,7 @@ function ManagePageInner() {
                           <ForceCaptionsButton
                             cid={v.cid}
                             wallet={address!}
-                            hasTranscript={!!v.transcript_cid}
+                            hasTranscript={!!(v.transcript_cid || (v as { transcript_text?: string | null }).transcript_text)}
                           />
                           <EditVideoDialog
                             cid={v.cid}
