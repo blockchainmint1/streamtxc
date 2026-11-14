@@ -22,19 +22,6 @@ import { assignVideoWallet } from "./txc-wallets.server";
 import { gatewayUrl, withGatewayKey } from "./ipfs.server";
 import { optionalWalletSession } from "./wallet-auth.functions";
 
-const optionalWalletSchema = z
-  .string()
-  .trim()
-  .optional()
-  .transform((v) => (v && v.length > 0 ? v : undefined))
-  .refine(
-    (v) =>
-      v === undefined ||
-      /^0x[a-fA-F0-9]{40}$/.test(v) ||
-      /^[a-zA-Z0-9]{20,90}$/.test(v),
-    "Invalid wallet address",
-  );
-
 const MIN_TXC = 0.01;
 const MAX_TXC = 10000;
 const MAX_BODY_LEN = 1000;
