@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+/// <reference types="bun" />
+import { describe, expect, it } from "bun:test";
 import {
   MEETING_CODE_RE, capabilitiesFor, cleanDisplayName, decodeExternalUserId, encodeExternalUserId, newMeetingCode, roleForCode,
 } from "./meeting-rules";
