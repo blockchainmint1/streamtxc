@@ -20,6 +20,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { explorerTxUrl } from "./txc.server";
 import { assignVideoWallet } from "./txc-wallets.server";
 import { gatewayUrl, withGatewayKey } from "./ipfs.server";
+import { optionalWalletSession } from "./wallet-auth.functions";
 
 const optionalWalletSchema = z
   .string()
@@ -49,18 +50,20 @@ export const COMMENT_PRICING = {
 
 // --- Create a pending comment intent -------------------------------------
 
+// A comment/boost is credited to a wallet ONLY when that wallet is signed in;
+// otherwise it posts as "anon". Nobody can post under someone else's wallet.
 export const createCommentIntent = createServerFn({ method: "POST" })
+  .middleware([optionalWalletSession])
   .inputValidator((input) =>
     z
       .object({
         videoCid: z.string().min(1).max(200),
         body: z.string().trim().min(1).max(MAX_BODY_LEN),
         amountTxc: z.number().min(MIN_TXC).max(MAX_TXC),
-        commenterWallet: optionalWalletSchema,
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { data: video, error: vErr } = await supabaseAdmin
       .from("videos")
       .select("cid, video_wallet, hidden_at")
@@ -83,7 +86,7 @@ export const createCommentIntent = createServerFn({ method: "POST" })
         video_cid: data.videoCid,
         body: data.body,
         body_hash: bodyHash,
-        commenter_wallet: data.commenterWallet ?? null,
+        commenter_wallet: context.wallet ?? null,
         initial_payment_txc: data.amountTxc,
         boost_total_txc: 0, // becomes amountTxc on payment confirmation
         status: "pending_payment",
@@ -108,16 +111,16 @@ export const createCommentIntent = createServerFn({ method: "POST" })
 // --- Create a pending boost intent ---------------------------------------
 
 export const createBoostIntent = createServerFn({ method: "POST" })
+  .middleware([optionalWalletSession])
   .inputValidator((input) =>
     z
       .object({
         commentId: z.string().uuid(),
         amountTxc: z.number().min(MIN_TXC).max(MAX_TXC),
-        boosterWallet: optionalWalletSchema,
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { data: comment, error: cErr } = await supabaseAdmin
       .from("comments")
       .select("id, video_cid, status")
@@ -144,7 +147,7 @@ export const createBoostIntent = createServerFn({ method: "POST" })
       .from("comment_boosts")
       .insert({
         comment_id: data.commentId,
-        booster_wallet: data.boosterWallet ?? null,
+        booster_wallet: context.wallet ?? null,
         amount_txc: data.amountTxc,
         status: "pending_payment",
         deposit_wallet: wallet.address,
