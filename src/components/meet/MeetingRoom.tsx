@@ -15,6 +15,21 @@ export interface JoinResult {
   title: string;
   meeting: any;
   attendee: { AttendeeId: string; ExternalUserId: string; JoinToken: string };
+  leaveToken?: string | null;
+}
+
+/** Tell the server this seat is free (works even while the tab is closing). */
+function sendLeave(join: JoinResult) {
+  if (!join.leaveToken) return;
+  const body = JSON.stringify({
+    meetingId: join.meeting?.MeetingId,
+    attendeeId: join.attendee.AttendeeId,
+    token: join.leaveToken,
+  });
+  try {
+    if (navigator.sendBeacon?.("/api/public/meet/leave", body)) return;
+  } catch { /* fall through */ }
+  void fetch("/api/public/meet/leave", { method: "POST", body, keepalive: true }).catch(() => {});
 }
 
 interface Tile { tileId: number; attendeeId: string; local: boolean; content: boolean }
@@ -41,6 +56,22 @@ export function MeetingRoom({
   const [needsSoundTap, setNeedsSoundTap] = useState(false);
   const [busy, setBusy] = useState(false);
   const canShare = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
+
+  const leftRef = useRef(false);
+  const leaveOnce = () => {
+    if (leftRef.current) return;
+    leftRef.current = true;
+    sendLeave(join);
+  };
+  useEffect(() => {
+    const onHide = (e: PageTransitionEvent) => { if (!e.persisted) leaveOnce(); };
+    window.addEventListener("pagehide", onHide);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      leaveOnce();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [join.attendee.AttendeeId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -226,6 +257,7 @@ export function MeetingRoom({
   }
 
   function leave() {
+    leaveOnce();
     try { avRef.current?.stopContentShare(); } catch { /* noop */ }
     try { avRef.current?.stop(); } catch { /* noop */ }
     setStatus("left");
