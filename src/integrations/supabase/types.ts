@@ -651,8 +651,55 @@ export type Database = {
           },
         ]
       }
+      meeting_join_requests: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          display_name: string
+          id: string
+          last_seen_at: string
+          role: string
+          room_id: string
+          status: string
+          token_hash: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          display_name: string
+          id?: string
+          last_seen_at?: string
+          role: string
+          room_id: string
+          status?: string
+          token_hash: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          display_name?: string
+          id?: string
+          last_seen_at?: string
+          role?: string
+          room_id?: string
+          status?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_join_requests_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_rooms: {
         Row: {
+          approve_team: boolean
+          approve_viewers: boolean
+          archived_at: string | null
           broadcast_pipeline_id: string | null
           broadcast_started_at: string | null
           chime_meeting: Json | null
@@ -660,14 +707,19 @@ export type Database = {
           created_at: string
           id: string
           join_code: string
+          join_sound: boolean
           last_joined_at: string | null
           meeting_generation: number
           owner_wallet: string
+          purpose: string | null
           title: string
           updated_at: string
           view_code: string
         }
         Insert: {
+          approve_team?: boolean
+          approve_viewers?: boolean
+          archived_at?: string | null
           broadcast_pipeline_id?: string | null
           broadcast_started_at?: string | null
           chime_meeting?: Json | null
@@ -675,14 +727,19 @@ export type Database = {
           created_at?: string
           id?: string
           join_code: string
+          join_sound?: boolean
           last_joined_at?: string | null
           meeting_generation?: number
           owner_wallet: string
+          purpose?: string | null
           title?: string
           updated_at?: string
           view_code: string
         }
         Update: {
+          approve_team?: boolean
+          approve_viewers?: boolean
+          archived_at?: string | null
           broadcast_pipeline_id?: string | null
           broadcast_started_at?: string | null
           chime_meeting?: Json | null
@@ -690,9 +747,11 @@ export type Database = {
           created_at?: string
           id?: string
           join_code?: string
+          join_sound?: boolean
           last_joined_at?: string | null
           meeting_generation?: number
           owner_wallet?: string
+          purpose?: string | null
           title?: string
           updated_at?: string
           view_code?: string
