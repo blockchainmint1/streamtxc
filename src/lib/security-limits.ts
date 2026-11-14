@@ -86,7 +86,7 @@ export function securityHeadersFor(pathname: string): Record<string, string> {
   return {
     "x-content-type-options": "nosniff",
     "referrer-policy": "strict-origin-when-cross-origin",
-    "strict-transport-security": "max-age=31536000; includeSubDomains",
+    "strict-transport-security": "max-age=31536000",
     "content-security-policy": `frame-ancestors ${embeddable ? "*" : FRAME_PARENTS}; object-src 'none'; base-uri 'self'`,
     "permissions-policy": "geolocation=(), payment=(), usb=()",
   };
