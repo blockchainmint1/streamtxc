@@ -72,6 +72,7 @@ import {
 import {
   getMyLiveChannel,
   provisionMyLiveChannel,
+  rotateMyStreamKey,
   startMyStream,
   stopMyStream,
   markMyStreamLive,
