@@ -4,8 +4,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
 const Body = z.object({
-  meetingId: z.string().uuid(),
-  attendeeId: z.string().uuid(),
+  meetingId: z.string().regex(/^[A-Za-z0-9-]{8,64}$/),
+  attendeeId: z.string().regex(/^[A-Za-z0-9-]{8,64}$/),
   token: z.string().regex(/^[0-9a-f]{64}$/),
 });
 
