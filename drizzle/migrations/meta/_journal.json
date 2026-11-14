@@ -64,6 +64,13 @@
       "when": 1794675877867,
       "tag": "0008_meeting_recordings",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794678284965,
+      "tag": "0009_wallet_sessions_and_email_limits",
+      "breakpoints": true
     }
   ]
 }

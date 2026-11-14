@@ -1318,7 +1318,10 @@ export type Database = {
           email: string | null
           email_verified_at: string | null
           email_verify_expires_at: string | null
+          email_verify_last_sent_at: string | null
+          email_verify_send_count: number
           email_verify_token: string | null
+          email_verify_window_start: string | null
           live_deposit_address: string | null
           live_deposit_derivation_index: number | null
           live_deposit_received_txc: number
@@ -1338,7 +1341,10 @@ export type Database = {
           email?: string | null
           email_verified_at?: string | null
           email_verify_expires_at?: string | null
+          email_verify_last_sent_at?: string | null
+          email_verify_send_count?: number
           email_verify_token?: string | null
+          email_verify_window_start?: string | null
           live_deposit_address?: string | null
           live_deposit_derivation_index?: number | null
           live_deposit_received_txc?: number
@@ -1358,7 +1364,10 @@ export type Database = {
           email?: string | null
           email_verified_at?: string | null
           email_verify_expires_at?: string | null
+          email_verify_last_sent_at?: string | null
+          email_verify_send_count?: number
           email_verify_token?: string | null
+          email_verify_window_start?: string | null
           live_deposit_address?: string | null
           live_deposit_derivation_index?: number | null
           live_deposit_received_txc?: number
@@ -1371,6 +1380,36 @@ export type Database = {
           telegram_pairing_expires_at?: string | null
           telegram_username?: string | null
           updated_at?: string
+          wallet?: string
+        }
+        Relationships: []
+      }
+      wallet_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          last_seen_at: string
+          revoked_at: string | null
+          user_agent: string | null
+          wallet: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          last_seen_at?: string
+          revoked_at?: string | null
+          user_agent?: string | null
+          wallet: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          last_seen_at?: string
+          revoked_at?: string | null
+          user_agent?: string | null
           wallet?: string
         }
         Relationships: []
