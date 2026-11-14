@@ -64,19 +64,23 @@ async function roomForOwner(wallet: string): Promise<Room | null> {
   return data as Room | null;
 }
 
+class NotStartedError extends Error {}
+
 function friendly(err: unknown): string {
+  if (err instanceof NotStartedError) return "The meeting hasn't started yet. This page will let you in as soon as it does.";
   const msg = err instanceof Error ? err.message : "";
   if (/permission is missing/i.test(msg)) return "Meetings aren't switched on yet — the host still needs to finish the AWS setup.";
   return "The meeting service didn't respond. Please try again in a moment.";
 }
 
 /** Returns the room's live Chime meeting, creating a new one if the last one ended. */
-async function ensureMeeting(room: Room): Promise<Room> {
+async function ensureMeeting(room: Room, allowCreate: boolean): Promise<Room> {
   const chime = await import("./aws-chime.server");
   if (room.chime_meeting_id) {
     const live = await chime.getMeeting(room.chime_meeting_id);
     if (live) return { ...room, chime_meeting: live };
   }
+  if (!allowCreate) throw new NotStartedError();
   const gen = room.meeting_generation + 1;
   // Same token for everyone racing to restart this generation → AWS returns one meeting.
   const meeting = await chime.createMeeting({
@@ -282,7 +286,7 @@ export const joinMeeting = createServerFn({ method: "POST" })
     const role = found ? roleForCode(found, data.code, context.wallet) : null;
     if (!found || !role) throw new Error("This meeting link isn't valid anymore. Ask the host for a new one.");
     try {
-      const room = await ensureMeeting(found);
+      const room = await ensureMeeting(found, role !== "viewer");
       const chime = await import("./aws-chime.server");
       const rand = crypto.randomUUID().replace(/-/g, "");
       const attendee = await chime.createAttendee(

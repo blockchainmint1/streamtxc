@@ -41,6 +41,7 @@ function JoinPage() {
   const [cam, setCam] = useState(true);
   const [joining, setJoining] = useState(false);
   const [joined, setJoined] = useState<JoinResult | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   useEffect(() => {
     setName(window.localStorage.getItem(NAME_KEY) ?? "");
@@ -52,10 +53,13 @@ function JoinPage() {
     if (!n) return;
     window.localStorage.setItem(NAME_KEY, n);
     setJoining(true);
+    setJoinError(null);
     try {
       setJoined((await doJoin({ data: { code, name: n } })) as JoinResult);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not join the meeting.");
+      const msg = err instanceof Error ? err.message : "Could not join the meeting.";
+      setJoinError(msg);
+      toast.error(msg);
     } finally {
       setJoining(false);
     }
@@ -96,7 +100,11 @@ function JoinPage() {
               </div>
               <h1 className="text-2xl font-bold">{d.title}</h1>
               <p className="text-sm text-muted-foreground mt-1">
-                {d.live ? "● The meeting is open now." : "○ Nobody's here yet — you'll open the room."}
+                {d.live
+                  ? "● The meeting is open now."
+                  : viewer
+                    ? "○ The meeting hasn't started yet — this page checks again every 20 seconds."
+                    : "○ Nobody's here yet — you'll open the room."}
               </p>
             </div>
             {viewer && (
@@ -119,7 +127,8 @@ function JoinPage() {
                 </Button>
               </div>
             )}
-            <Button type="submit" size="lg" className="w-full" disabled={joining || !name.trim()}>
+            {joinError && <p role="alert" className="text-sm text-destructive">{joinError}</p>}
+            <Button type="submit" size="lg" className="w-full" disabled={joining || !name.trim() || (viewer && !d.live)}>
               {joining ? "Joining…" : viewer ? "Start watching" : "Join meeting"}
             </Button>
           </form>
