@@ -98,6 +98,7 @@ function JoinPage() {
     return (
       <MeetingRoom
         join={joined}
+        code={code}
         startMic={mic}
         startCam={cam}
         onExit={() => { setJoined(null); void info.refetch(); }}
