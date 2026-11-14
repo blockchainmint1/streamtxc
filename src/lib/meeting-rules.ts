@@ -94,3 +94,21 @@ export function isMeetingBillable(ownerWallet: string, adminWallet: string): boo
 export function shouldEndForCredit(balanceTxc: number, nextMinuteTxc: number): boolean {
   return nextMinuteTxc > 0 && balanceTxc < nextMinuteTxc;
 }
+
+// ---------- Room settings & waiting room ----------
+export const MAX_ROOMS_PER_HOST = 20;
+/** A waiting guest whose page hasn't checked in for this long has given up. */
+export const WAITING_STALE_MS = 30_000;
+
+/** Does this seat have to wait for the host to let them in? The host never waits. */
+export function needsApproval(
+  room: { approve_team: boolean; approve_viewers: boolean },
+  role: MeetingRole,
+): boolean {
+  if (role === "host") return false;
+  return role === "viewer" ? room.approve_viewers : room.approve_team;
+}
+
+export function cleanRoomTitle(raw: string): string {
+  return raw.normalize("NFKC").replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim().slice(0, 80);
+}
