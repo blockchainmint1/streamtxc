@@ -51,7 +51,7 @@ export async function writeMeetingNotes(args: { title: string; transcriptText: s
     baseURL: GATEWAY_URL,
     apiKey,
     headers: { "Lovable-API-Key": apiKey, "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
-    fetch: runIdFetch.fetch,
+    fetch: runIdFetch.fetch as typeof fetch,
   });
   const result = streamText({
     model: provider.responses(MODEL),
