@@ -273,14 +273,23 @@ export const listMyMeetingRooms = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     await assertCanHost(context.wallet);
     const sb = await db();
-    const { data } = await sb
+    const { data, error } = await sb
       .from("meeting_rooms")
       .select("*")
       .eq("owner_wallet", context.wallet)
       .is("archived_at", null)
       .order("created_at", { ascending: true });
+    // A failed lookup must never look like "no rooms yet" — that once made a new room on every refresh.
+    if (error) throw new Error("Could not load your meeting rooms. Try again in a moment.");
     let rooms = (data ?? []) as Room[];
-    if (!rooms.length) rooms = [await insertRoom(context.wallet, "Daily team meeting", null)];
+    if (!rooms.length) {
+      const { count } = await sb
+        .from("meeting_rooms")
+        .select("id", { count: "exact", head: true })
+        .eq("owner_wallet", context.wallet);
+      // Only a brand-new host gets a starter room (deleted rooms still count).
+      if ((count ?? 0) === 0) rooms = [await insertRoom(context.wallet, "Daily team meeting", null)];
+    }
     const [lives, waiting, billing, recs] = await Promise.all([
       Promise.all(rooms.map(isMeetingLive)),
       freshWaiting(rooms.map((r) => r.id)),
