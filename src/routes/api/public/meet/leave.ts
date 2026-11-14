@@ -18,7 +18,8 @@ export const Route = createFileRoute("/api/public/meet/leave")({
         let parsed: z.infer<typeof Body>;
         try {
           parsed = Body.parse(JSON.parse((await request.text()).slice(0, 2000)));
-        } catch {
+        } catch (e) {
+          console.warn("[meet-leave] bad body", e instanceof Error ? e.message.slice(0, 200) : e);
           return new Response(null, { status: 400 });
         }
         const { verifyLeaveToken } = await import("@/lib/meeting-leave");
