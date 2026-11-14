@@ -97,6 +97,7 @@ import {
   skipLiveArchive,
   getRtmpConfig,
   getLiveSignalHealth,
+  rotateAdminStreamKey,
 } from "@/lib/livestream.functions";
 import { Radio } from "lucide-react";
 
@@ -2567,6 +2568,8 @@ function MyGoLiveSection({ wallet }: { wallet: string }) {
   const eligFn = useServerFn(getMyLiveEligibility);
   const channelFn = useServerFn(getMyLiveChannel);
   const provisionFn = useServerFn(provisionMyLiveChannel);
+  const rotateMyKeyFn = useServerFn(rotateMyStreamKey);
+  const [rotatingKey, setRotatingKey] = useState(false);
   const startFn = useServerFn(startMyStream);
   const stopFn = useServerFn(stopMyStream);
   const markLiveFn = useServerFn(markMyStreamLive);
@@ -2846,6 +2849,33 @@ function MyGoLiveSection({ wallet }: { wallet: string }) {
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
+              {ch.weakStreamKey && (
+                <div className="text-xs text-destructive mt-1">
+                  This stream key is the old, easy-to-guess kind. Make a new one while you're not live.
+                </div>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                className="font-mono mt-2"
+                disabled={rotatingKey || state.data?.state !== "IDLE"}
+                title={state.data?.state !== "IDLE" ? "Stop the channel first" : undefined}
+                onClick={async () => {
+                  if (!window.confirm("Make a new stream key? The old one stops working right away, so paste the new one into StreamYard / OBS before your next stream.")) return;
+                  setRotatingKey(true);
+                  try {
+                    await rotateMyKeyFn();
+                    await qc.invalidateQueries({ queryKey: ["my-live-channel", wallet] });
+                    toast.success("New stream key ready — paste it into StreamYard / OBS.");
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Couldn't make a new key");
+                  } finally {
+                    setRotatingKey(false);
+                  }
+                }}
+              >
+                {rotatingKey ? "Making new key…" : "Make a new stream key"}
+              </Button>
             </div>
           </div>
 
