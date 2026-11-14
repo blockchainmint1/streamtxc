@@ -43,12 +43,14 @@ export async function backfillOneTranscript(
 
   const { data: row, error } = await supabaseAdmin
     .from("videos")
-    .select("cid, transcript_cid, hls_cid, size_bytes")
+    .select("cid, transcript_cid, transcript_text, hls_cid, size_bytes")
     .eq("cid", cid)
     .maybeSingle();
   if (error) throw error;
   if (!row) throw new Error(`Video not found: ${cid}`);
-  if (row.transcript_cid) return { cid, action: "already_transcribed" };
+  if (row.transcript_cid || (row as { transcript_text?: string | null }).transcript_text) {
+    return { cid, action: "already_transcribed" };
+  }
 
   // Fast path: audio was already produced by an earlier transcode.
   const audioKey = `audio/${cid}/source.mp4`;
@@ -58,7 +60,7 @@ export async function backfillOneTranscript(
     return {
       cid,
       action: "transcribed_from_existing_audio",
-      transcriptCid: t?.transcriptCid,
+      transcriptCid: t?.transcriptCid ?? undefined,
       bytes: t?.vttBytes,
     };
   }
@@ -98,6 +100,7 @@ export async function pickTranscriptCandidates(limit: number) {
     .select("cid, view_count")
     .not("hls_cid", "is", null)
     .is("transcript_cid", null)
+    .is("transcript_text", null)
     .order("view_count", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .limit(limit);

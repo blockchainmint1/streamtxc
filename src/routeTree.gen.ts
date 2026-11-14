@@ -42,6 +42,7 @@ import { Route as ApiPublicAdminBackfillTranscriptsRouteImport } from './routes/
 import { Route as ApiPublicAdminFinalizeHlsRouteImport } from './routes/api/public/admin/finalize-hls'
 import { Route as ApiPublicAdminImpersonateWalletRouteImport } from './routes/api/public/admin/impersonate-wallet'
 import { Route as ApiPublicAdminRetryStampsRouteImport } from './routes/api/public/admin/retry-stamps'
+import { Route as ApiPublicAuthLogoutRouteImport } from './routes/api/public/auth/logout'
 import { Route as ApiPublicAuthWalletCallbackRouteImport } from './routes/api/public/auth/wallet-callback'
 import { Route as ApiPublicAuthWalletChallengeRouteImport } from './routes/api/public/auth/wallet-challenge'
 import { Route as ApiPublicAuthWalletExchangeRouteImport } from './routes/api/public/auth/wallet-exchange'
@@ -232,6 +233,11 @@ const ApiPublicAdminRetryStampsRoute =
     path: '/public/admin/retry-stamps',
     getParentRoute: () => ApiRoute,
   } as any)
+const ApiPublicAuthLogoutRoute = ApiPublicAuthLogoutRouteImport.update({
+  id: '/public/auth/logout',
+  path: '/public/auth/logout',
+  getParentRoute: () => ApiRoute,
+} as any)
 const ApiPublicAuthWalletCallbackRoute =
   ApiPublicAuthWalletCallbackRouteImport.update({
     id: '/public/auth/wallet-callback',
@@ -364,6 +370,7 @@ export interface FileRoutesByFullPath {
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/impersonate-wallet': typeof ApiPublicAdminImpersonateWalletRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/auth/logout': typeof ApiPublicAuthLogoutRoute
   '/api/public/auth/wallet-callback': typeof ApiPublicAuthWalletCallbackRoute
   '/api/public/auth/wallet-challenge': typeof ApiPublicAuthWalletChallengeRoute
   '/api/public/auth/wallet-exchange': typeof ApiPublicAuthWalletExchangeRoute
@@ -416,6 +423,7 @@ export interface FileRoutesByTo {
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/impersonate-wallet': typeof ApiPublicAdminImpersonateWalletRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/auth/logout': typeof ApiPublicAuthLogoutRoute
   '/api/public/auth/wallet-callback': typeof ApiPublicAuthWalletCallbackRoute
   '/api/public/auth/wallet-challenge': typeof ApiPublicAuthWalletChallengeRoute
   '/api/public/auth/wallet-exchange': typeof ApiPublicAuthWalletExchangeRoute
@@ -469,6 +477,7 @@ export interface FileRoutesById {
   '/api/public/admin/finalize-hls': typeof ApiPublicAdminFinalizeHlsRoute
   '/api/public/admin/impersonate-wallet': typeof ApiPublicAdminImpersonateWalletRoute
   '/api/public/admin/retry-stamps': typeof ApiPublicAdminRetryStampsRoute
+  '/api/public/auth/logout': typeof ApiPublicAuthLogoutRoute
   '/api/public/auth/wallet-callback': typeof ApiPublicAuthWalletCallbackRoute
   '/api/public/auth/wallet-challenge': typeof ApiPublicAuthWalletChallengeRoute
   '/api/public/auth/wallet-exchange': typeof ApiPublicAuthWalletExchangeRoute
@@ -523,6 +532,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/impersonate-wallet'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/auth/logout'
     | '/api/public/auth/wallet-callback'
     | '/api/public/auth/wallet-challenge'
     | '/api/public/auth/wallet-exchange'
@@ -575,6 +585,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/impersonate-wallet'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/auth/logout'
     | '/api/public/auth/wallet-callback'
     | '/api/public/auth/wallet-challenge'
     | '/api/public/auth/wallet-exchange'
@@ -627,6 +638,7 @@ export interface FileRouteTypes {
     | '/api/public/admin/finalize-hls'
     | '/api/public/admin/impersonate-wallet'
     | '/api/public/admin/retry-stamps'
+    | '/api/public/auth/logout'
     | '/api/public/auth/wallet-callback'
     | '/api/public/auth/wallet-challenge'
     | '/api/public/auth/wallet-exchange'
@@ -904,6 +916,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicAdminRetryStampsRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/public/auth/logout': {
+      id: '/api/public/auth/logout'
+      path: '/public/auth/logout'
+      fullPath: '/api/public/auth/logout'
+      preLoaderRoute: typeof ApiPublicAuthLogoutRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/public/auth/wallet-callback': {
       id: '/api/public/auth/wallet-callback'
       path: '/public/auth/wallet-callback'
@@ -1050,6 +1069,7 @@ interface ApiRouteChildren {
   ApiPublicAdminFinalizeHlsRoute: typeof ApiPublicAdminFinalizeHlsRoute
   ApiPublicAdminImpersonateWalletRoute: typeof ApiPublicAdminImpersonateWalletRoute
   ApiPublicAdminRetryStampsRoute: typeof ApiPublicAdminRetryStampsRoute
+  ApiPublicAuthLogoutRoute: typeof ApiPublicAuthLogoutRoute
   ApiPublicAuthWalletCallbackRoute: typeof ApiPublicAuthWalletCallbackRoute
   ApiPublicAuthWalletChallengeRoute: typeof ApiPublicAuthWalletChallengeRoute
   ApiPublicAuthWalletExchangeRoute: typeof ApiPublicAuthWalletExchangeRoute
@@ -1080,6 +1100,7 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiPublicAdminFinalizeHlsRoute: ApiPublicAdminFinalizeHlsRoute,
   ApiPublicAdminImpersonateWalletRoute: ApiPublicAdminImpersonateWalletRoute,
   ApiPublicAdminRetryStampsRoute: ApiPublicAdminRetryStampsRoute,
+  ApiPublicAuthLogoutRoute: ApiPublicAuthLogoutRoute,
   ApiPublicAuthWalletCallbackRoute: ApiPublicAuthWalletCallbackRoute,
   ApiPublicAuthWalletChallengeRoute: ApiPublicAuthWalletChallengeRoute,
   ApiPublicAuthWalletExchangeRoute: ApiPublicAuthWalletExchangeRoute,

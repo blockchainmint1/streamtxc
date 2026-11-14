@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { formatTxc, shortenHash } from "@/lib/fees";
+import { useWallet } from "@/lib/wallet";
 import {
   Check,
   Copy,
@@ -87,7 +88,8 @@ export function Comments({ cid }: { cid: string }) {
   // --- Compose form state ---
   const [body, setBody] = useState("");
   const [amount, setAmount] = useState<string>("0.01");
-  const [wallet, setWallet] = useState("");
+  const { address: myWallet, isAuthenticated } = useWallet();
+  const postingAs = isAuthenticated && myWallet ? myWallet : null;
   const [pending, setPending] = useState<PendingIntent | null>(null);
 
   const create = useMutation({
@@ -97,7 +99,6 @@ export function Comments({ cid }: { cid: string }) {
           videoCid: cid,
           body: body.trim(),
           amountTxc: Number(amount),
-          commenterWallet: wallet.trim() || undefined,
         },
       }),
     onSuccess: (res) => {
@@ -215,15 +216,14 @@ export function Comments({ cid }: { cid: string }) {
             </div>
             <div>
               <Label className="font-mono text-xs flex items-center gap-1 h-4 whitespace-nowrap">
-                <Wallet className="h-3 w-3" /> Your wallet (optional)
+                <Wallet className="h-3 w-3" /> Posting as
               </Label>
-              <input
-                value={wallet}
-                onChange={(e) => setWallet(e.target.value)}
-                placeholder="T… (leave blank to post anon)"
-                className="mt-1 w-full bg-input border border-border rounded-sm px-2 py-2 font-mono text-sm"
-              />
-              <div className="h-[22px] mt-1" aria-hidden />
+              <div className="mt-1 w-full bg-input border border-border rounded-sm px-2 py-2 font-mono text-sm truncate">
+                {postingAs ? shortenHash(postingAs) : "anon"}
+              </div>
+              <div className="text-[10px] font-mono text-muted-foreground mt-1 min-h-[22px]">
+                {postingAs ? "Your signed-in wallet" : "Sign in to put your wallet on it"}
+              </div>
             </div>
           </div>
 
@@ -264,13 +264,12 @@ export function Comments({ cid }: { cid: string }) {
               c={c}
               rank={i}
               boostPending={pending?.kind === "boost" && pending.id === c.id ? pending : null}
-              onCreateBoost={async (amt, w) => {
+              onCreateBoost={async (amt) => {
                 try {
                   const res = await createBoostFn({
                     data: {
                       commentId: c.id,
                       amountTxc: amt,
-                      boosterWallet: w || undefined,
                     },
                   });
                   setPending({
@@ -444,14 +443,13 @@ function CommentItem({
   c: CommentRow;
   rank: number;
   boostPending: PendingIntent | null;
-  onCreateBoost: (amount: number, wallet: string) => Promise<string | null>;
+  onCreateBoost: (amount: number) => Promise<string | null>;
   onBoostActive: () => void;
   onBoostExpire: () => void;
   onCancelBoost: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [boostAmt, setBoostAmt] = useState("0.10");
-  const [boostWallet, setBoostWallet] = useState("");
   const [busy, setBusy] = useState(false);
   const [boostId, setBoostId] = useState<string | null>(null);
 
@@ -534,7 +532,7 @@ function CommentItem({
           </div>
 
           {open && (
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-end">
               <div>
                 <Label className="font-mono text-[10px]">Amount (TXC)</Label>
                 <input
@@ -546,27 +544,13 @@ function CommentItem({
                   className="w-full bg-input border border-border rounded-sm px-2 py-1.5 font-mono text-sm"
                 />
               </div>
-              <div>
-                <Label className="font-mono text-[10px]">
-                  Wallet (optional)
-                </Label>
-                <input
-                  value={boostWallet}
-                  onChange={(e) => setBoostWallet(e.target.value)}
-                  placeholder="0x…"
-                  className="w-full bg-input border border-border rounded-sm px-2 py-1.5 font-mono text-xs"
-                />
-              </div>
               <Button
                 size="sm"
                 disabled={busy || Number(boostAmt) < 0.01}
                 onClick={async () => {
                   setBusy(true);
                   try {
-                    const id = await onCreateBoost(
-                      Number(boostAmt),
-                      boostWallet.trim(),
-                    );
+                    const id = await onCreateBoost(Number(boostAmt));
                     if (id) {
                       setBoostId(id);
                       setOpen(false);

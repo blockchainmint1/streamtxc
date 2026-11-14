@@ -218,7 +218,7 @@ export const Route = createFileRoute("/api/public/hooks/mediaconvert")({
         // For Zoom imports: transcribe the audio-only MediaConvert output
         // and stamp the transcript CID onto the row. Best-effort —
         // failures don't block the HLS flow.
-        let transcript: { cid: string; bytes: number } | null = null;
+        let transcript: { cid: string | null; bytes: number } | null = null;
         try {
           const { maybeTranscribeVideo } = await import(
             "@/lib/transcription.server"

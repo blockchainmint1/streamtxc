@@ -14,7 +14,7 @@ interface ChatRow {
 }
 
 export function LiveChat({ streamId }: { streamId: string }) {
-  const { address } = useWallet();
+  const { address, isAuthenticated } = useWallet();
   const [messages, setMessages] = useState<ChatRow[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -62,10 +62,10 @@ export function LiveChat({ streamId }: { streamId: string }) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!text.trim() || !address) return;
+    if (!text.trim() || !isAuthenticated) return;
     setBusy(true);
     try {
-      await post({ data: { streamId, wallet: address, body: text.trim() } });
+      await post({ data: { streamId, body: text.trim() } });
       setText("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to send");
@@ -96,7 +96,7 @@ export function LiveChat({ streamId }: { streamId: string }) {
         <div ref={bottomRef} />
       </div>
       <form onSubmit={submit} className="border-t border-border p-2 flex gap-2">
-        {address ? (
+        {address && isAuthenticated ? (
           <>
             <input
               type="text"

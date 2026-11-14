@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireWalletSession } from "./wallet-auth.functions";
 
-const ADMIN_WALLET = "TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m";
+import { ADMIN_WALLET } from "./admin";
 
 function assertAdmin(wallet: string | null | undefined) {
   if (!wallet || wallet !== ADMIN_WALLET) throw new Error("Forbidden");
@@ -54,19 +54,20 @@ export const listLiveChat = createServerFn({ method: "GET" })
 
 const PostChatSchema = z.object({
   streamId: z.string().uuid(),
-  wallet: z.string().min(4).max(120),
   body: z.string().trim().min(1).max(500),
 });
 
+// The poster is always the signed-in wallet — never a name the browser sends.
 export const postLiveChat = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input: unknown) => PostChatSchema.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const w = data.wallet;
+    const w = context.wallet;
     const displayName = w.length > 10 ? `${w.slice(0, 6)}…${w.slice(-4)}` : w;
     const { error } = await supabaseAdmin.from("live_chat_messages").insert({
       stream_id: data.streamId,
-      wallet: data.wallet,
+      wallet: w,
       display_name: displayName,
       body: data.body,
     });
@@ -315,6 +316,19 @@ export const getRtmpConfig = createServerFn({ method: "POST" })
       return { serverUrl: full, streamKey: "", fullUrl: full };
     });
     return { endpoints: split };
+  });
+
+/** Admin: replace the main channel's stream key with a new random one. */
+export const rotateAdminStreamKey = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
+  .handler(async ({ context }) => {
+    assertAdmin(context.wallet);
+    const inputId = process.env.MEDIALIVE_INPUT_ID;
+    const channelId = process.env.MEDIALIVE_CHANNEL_ID;
+    if (!inputId || !channelId) throw new Error("Main live channel isn't configured.");
+    const { rotateRtmpStreamKey } = await import("./aws-medialive.server");
+    const { newStreamKey } = await import("./security-limits");
+    return rotateRtmpStreamKey({ inputId, channelId, newKey: newStreamKey() });
   });
 
 // ---------- Admin: archive consent flow ----------

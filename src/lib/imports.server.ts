@@ -5,7 +5,7 @@
 //     a TransformStream counting bytes so we can keep an `imports` row in
 //     sync for the polling progress bar.
 
-import { createHmac, randomUUID } from "crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { ImportSource } from "./import-sources.server";
 
@@ -13,12 +13,10 @@ export const IMPORT_MAX_BYTES = 10 * 1024 * 1024 * 1024; // 10 GB hard cap
 const TOKEN_TTL_MS = 15 * 60_000;
 
 function signingKey(): string {
-  // Re-use an existing server secret instead of asking the user for a new one.
-  // The token is server-issued and server-verified — it never crosses a
-  // trust boundary outside our Worker.
-  const k = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!k) throw new Error("SUPABASE_SERVICE_ROLE_KEY missing — required to sign import tokens");
-  return k;
+  // Dedicated signing secret, separated from session tokens by a purpose label.
+  const k = process.env.SESSION_SECRET;
+  if (!k) throw new Error("SESSION_SECRET missing — required to sign import tokens");
+  return `import-token:${k}`;
 }
 
 export interface ImportTokenPayload {
@@ -41,7 +39,9 @@ export function verifyImportToken(token: string): ImportTokenPayload {
   const [body, sig] = token.split(".");
   if (!body || !sig) throw new Error("Malformed import token");
   const expected = createHmac("sha256", signingKey()).update(body).digest("base64url");
-  if (expected !== sig) throw new Error("Invalid import token signature");
+  if (expected.length !== sig.length || !timingSafeEqual(Buffer.from(expected), Buffer.from(sig))) {
+    throw new Error("Invalid import token signature");
+  }
   const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as ImportTokenPayload;
   if (payload.exp < Date.now()) {
     throw new Error("Import token expired — resolve the link again.");

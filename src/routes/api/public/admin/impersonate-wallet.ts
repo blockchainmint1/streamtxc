@@ -29,7 +29,7 @@ export const Route = createFileRoute("/api/public/admin/impersonate-wallet")({
           return new Response("Bad wallet", { status: 400 });
         }
 
-        const session = await issueSessionToken(wallet);
+        const session = await issueSessionToken(wallet, request.headers.get("user-agent"));
         const payload = JSON.stringify({
           address: wallet,
           token: session.token,

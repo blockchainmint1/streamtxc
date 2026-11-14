@@ -5,8 +5,9 @@
 //      Issued by `requestWalletLogin`, returned to client, must be echoed
 //      back to `completeWalletLogin` along with the user's signature. This
 //      lets us verify the signed message without persisting nonces in the DB.
-//   2. Session token — long-lived (7 days), wraps {wallet}. Sent as
-//      `Authorization: Bearer <token>` on every protected server fn.
+//   2. Session token — 7 days, wraps {wallet, sid}. Sent as
+//      `Authorization: Bearer <token>` on every protected server fn. Each
+//      session also has a wallet_sessions row so it can be revoked early.
 //
 // We intentionally do NOT use a separate JWT library. The Worker runtime
 // has `crypto.subtle` natively, so a tiny HS256 implementation is enough
@@ -16,11 +17,10 @@ const CHALLENGE_TTL_SEC = 5 * 60;
 const SESSION_TTL_SEC = 7 * 24 * 60 * 60;
 
 function getSecret(): string {
-  // Reuse the service-role key as the HMAC secret. It's already server-only,
-  // stable, and rotation invalidates outstanding sessions — which is what we
-  // want.
-  const s = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!s) throw new Error("Server is missing SUPABASE_SERVICE_ROLE_KEY");
+  // Dedicated signing secret (never the database service key). Rotating it
+  // signs everyone out.
+  const s = process.env.SESSION_SECRET;
+  if (!s) throw new Error("Server is missing SESSION_SECRET");
   return s;
 }
 
@@ -103,6 +103,7 @@ export interface ChallengeClaims {
 export interface SessionClaims {
   kind: "wallet-session";
   wallet: string;
+  sid: string;
   iat: number;
   exp: number;
 }
@@ -131,27 +132,86 @@ export async function verifyChallengeToken(
   return claims;
 }
 
-export async function issueSessionToken(wallet: string): Promise<{
+async function sessionsDb() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
+
+export async function issueSessionToken(wallet: string, userAgent?: string | null): Promise<{
   token: string;
   expiresAt: number;
 }> {
   const now = Math.floor(Date.now() / 1000);
   const exp = now + SESSION_TTL_SEC;
+  const db = await sessionsDb();
+  const { data: row, error } = await db
+    .from("wallet_sessions")
+    .insert({
+      wallet,
+      expires_at: new Date(exp * 1000).toISOString(),
+      user_agent: userAgent ? userAgent.slice(0, 300) : null,
+    })
+    .select("id")
+    .single();
+  if (error || !row) throw new Error("Could not start your session — try again.");
   const token = await sign({
     kind: "wallet-session",
     wallet,
+    sid: row.id,
     iat: now,
     exp,
   } satisfies SessionClaims);
   return { token, expiresAt: exp };
 }
 
+/** Signature check only (no database). Exported for tests. */
+export async function readSessionClaims(token: string): Promise<SessionClaims | null> {
+  const claims = await verify<SessionClaims>(token);
+  if (!claims || claims.kind !== "wallet-session" || typeof claims.sid !== "string") return null;
+  return claims;
+}
+
+/** Valid signature AND a live (not revoked, not expired) server-side session. */
 export async function verifySessionToken(
   token: string,
 ): Promise<SessionClaims | null> {
-  const claims = await verify<SessionClaims>(token);
-  if (!claims || claims.kind !== "wallet-session") return null;
+  const claims = await readSessionClaims(token);
+  if (!claims) return null;
+  const db = await sessionsDb();
+  const { data: row } = await db
+    .from("wallet_sessions")
+    .select("wallet, expires_at, revoked_at, last_seen_at")
+    .eq("id", claims.sid)
+    .maybeSingle();
+  if (!row || row.revoked_at || row.wallet !== claims.wallet) return null;
+  if (new Date(row.expires_at).getTime() <= Date.now()) return null;
+  if (Date.now() - new Date(row.last_seen_at).getTime() > 10 * 60_000) {
+    void db.from("wallet_sessions").update({ last_seen_at: new Date().toISOString() }).eq("id", claims.sid).then(() => null, () => null);
+  }
   return claims;
+}
+
+/** Cancel one session (sign out on this device). */
+export async function revokeSession(sid: string, wallet: string): Promise<void> {
+  const db = await sessionsDb();
+  await db
+    .from("wallet_sessions")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", sid)
+    .eq("wallet", wallet)
+    .is("revoked_at", null);
+}
+
+/** Cancel every session for a wallet (sign out everywhere). Returns how many. */
+export async function revokeAllSessions(wallet: string): Promise<number> {
+  const db = await sessionsDb();
+  const { data } = await db
+    .from("wallet_sessions")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("wallet", wallet)
+    .is("revoked_at", null)
+    .select("id");
+  return data?.length ?? 0;
 }
 // ---- honest.money SSO: short-lived "link this member to a wallet" token ----
 export interface HmLinkClaims {

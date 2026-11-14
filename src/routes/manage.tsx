@@ -60,6 +60,8 @@ import { Captions } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationPrefs } from "@/components/NotificationPrefs";
 import { MeetingRoomsManager } from "@/components/meet/HostPanel";
+import { SignInSecuritySection } from "@/components/SignInSecurity";
+import { ADMIN_WALLET } from "@/lib/admin";
 import { BranchSharePanel } from "@/components/BranchSharePanel";
 import { listBugReports } from "@/lib/bug-reports.functions";
 import {
@@ -70,6 +72,7 @@ import {
 import {
   getMyLiveChannel,
   provisionMyLiveChannel,
+  rotateMyStreamKey,
   startMyStream,
   stopMyStream,
   markMyStreamLive,
@@ -95,6 +98,7 @@ import {
   skipLiveArchive,
   getRtmpConfig,
   getLiveSignalHealth,
+  rotateAdminStreamKey,
 } from "@/lib/livestream.functions";
 import { Radio } from "lucide-react";
 
@@ -376,19 +380,19 @@ function ForceCaptionsButton({
       size="icon"
       variant="outline"
       className="font-mono h-7 w-7"
-      title={hasTranscript ? "Regenerate closed captions" : "Generate closed captions"}
-      aria-label="Generate closed captions"
+      title={hasTranscript ? "Transcript ready" : "Make a transcript"}
+      aria-label="Make a transcript"
       disabled={busy}
       onClick={async () => {
         setBusy(true);
         try {
           const res = await run({ data: { wallet, cid } });
           if (res.action === "already_transcribed") {
-            toast.success("Captions already exist");
+            toast.success("Transcript already exists");
           } else if (res.action === "transcribed_from_existing_audio") {
-            toast.success("Captions generated");
+            toast.success("Transcript ready — it shows under the video");
           } else if (res.action === "audio_job_queued") {
-            toast.success("Audio job queued — captions will appear shortly");
+            toast.success("Working on it — the transcript will appear in a few minutes");
           } else if (res.action === "skipped_no_input") {
             toast.error("Source video unavailable");
           } else if (res.action === "skipped_too_large") {
@@ -773,7 +777,7 @@ function ManagePageInner() {
                           <ForceCaptionsButton
                             cid={v.cid}
                             wallet={address!}
-                            hasTranscript={!!v.transcript_cid}
+                            hasTranscript={!!(v.transcript_cid || (v as { transcript_text?: string | null }).transcript_text)}
                           />
                           <EditVideoDialog
                             cid={v.cid}
@@ -856,13 +860,13 @@ function ManagePageInner() {
         {address && <GoLiveAdminSection wallet={address} />}
         {address && <MyGoLiveSection wallet={address} />}
         {address && <ConferenceSection />}
+        {address && <SignInSecuritySection />}
       </main>
       <Footer />
     </div>
   );
 }
 
-const ADMIN_WALLET = "TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m";
 
 // Conference — the same meeting rooms as /meet: make named rooms, edit them,
 // copy their team / view-only links and join.
@@ -1405,6 +1409,8 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const archive = useServerFn(archiveLiveStream);
   const skipArchive = useServerFn(skipLiveArchive);
   const rtmpCfg = useServerFn(getRtmpConfig);
+  const rotateKey = useServerFn(rotateAdminStreamKey);
+  const [rotating, setRotating] = useState(false);
   const signalHealth = useServerFn(getLiveSignalHealth);
 
   const { data, isLoading, refetch } = useQuery({
@@ -1752,6 +1758,36 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
                 Backup: <code className="text-primary/70 select-all">{backup.serverUrl}</code> · key <code className="text-primary/70 select-all">{backup.streamKey}</code>
               </div>
             )}
+            {primary.streamKey.length < 32 && (
+              <div className="text-destructive pt-1">
+                This stream key is the old, easy-to-guess kind. Make a new one while you're not live, then paste it into StreamYard.
+              </div>
+            )}
+            <div className="pt-1">
+              <Button
+                size="sm"
+                variant="outline"
+                className="font-mono h-7"
+                disabled={rotating || channelState !== "IDLE"}
+                title={channelState !== "IDLE" ? "Stop the channel first" : undefined}
+                onClick={async () => {
+                  if (!window.confirm("Make a new stream key? The old one stops working right away, so you'll need to paste the new key into StreamYard before your next stream.")) return;
+                  setRotating(true);
+                  try {
+                    const r = await rotateKey();
+                    const full = `${r.serverUrl}/${r.streamKey}`;
+                    setRtmpEndpoints([{ serverUrl: r.serverUrl, streamKey: r.streamKey, fullUrl: full }]);
+                    toast.success("New stream key ready — paste it into StreamYard.");
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Couldn't make a new key");
+                  } finally {
+                    setRotating(false);
+                  }
+                }}
+              >
+                {rotating ? "Making new key…" : "Make a new stream key"}
+              </Button>
+            </div>
             <div className="text-muted-foreground pt-1">
               In StreamYard: Destinations → Custom RTMP → Server URL + Stream key
               go into their two separate fields. Channel must be <b>RUNNING</b>{" "}
@@ -2533,6 +2569,8 @@ function MyGoLiveSection({ wallet }: { wallet: string }) {
   const eligFn = useServerFn(getMyLiveEligibility);
   const channelFn = useServerFn(getMyLiveChannel);
   const provisionFn = useServerFn(provisionMyLiveChannel);
+  const rotateMyKeyFn = useServerFn(rotateMyStreamKey);
+  const [rotatingKey, setRotatingKey] = useState(false);
   const startFn = useServerFn(startMyStream);
   const stopFn = useServerFn(stopMyStream);
   const markLiveFn = useServerFn(markMyStreamLive);
@@ -2812,6 +2850,33 @@ function MyGoLiveSection({ wallet }: { wallet: string }) {
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
+              {ch.weakStreamKey && (
+                <div className="text-xs text-destructive mt-1">
+                  This stream key is the old, easy-to-guess kind. Make a new one while you're not live.
+                </div>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                className="font-mono mt-2"
+                disabled={rotatingKey || state.data?.state !== "IDLE"}
+                title={state.data?.state !== "IDLE" ? "Stop the channel first" : undefined}
+                onClick={async () => {
+                  if (!window.confirm("Make a new stream key? The old one stops working right away, so paste the new one into StreamYard / OBS before your next stream.")) return;
+                  setRotatingKey(true);
+                  try {
+                    await rotateMyKeyFn();
+                    await qc.invalidateQueries({ queryKey: ["my-live-channel", wallet] });
+                    toast.success("New stream key ready — paste it into StreamYard / OBS.");
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Couldn't make a new key");
+                  } finally {
+                    setRotatingKey(false);
+                  }
+                }}
+              >
+                {rotatingKey ? "Making new key…" : "Make a new stream key"}
+              </Button>
             </div>
           </div>
 

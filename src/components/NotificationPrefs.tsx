@@ -59,9 +59,8 @@ export function NotificationPrefs({ wallet }: { wallet: string }) {
         toast.success("Email removed");
       } else if (res.sent) {
         toast.success("Verification email sent — click the link in your inbox.");
-      } else if (res.devLink) {
-        toast.success("Saved. Email sending isn't wired up yet — use the verify link printed in the console.");
-        console.info("[verify email link]", res.devLink);
+      } else if ("error" in res && res.error) {
+        toast.error(`Email saved, but ${res.error.charAt(0).toLowerCase()}${res.error.slice(1)}`);
       } else {
         toast.success("Email saved");
       }

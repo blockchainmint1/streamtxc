@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireWalletSession } from "./wallet-auth.functions";
 
-const ADMIN_WALLET = "TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m";
+import { ADMIN_WALLET } from "./admin";
 
 const SubmitSchema = z.object({
   name: z.string().trim().max(120).optional().nullable(),

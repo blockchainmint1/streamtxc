@@ -95,7 +95,7 @@ export const Route = createFileRoute("/api/public/auth/wallet-exchange")({
           );
         }
 
-        const session = await issueSessionToken(ch.wallet_address);
+        const session = await issueSessionToken(ch.wallet_address, request.headers.get("user-agent"));
         return Response.json(
           {
             wallet: ch.wallet_address,

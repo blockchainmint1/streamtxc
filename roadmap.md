@@ -7,12 +7,13 @@
 - [x] Test real member lookup and Hub reporting; test signed site ticket through the browser to Bobby's 103-video account, replay rejection and profile sync; ten protocol tests pass.
 - [ ] Confirm an HME-issued sign-in after publishing and HME's automatic profile-update delivery. Blocker: no HME browser session; publication and sender registration are outside this turn. Test tickets were generated server-side, not issued through HME's login screen.
 # Audit medium items still open (verified in code Nov 11)
-- [ ] M-1 import host allow-list bypass via prefetched path
-- [ ] M-2 chat/comment wallet spoofing (no sign-in check)
-- [ ] M-3 predictable live stream keys + open 0.0.0.0/0 ingest security group
-- [ ] M-5 sessions signed with service key, 7-day tokens, no revocation
-- [ ] M-7 no site-wide browser security headers (clickjacking etc.)
-- [ ] M-10 email verification link returned to caller, no rate limit
+- [x] M-1 Dropbox shortcut imports must be real Dropbox https links (tested)
+- [x] M-2 chat requires sign-in; comments/boosts credit only the signed-in wallet, else "anon"
+- [x] M-3 new channels get random keys; "Make a new stream key" button; no auto-created open groups
+- [ ] M-3 follow-up: replace Bobby's and TsNCJ…'s old "primary" keys. Blocker: Bobby must run the AWS command (adds key-change permission), then press the button and update StreamYard.
+- [x] M-5 own SESSION_SECRET, server-side sessions (sign-out cancels, "Sign out everywhere"), import tokens off the service key, admin wallet in one place; revocation tested against the database
+- [x] M-7 site-wide headers (anti-framing except /embed, nosniff, referrer, HSTS); full script CSP / hm.js pinning not done (hm.js updates itself)
+- [x] M-10 link never returned, 1/min and 5/day per wallet, verify page escaped
 - [x] M-11 diagnostic tools now return only status/progress; raw errors owner-only; tests added
 # Team meetings (/meet)
 - [x] Build /meet host page, team link + view-only link, meeting screen (mic, camera, screen share, leave, end for all), send-to-live-stream button; 6 link-rule tests pass.
@@ -25,3 +26,6 @@
 - [ ] Recording + notes end-to-end test. Blocker: Bobby must run the AWS setup command (recordings bucket + permissions), then a real meeting.
 - [x] Fixed duplicate "Daily team meeting" rooms (19 accidental copies archived; failed room lookups no longer create rooms).
 - [ ] Discuss with Bobby how people pay in TXC (top-up flow, pay-per-meeting, plans). Blocker: Bobby's decision.
+# Captions
+- [x] Transcription request used a format the AI service rejects (0 videos had transcripts); now saves transcript text.
+- [ ] Timed closed captions (.vtt). Blocker: AI service returns no timings; needs Amazon Transcribe (Bobby decision + AWS permission).
