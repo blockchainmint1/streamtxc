@@ -342,20 +342,20 @@ export function MeetingRoom({
       <div className="flex items-center justify-center gap-2 border-t border-border px-4 py-3">
         {!viewer && (
           <>
-            <Button variant={micOn ? "secondary" : "destructive"} size="lg" onClick={toggleMic} aria-label={micOn ? "Mute microphone" : "Unmute microphone"}>
+            <Button variant={micOn ? "secondary" : "destructive"} size="lg" className="px-4" onClick={toggleMic} aria-label={micOn ? "Mute microphone" : "Unmute microphone"}>
               {micOn ? <Mic /> : <MicOff />}<span className="hidden sm:inline">{micOn ? "Mute" : "Unmute"}</span>
             </Button>
-            <Button variant={camOn ? "secondary" : "outline"} size="lg" onClick={toggleCam} disabled={busy} aria-label={camOn ? "Turn camera off" : "Turn camera on"}>
+            <Button variant={camOn ? "secondary" : "outline"} size="lg" className="px-4" onClick={toggleCam} disabled={busy} aria-label={camOn ? "Turn camera off" : "Turn camera on"}>
               {camOn ? <Video /> : <VideoOff />}<span className="hidden sm:inline">{camOn ? "Camera off" : "Camera on"}</span>
             </Button>
             {canShare && (
-              <Button variant={sharing ? "default" : "outline"} size="lg" onClick={toggleShare} aria-label={sharing ? "Stop sharing screen" : "Share screen"}>
+              <Button variant={sharing ? "default" : "outline"} size="lg" className="px-4" onClick={toggleShare} aria-label={sharing ? "Stop sharing screen" : "Share screen"}>
                 {sharing ? <MonitorX /> : <MonitorUp />}<span className="hidden sm:inline">{sharing ? "Stop sharing" : "Share screen"}</span>
               </Button>
             )}
           </>
         )}
-        <Button variant="destructive" size="lg" onClick={leave} aria-label="Leave meeting">
+        <Button variant="destructive" size="lg" className="px-4" onClick={leave} aria-label="Leave meeting">
           <PhoneOff /><span className="hidden sm:inline">Leave</span>
         </Button>
       </div>
