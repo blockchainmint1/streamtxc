@@ -20,5 +20,7 @@
 - [ ] Live meeting test with real audio/video. Blocker: needs Bobby on real devices after publishing (test browser can't place calls).
 - [x] Charge hosts ~10x AWS cost from prepaid TXC balance (admin room free); seat freed on leave; real AWS seat count test passed.
 - [x] Meeting settings: multiple named rooms with own links, join sound (+ personal mute), approve team / view-only link with waiting room; browser-tested create → approve → admit → delete.
-- [ ] Bobby's 4th meeting setting (bullet left blank). Blocker: waiting on Bobby.
+- [x] Bobby's 4th/5th meeting settings: record option + transcript/meeting notes (room auto-settings + Record / Take notes buttons, private recording page, one-click publish, AI summary/decisions/to-dos). 33 meeting tests pass; AI notes tested live; Record button shows the AWS-setup message.
+- [ ] Recording + notes end-to-end test. Blocker: Bobby must run the AWS setup command (recordings bucket + permissions), then a real meeting.
+- [x] Fixed duplicate "Daily team meeting" rooms (19 accidental copies archived; failed room lookups no longer create rooms).
 - [ ] Discuss with Bobby how people pay in TXC (top-up flow, pay-per-meeting, plans). Blocker: Bobby's decision.
