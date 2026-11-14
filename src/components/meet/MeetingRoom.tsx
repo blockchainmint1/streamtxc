@@ -54,6 +54,9 @@ export function MeetingRoom({
 
     (async () => {
       try {
+        // The Chime SDK reads Node's `global`; browsers only have globalThis.
+        const g = globalThis as unknown as { global?: unknown };
+        if (typeof g.global === "undefined") g.global = globalThis;
         const sdk = await import("amazon-chime-sdk-js");
         if (cancelled) return;
         const logger = new sdk.ConsoleLogger("meet", sdk.LogLevel.WARN);
