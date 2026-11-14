@@ -2,13 +2,14 @@
 // with a dynamic import inside an effect (never at module scope).
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Mic, MicOff, Video, VideoOff, MonitorUp, MonitorX, PhoneOff, Users, Eye, Volume2,
+  Mic, MicOff, Video, VideoOff, MonitorUp, MonitorX, PhoneOff, Users, Eye, Volume2, Bell, BellOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { decodeExternalUserId, type MeetingRole } from "@/lib/meeting-rules";
-import { HostPanel } from "./HostPanel";
+import { InMeetingHostBar } from "./HostPanel";
+import { playMeetSound, setSoundsMutedLocally, soundsMutedLocally } from "@/lib/meet-sound";
 
 export interface JoinResult {
   role: MeetingRole;
@@ -16,6 +17,8 @@ export interface JoinResult {
   meeting: any;
   attendee: { AttendeeId: string; ExternalUserId: string; JoinToken: string };
   leaveToken?: string | null;
+  roomId?: string | null;
+  joinSound?: boolean;
 }
 
 /** Tell the server this seat is free (works even while the tab is closing). */
@@ -57,6 +60,16 @@ export function MeetingRoom({
   const [busy, setBusy] = useState(false);
   const canShare = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
 
+  const [soundsOff, setSoundsOff] = useState(false);
+  const soundsOffRef = useRef(false);
+  const joinedAt = useRef(0);
+  useEffect(() => { const m = soundsMutedLocally(); setSoundsOff(m); soundsOffRef.current = m; }, []);
+  function toggleSounds() {
+    const next = !soundsOff;
+    setSoundsOff(next);
+    soundsOffRef.current = next;
+    setSoundsMutedLocally(next);
+  }
   const leftRef = useRef(false);
   const leaveOnce = () => {
     if (leftRef.current) return;
@@ -98,7 +111,11 @@ export function MeetingRoom({
         avRef.current = av;
 
         av.addObserver({
-          audioVideoDidStart: () => !cancelled && setStatus("live"),
+          audioVideoDidStart: () => {
+            if (cancelled) return;
+            joinedAt.current = Date.now();
+            setStatus("live");
+          },
           audioVideoDidStop: (s: any) => {
             if (cancelled) return;
             const code = s.statusCode();
@@ -139,6 +156,11 @@ export function MeetingRoom({
           }
           const { name, role } = decodeExternalUserId(ext);
           setPeople((prev) => ({ ...prev, [id]: prev[id] ?? { attendeeId: id, name, role, muted: true, speaking: false } }));
+          // Chime for real arrivals only — not for the people already here when we connected.
+          if (
+            join.joinSound && !soundsOffRef.current && id !== join.attendee.AttendeeId &&
+            joinedAt.current && Date.now() - joinedAt.current > 4_000
+          ) playMeetSound("join");
           av.realtimeSubscribeToVolumeIndicator(id, (aid: string, volume: number | null, muted: boolean | null) => {
             setPeople((prev) => {
               const p = prev[aid];
@@ -308,6 +330,14 @@ export function MeetingRoom({
         <div className="flex items-center gap-3 font-mono text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" />{speakers.length}</span>
           <span className="inline-flex items-center gap-1"><Eye className="h-3.5 w-3.5" />{viewerCount}</span>
+          {join.joinSound && (
+            <button
+              type="button" onClick={toggleSounds} className="inline-flex items-center hover:text-foreground"
+              aria-label={soundsOff ? "Turn join sounds on" : "Turn join sounds off"} title={soundsOff ? "Join sounds off" : "Join sounds on"}
+            >
+              {soundsOff ? <BellOff className="h-3.5 w-3.5" /> : <Bell className="h-3.5 w-3.5" />}
+            </button>
+          )}
           {status === "connecting" && <span className="text-primary">connecting…</span>}
         </div>
       </div>
@@ -372,7 +402,7 @@ export function MeetingRoom({
         </div>
       </div>
 
-      {join.role === "host" && <HostPanel compact />}
+      {join.role === "host" && join.roomId && <InMeetingHostBar roomId={join.roomId} />}
 
       <div className="flex items-center justify-center gap-2 border-t border-border px-4 py-3">
         {!viewer && (

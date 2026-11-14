@@ -19,4 +19,6 @@
 - [x] AWS Chime permission granted; room join/roles verified in browser.
 - [ ] Live meeting test with real audio/video. Blocker: needs Bobby on real devices after publishing (test browser can't place calls).
 - [x] Charge hosts ~10x AWS cost from prepaid TXC balance (admin room free); seat freed on leave; real AWS seat count test passed.
+- [x] Meeting settings: multiple named rooms with own links, join sound (+ personal mute), approve team / view-only link with waiting room; browser-tested create → approve → admit → delete.
+- [ ] Bobby's 4th meeting setting (bullet left blank). Blocker: waiting on Bobby.
 - [ ] Discuss with Bobby how people pay in TXC (top-up flow, pay-per-meeting, plans). Blocker: Bobby's decision.

@@ -50,6 +50,13 @@
       "when": 1794670389818,
       "tag": "0006_meeting_rooms",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794673130284,
+      "tag": "0007_meeting_rooms_multi_and_waiting",
+      "breakpoints": true
     }
   ]
 }
