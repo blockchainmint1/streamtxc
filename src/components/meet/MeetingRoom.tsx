@@ -13,6 +13,7 @@ import { decodeExternalUserId, type MeetingRole } from "@/lib/meeting-rules";
 import { InMeetingHostBar } from "./HostPanel";
 import { playMeetSound, setSoundsMutedLocally, soundsMutedLocally } from "@/lib/meet-sound";
 import { getMeetingRecordingState } from "@/lib/meetings.functions";
+import { SEAT_HEARTBEAT_MS } from "@/lib/meeting-rules";
 
 export interface JoinResult {
   role: MeetingRole;
@@ -36,6 +37,17 @@ function sendLeave(join: JoinResult) {
     if (navigator.sendBeacon?.("/api/public/meet/leave", body)) return;
   } catch { /* fall through */ }
   void fetch("/api/public/meet/leave", { method: "POST", body, keepalive: true }).catch(() => {});
+}
+
+/** "Still here" check-in — the host is only charged for seats that check in. */
+function sendHeartbeat(join: JoinResult) {
+  if (!join.leaveToken) return;
+  const body = JSON.stringify({
+    meetingId: join.meeting?.MeetingId,
+    attendeeId: join.attendee.AttendeeId,
+    token: join.leaveToken,
+  });
+  void fetch("/api/public/meet/heartbeat", { method: "POST", body, keepalive: true }).catch(() => {});
 }
 
 interface Tile { tileId: number; attendeeId: string; local: boolean; content: boolean }
@@ -86,6 +98,14 @@ export function MeetingRoom({
     setSoundsMutedLocally(next);
   }
   const leftRef = useRef(false);
+  // Check in while connected (starts once the meeting connection is up).
+  useEffect(() => {
+    if (status !== "live") return;
+    sendHeartbeat(join);
+    const t = setInterval(() => { if (!leftRef.current) sendHeartbeat(join); }, SEAT_HEARTBEAT_MS);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, join.attendee.AttendeeId]);
   const leaveOnce = () => {
     if (leftRef.current) return;
     leftRef.current = true;
