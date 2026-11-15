@@ -58,7 +58,9 @@ const optionalWalletSchema = walletSchema.optional().nullable();
 /** Owner-comparison helper that tolerates null/legacy-case mismatches. */
 function ownerMatches(rowOwner: string | null, claim: string): boolean {
   if (!rowOwner) return false;
-  return rowOwner.toLowerCase() === claim.toLowerCase();
+  // TXC (base58) addresses are case-sensitive; only legacy 0x hex wallets ignore case.
+  if (rowOwner.startsWith("0x") && claim.startsWith("0x")) return rowOwner.toLowerCase() === claim.toLowerCase();
+  return rowOwner === claim;
 }
 
 /**
@@ -1207,13 +1209,13 @@ const REPORT_REASONS = [
 /** Distinct reporters needed before a video is auto-hidden for review. */
 export const REPORTS_TO_HIDE = 3;
 
-function hashReporter(): string {
-  // Stable per-IP hash (with daily salt) so the same person can't spam reports
-  // on the same video, but their identity is never stored in plaintext.
+async function hashReporter(): Promise<string> {
+  // One IP counts as one reporter per video, forever. Stored only as a keyed
+  // hash (HMAC with a server secret), so the address can't be recovered.
   // cf-connecting-ip is set by Cloudflare and can't be spoofed by the client.
   const ip = getRequestHeader("cf-connecting-ip") || getRequestIP() || "unknown";
-  // No date in the hash: one IP counts as one reporter per video, forever.
-  return createHash("sha256").update(`report|${ip}`).digest("hex");
+  const { keyedIpHash } = await import("./ip-hash");
+  return keyedIpHash("report", ip);
 }
 
 export const reportVideo = createServerFn({ method: "POST" })
@@ -1236,7 +1238,7 @@ export const reportVideo = createServerFn({ method: "POST" })
     if (vErr) throw new Error(vErr.message);
     if (!video) throw new Error("Video not found");
 
-    const ipHash = hashReporter();
+    const ipHash = await hashReporter();
 
     // Insert report; unique(cid, ip_hash) silently dedupes repeat reports
     // from the same IP on the same day.
