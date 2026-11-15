@@ -24,6 +24,16 @@ import {
   PRICE_USD_PER_BROADCAST_MINUTE,
   recordingMinuteUsd,
   RECORDING_KEEP_DAYS,
+  mayOpenRoom,
+  mayAutoStartRecording,
+  seatHoldsPlace,
+  seatIsLive,
+  clampMaxSeats,
+  MAX_SEATS_LIMIT,
+  PUBLISH_TITLE_MAX,
+  PUBLISH_DESCRIPTION_MAX,
+  cleanPublishText,
+  type SeatState,
 } from "./meeting-rules";
 
 import { ADMIN_WALLET } from "./admin";
@@ -47,6 +57,8 @@ type Room = {
   archived_at: string | null;
   auto_record: boolean;
   auto_notes: boolean;
+  max_seats: number;
+  team_can_start: boolean;
   created_at: string;
 };
 
@@ -100,6 +112,7 @@ async function sha256Hex(s: string): Promise<string> {
 
 class NotStartedError extends Error {}
 class NoCreditError extends Error {}
+class RoomFullError extends Error {}
 
 /** Host's prepaid TXC balance (same balance as live streaming) and today's meeting prices in TXC. */
 async function meetingBilling(wallet: string) {
@@ -133,6 +146,7 @@ async function meetingBilling(wallet: string) {
 function friendly(err: unknown): string {
   if (err instanceof NotStartedError) return "The meeting hasn't started yet. This page will let you in as soon as it does.";
   if (err instanceof NoCreditError) return err.message;
+  if (err instanceof RoomFullError) return err.message;
   const msg = err instanceof Error ? err.message : "";
   if (/permission is missing/i.test(msg)) return "Meetings aren't switched on yet — the host still needs to finish the AWS setup.";
   return "The meeting service didn't respond. Please try again in a moment.";
@@ -219,7 +233,7 @@ async function recentRecordings(roomIds: string[]): Promise<RecSummary[]> {
   return (data ?? []) as RecSummary[];
 }
 
-function roomView(room: Room, live: boolean, waitingCount: number, recs: RecSummary[] = []) {
+function roomView(room: Room, live: boolean, waitingCount: number, recs: RecSummary[] = [], seatsNow = 0) {
   const active = live ? recs.find((r) => r.status === "recording") : undefined;
   return {
     id: room.id,
@@ -236,6 +250,9 @@ function roomView(room: Room, live: boolean, waitingCount: number, recs: RecSumm
     waitingCount,
     autoRecord: room.auto_record,
     autoNotes: room.auto_notes,
+    maxSeats: room.max_seats,
+    teamCanStart: room.team_can_start,
+    seatsNow: live ? seatsNow : 0,
     recording: active ? { video: active.record_video, notes: active.take_notes } : null,
     recordings: recs.slice(0, 8).map(recView),
   };
@@ -253,6 +270,22 @@ async function freshWaiting(roomIds: string[]) {
     .order("created_at", { ascending: true })
     .limit(200);
   return (data ?? []) as Array<{ id: string; room_id: string; role: string; display_name: string; created_at: string }>;
+}
+
+type SeatRow = SeatState & { room_id: string; meeting_id: string; role: string };
+
+/** Open (not yet left) seats for these rooms' current meetings. */
+async function openSeats(rooms: Pick<Room, "id" | "chime_meeting_id">[]): Promise<SeatRow[]> {
+  const meetingIds = rooms.map((r) => r.chime_meeting_id).filter((x): x is string => !!x);
+  if (!meetingIds.length) return [];
+  const sb = await db();
+  const { data } = await sb
+    .from("meeting_seats")
+    .select("room_id, meeting_id, role, created_at, last_seen_at, left_at")
+    .in("meeting_id", meetingIds)
+    .is("left_at", null)
+    .limit(2000);
+  return (data ?? []) as SeatRow[];
 }
 
 async function insertRoom(wallet: string, title: string, purpose: string | null) {
@@ -290,17 +323,23 @@ export const listMyMeetingRooms = createServerFn({ method: "POST" })
       // Only a brand-new host gets a starter room (deleted rooms still count).
       if ((count ?? 0) === 0) rooms = [await insertRoom(context.wallet, "Daily team meeting", null)];
     }
-    const [lives, waiting, billing, recs] = await Promise.all([
+    const [lives, waiting, billing, recs, seats] = await Promise.all([
       Promise.all(rooms.map(isMeetingLive)),
       freshWaiting(rooms.map((r) => r.id)),
       meetingBilling(context.wallet),
       recentRecordings(rooms.map((r) => r.id)),
+      openSeats(rooms),
     ]);
+    const now = Date.now();
     return {
       billing,
       keepDays: RECORDING_KEEP_DAYS,
+      maxSeatsLimit: MAX_SEATS_LIMIT,
       rooms: rooms.map((r, i) =>
-        roomView(r, lives[i], waiting.filter((w) => w.room_id === r.id).length, recs.filter((x) => x.room_id === r.id)),
+        roomView(
+          r, lives[i], waiting.filter((w) => w.room_id === r.id).length, recs.filter((x) => x.room_id === r.id),
+          seats.filter((s) => s.meeting_id === r.chime_meeting_id && seatIsLive(s, now)).length,
+        ),
       ),
     };
   });
@@ -339,6 +378,8 @@ export const updateMeetingRoom = createServerFn({ method: "POST" })
       approveViewers: z.boolean().optional(),
       autoRecord: z.boolean().optional(),
       autoNotes: z.boolean().optional(),
+      maxSeats: z.number().int().min(2).max(MAX_SEATS_LIMIT).optional(),
+      teamCanStart: z.boolean().optional(),
       rotateLinks: z.boolean().optional(),
     }).parse(i),
   )
@@ -357,6 +398,8 @@ export const updateMeetingRoom = createServerFn({ method: "POST" })
     if (data.approveViewers !== undefined) patch.approve_viewers = data.approveViewers;
     if (data.autoRecord !== undefined) patch.auto_record = data.autoRecord;
     if (data.autoNotes !== undefined) patch.auto_notes = data.autoNotes;
+    if (data.maxSeats !== undefined) patch.max_seats = clampMaxSeats(data.maxSeats);
+    if (data.teamCanStart !== undefined) patch.team_can_start = data.teamCanStart;
     if (data.rotateLinks) {
       patch.join_code = newMeetingCode();
       patch.view_code = newMeetingCode();
@@ -374,6 +417,10 @@ async function closeMeeting(room: Room) {
   if (room.broadcast_pipeline_id) await chime.stopMediaPipeline(room.broadcast_pipeline_id).catch(() => {});
   if (room.chime_meeting_id) await chime.deleteMeeting(room.chime_meeting_id);
   const sb = await db();
+  if (room.chime_meeting_id) {
+    await sb.from("meeting_seats").update({ left_at: new Date().toISOString() })
+      .eq("meeting_id", room.chime_meeting_id).is("left_at", null);
+  }
   await sb
     .from("meeting_rooms")
     .update({ chime_meeting_id: null, chime_meeting: null, broadcast_pipeline_id: null, broadcast_started_at: null })
@@ -544,20 +591,32 @@ async function activeRecordingFor(roomId: string) {
 
 /** Gives this person a seat in the room's meeting and returns what their browser needs. */
 async function seat(found: Room, role: "host" | "participant" | "viewer", name: string, allowCreate: boolean) {
+  // Seat tokens are mandatory — fail before anyone gets a seat that could never be freed.
+  const { signLeaveToken, leaveSecret } = await import("./meeting-leave");
+  const secret = await leaveSecret();
   const room = await ensureMeeting(found, allowCreate);
-  if (role !== "viewer" && (room.auto_record || room.auto_notes)) {
+  const sb = await db();
+  if (role !== "host") {
+    const seats = await openSeats([room]);
+    const now = Date.now();
+    const limit = clampMaxSeats(room.max_seats ?? 25);
+    if (seats.filter((s) => seatHoldsPlace(s, now)).length >= limit) {
+      throw new RoomFullError(`This meeting is full (${limit} people). Ask the host to raise the limit.`);
+    }
+  }
+  if ((room.auto_record || room.auto_notes) && mayAutoStartRecording(role, room.team_can_start)) {
     const { maybeAutoStart } = await import("./meeting-recording.server");
     await maybeAutoStart(room);
   }
   const chime = await import("./aws-chime.server");
   const rand = crypto.randomUUID().replace(/-/g, "");
   const attendee = await chime.createAttendee(room.chime_meeting_id!, encodeExternalUserId(role, name, rand), capabilitiesFor(role));
-  const sb = await db();
+  await sb.from("meeting_seats").insert({
+    room_id: room.id, meeting_id: room.chime_meeting_id, attendee_id: attendee.AttendeeId, role,
+  });
   await sb.from("meeting_rooms").update({ last_joined_at: new Date().toISOString() }).eq("id", room.id);
   const m = room.chime_meeting;
-  const { signLeaveToken } = await import("./meeting-leave");
-  const leaveSecret = process.env.MEETING_LEAVE_SECRET;
-  const leaveToken = leaveSecret ? await signLeaveToken(leaveSecret, m.MeetingId, attendee.AttendeeId) : null;
+  const leaveToken = await signLeaveToken(secret, m.MeetingId, attendee.AttendeeId);
   return {
     status: "joined" as const,
     leaveToken,
@@ -594,7 +653,8 @@ export const joinMeeting = createServerFn({ method: "POST" })
       return { status: "waiting" as const, requestId: req.id as string, token };
     }
     try {
-      return await seat(found, role, data.name, role !== "viewer");
+      // Only the host opens a room, unless the host lets the team start without them.
+      return await seat(found, role, data.name, mayOpenRoom(role, found.team_can_start));
     } catch (err) {
       throw new Error(friendly(err));
     }
@@ -632,7 +692,7 @@ export const checkJoinRequest = createServerFn({ method: "POST" })
     const { data: room } = await sb.from("meeting_rooms").select("*").eq("id", req.room_id).is("archived_at", null).maybeSingle();
     if (!room) return { status: "denied" as const };
     try {
-      return await seat(room as Room, req.role, req.display_name, true);
+      return await seat(room as Room, req.role, req.display_name, mayOpenRoom(req.role, (room as Room).team_can_start));
     } catch (err) {
       await sb.from("meeting_join_requests").update({ status: "admitted" }).eq("id", req.id);
       throw new Error(friendly(err));
@@ -753,10 +813,21 @@ export const getMeetingRecording = createServerFn({ method: "POST" })
 
 export const publishMeetingRecording = createServerFn({ method: "POST" })
   .middleware([requireWalletSession])
-  .inputValidator((i: unknown) => RecId.parse(i))
+  .inputValidator((i: unknown) =>
+    RecId.extend({
+      title: z.string().max(PUBLISH_TITLE_MAX * 2),
+      description: z.string().max(PUBLISH_DESCRIPTION_MAX * 2),
+    }).parse(i),
+  )
   .handler(async ({ data, context }) => {
     await assertCanHost(context.wallet);
     const r = await ownedRecording(context.wallet, data.id);
+    // The host reviews the public title/description; AI text is never posted unseen.
+    const title = cleanPublishText(data.title, PUBLISH_TITLE_MAX);
+    if (!title) throw new Error("Give the video a title.");
+    const description = cleanPublishText(data.description, PUBLISH_DESCRIPTION_MAX);
+    const sbp = await db();
+    await sbp.from("meeting_recordings").update({ publish_title: title, publish_description: description }).eq("id", r.id);
     if (r.status !== "ready" || !r.video_key) throw new Error("This recording isn't ready to publish yet.");
     const rec = await import("./meeting-recording.server");
     if (!rec.videoStillKept(r)) throw new Error(`Private recordings are kept for ${RECORDING_KEEP_DAYS} days — this video is gone.`);
@@ -787,9 +858,15 @@ export const deleteMeetingRecording = createServerFn({ method: "POST" })
     if (r.status === "recording") throw new Error("Stop the recording first.");
     const { recordingsBucket } = await import("./aws-chime.server");
     const { listObjects, deleteObject } = await import("./aws-s3.server");
-    // Delete the finished files now (the 5-second pieces expire on their own).
-    const keys = await listObjects(recordingsBucket(), `final/${r.id}/`).catch(() => [] as string[]);
-    for (const k of keys.slice(0, 20)) await deleteObject(recordingsBucket(), k).catch(() => {});
+    // "Delete for good": the finished files and every 5-second capture piece.
+    const bucket = recordingsBucket();
+    const keys = [
+      ...(await listObjects(bucket, `final/${r.id}/`).catch(() => [] as string[])),
+      ...(await listObjects(bucket, `capture/${r.id}/`).catch(() => [] as string[])),
+    ];
+    for (let i = 0; i < keys.length; i += 10) {
+      await Promise.all(keys.slice(i, i + 10).map((k) => deleteObject(bucket, k).catch(() => {})));
+    }
     const sb = await db();
     await sb
       .from("meeting_recordings")
