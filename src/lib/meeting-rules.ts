@@ -220,3 +220,86 @@ export function clockLabel(ms: number): string {
 export function transcriptToText(lines: TranscriptLine[]): string {
   return lines.map((l) => `[${clockLabel(l.atMs)}] ${l.speaker}: ${l.text}`).join("\n");
 }
+
+// ---------- Seats that are really there (audit N-1 / N-2) ----------
+// Every seat's browser checks in while it is connected. Billing counts only
+// seats seen recently, so a script that grabs seats and never connects costs
+// the host nothing, and abandoned seats are cleared out.
+export const SEAT_HEARTBEAT_MS = 30_000;
+/** No check-in for this long → the person is gone (covers throttled background tabs). */
+export const SEAT_STALE_MS = 3 * 60_000;
+/** A seat that never checked in at all is dropped after this long. */
+export const SEAT_NEVER_CONNECTED_MS = 2 * 60_000;
+/** Room closes when the host has been gone this long (unless the team may run it alone). */
+export const HOST_ABSENT_CLOSE_MS = 10 * 60_000;
+export const DEFAULT_MAX_SEATS = 25;
+export const MAX_SEATS_LIMIT = 250;
+/** While the host's live stream is on, a meeting may not eat this many minutes of its funding. */
+export const LIVE_RESERVE_MINUTES = 30;
+
+export interface SeatState {
+  created_at: string;
+  last_seen_at: string | null;
+  left_at: string | null;
+}
+
+/** Connected right now → billed. */
+export function seatIsLive(s: SeatState, nowMs: number): boolean {
+  if (s.left_at || !s.last_seen_at) return false;
+  return nowMs - Date.parse(s.last_seen_at) <= SEAT_STALE_MS;
+}
+
+/** Should be removed from the meeting (never connected, or stopped checking in). */
+export function seatIsAbandoned(s: SeatState, nowMs: number): boolean {
+  if (s.left_at) return false;
+  if (!s.last_seen_at) return nowMs - Date.parse(s.created_at) > SEAT_NEVER_CONNECTED_MS;
+  return nowMs - Date.parse(s.last_seen_at) > SEAT_STALE_MS;
+}
+
+/** Counts against the room's seat limit: live seats plus brand-new ones still connecting. */
+export function seatHoldsPlace(s: SeatState, nowMs: number): boolean {
+  return seatIsLive(s, nowMs) || (!s.left_at && !s.last_seen_at && nowMs - Date.parse(s.created_at) <= SEAT_NEVER_CONNECTED_MS);
+}
+
+export function clampMaxSeats(n: number): number {
+  if (!Number.isFinite(n)) return DEFAULT_MAX_SEATS;
+  return Math.min(MAX_SEATS_LIMIT, Math.max(2, Math.floor(n)));
+}
+
+/** Who may open a closed room: always the host; the team only if the host allowed it; viewers never. */
+export function mayOpenRoom(role: MeetingRole, teamCanStart: boolean): boolean {
+  if (role === "host") return true;
+  if (role === "participant") return teamCanStart;
+  return false;
+}
+
+/** Automatic recording/notes start only with the host there (or when the host let the team run it). */
+export function mayAutoStartRecording(role: MeetingRole, teamCanStart: boolean): boolean {
+  return role === "host" || (role === "participant" && teamCanStart);
+}
+
+/** Close an open room whose host left (or never came) — only when the team may not run it alone. */
+export function hostAbsentTooLong(args: {
+  teamCanStart: boolean;
+  meetingOpenedMs: number;
+  hostLastSeenMs: number | null;
+  nowMs: number;
+}): boolean {
+  if (args.teamCanStart) return false;
+  const since = args.hostLastSeenMs ?? args.meetingOpenedMs;
+  return args.nowMs - since > HOST_ABSENT_CLOSE_MS;
+}
+
+/** End the meeting if paying this minute would dig into the money a running live stream needs. */
+export function shouldEndForLiveReserve(balanceTxc: number, liveRunning: boolean, liveRatePerMinTxc: number): boolean {
+  if (!liveRunning || !(liveRatePerMinTxc > 0)) return false;
+  return balanceTxc < liveRatePerMinTxc * LIVE_RESERVE_MINUTES;
+}
+
+// ---------- Publishing a recording (audit N-4) ----------
+export const PUBLISH_TITLE_MAX = 120;
+export const PUBLISH_DESCRIPTION_MAX = 2000;
+
+export function cleanPublishText(raw: string, max: number): string {
+  return raw.normalize("NFKC").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").trim().slice(0, max);
+}
