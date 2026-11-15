@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { secretMatches } from "@/lib/admin-token";
 
 /**
  * Admin endpoint: manually finalize the HLS pipeline for a single video
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/api/public/admin/finalize-hls")({
       POST: async ({ request }) => {
         const expected = process.env.TXC_RPC_PASS;
         const provided = request.headers.get("x-admin-token");
-        if (!expected || provided !== expected) {
+        if (!secretMatches(provided, expected)) {
           return new Response("Unauthorized", { status: 401 });
         }
         const url = new URL(request.url);

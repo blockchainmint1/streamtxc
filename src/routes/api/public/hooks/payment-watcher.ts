@@ -34,6 +34,7 @@ import { sweepCommentPayout } from "@/lib/videos.functions";
 import { recordSplitPayout } from "@/lib/chain-events.server";
 import { deliverAlert } from "@/lib/notifications.server";
 import { escapeHtml } from "@/lib/security-limits";
+import { secretMatches } from "@/lib/admin-token";
 
 // How long after expires_at we keep the file pinned before actually
 // removing from IPFS storage. Metadata + DB row stay forever.
@@ -177,7 +178,7 @@ async function handler({ request }: { request: Request }) {
   // expensive blockchain RPCs, payout splits, and unpins.
   const expected = process.env.TXC_RPC_PASS;
   const provided = request.headers.get("x-admin-token");
-  if (!expected || provided !== expected) {
+  if (!secretMatches(provided, expected)) {
     return new Response("Unauthorized", { status: 401 });
   }
   const videoResults = await processVideos();

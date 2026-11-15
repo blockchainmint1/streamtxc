@@ -10,6 +10,7 @@
 // Guarded by x-admin-token = TXC_RPC_PASS.
 
 import { createFileRoute } from "@tanstack/react-router";
+import { secretMatches } from "@/lib/admin-token";
 
 export const Route = createFileRoute("/api/public/hooks/live-billing-tick")({
   server: {
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/api/public/hooks/live-billing-tick")({
       POST: async ({ request }) => {
         const expected = process.env.TXC_RPC_PASS;
         const provided = request.headers.get("x-admin-token");
-        if (!expected || provided !== expected) {
+        if (!secretMatches(provided, expected)) {
           return new Response("Unauthorized", { status: 401 });
         }
 

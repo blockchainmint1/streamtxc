@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { secretMatches } from "@/lib/admin-token";
 
 /**
  * Admin endpoint: backfill old videos (origin cid only, no hls bundle) into
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/api/public/admin/backfill-hls")({
       POST: async ({ request }) => {
         const expected = process.env.TXC_RPC_PASS;
         const provided = request.headers.get("x-admin-token");
-        if (!expected || provided !== expected) {
+        if (!secretMatches(provided, expected)) {
           return new Response("Unauthorized", { status: 401 });
         }
 

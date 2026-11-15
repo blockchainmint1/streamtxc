@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { secretMatches } from "@/lib/admin-token";
 
 /**
  * Cron-driven reconciler for HLS transcodes that finished on MediaConvert
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/api/public/hooks/finalize-stuck-hls")({
       POST: async ({ request }) => {
         const expected = process.env.TXC_RPC_PASS;
         const provided = request.headers.get("x-admin-token");
-        if (!expected || provided !== expected) {
+        if (!secretMatches(provided, expected)) {
           return new Response("Unauthorized", { status: 401 });
         }
 

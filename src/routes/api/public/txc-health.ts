@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { secretMatches } from "@/lib/admin-token";
 
 /**
  * Lightweight diagnostic for the TXC RPC connection. Hits a few read-only
@@ -13,7 +14,7 @@ export const Route = createFileRoute("/api/public/txc-health")({
         // Admin-only: leaks internal RPC URL, balance, and topup address.
         const expectedToken = process.env.TXC_RPC_PASS;
         const providedToken = request.headers.get("x-admin-token");
-        if (!expectedToken || providedToken !== expectedToken) {
+        if (!secretMatches(providedToken, expectedToken)) {
           return new Response("Unauthorized", { status: 401 });
         }
         const url = process.env.TXC_RPC_URL;
