@@ -33,6 +33,7 @@ import { PAYMENT_GRACE_HOURS } from "@/lib/fees";
 import { sweepCommentPayout } from "@/lib/videos.functions";
 import { recordSplitPayout } from "@/lib/chain-events.server";
 import { deliverAlert } from "@/lib/notifications.server";
+import { escapeHtml } from "@/lib/security-limits";
 
 // How long after expires_at we keep the file pinned before actually
 // removing from IPFS storage. Metadata + DB row stay forever.
@@ -486,7 +487,7 @@ async function processVideos() {
 
       // --- Lifecycle for already-paid videos ---------------------------
       const expMs = new Date(v.expires_at).getTime();
-      const title = v.title ?? v.cid.slice(0, 12);
+      const title = escapeHtml(v.title ?? v.cid.slice(0, 12));
 
       // 3a. Past unpin_after → actually remove from the self-hosted node.
       if (
@@ -717,7 +718,7 @@ async function processVideos() {
     const deadlineMs = v.expires_at
       ? new Date(v.expires_at).getTime()
       : new Date(v.created_at).getTime() + graceMs;
-    const uTitle = v.title ?? v.cid.slice(0, 12);
+    const uTitle = escapeHtml(v.title ?? v.cid.slice(0, 12));
     const markU = (patch: Record<string, unknown>) =>
       supabaseAdmin.from("videos").update(patch as never).eq("cid", v.cid);
 
@@ -886,7 +887,7 @@ async function processPendingComments() {
           video_cid: c.video_cid,
           video_wallet: videoWallet,
           event_type: "M",
-          tx_hash: stamp.txid,
+          tx_hash: stamp.real ? stamp.txid : null,
           op_return_payload: stamp.payload,
           to_wallet: videoWallet,
           status: stamp.real ? "mempool" : "stamp_failed",
