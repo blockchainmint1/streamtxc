@@ -15,7 +15,12 @@ async function hmacHex(secret: string, msg: string): Promise<string> {
  * hosts would pay for people who left. Falls back to a purpose-separated key
  * derived from SESSION_SECRET; throws when neither exists (fail closed).
  */
-export async function leaveSecret(env: { MEETING_LEAVE_SECRET?: string; SESSION_SECRET?: string } = process.env): Promise<string> {
+export async function leaveSecret(
+  env: { MEETING_LEAVE_SECRET?: string; SESSION_SECRET?: string } = {
+    MEETING_LEAVE_SECRET: process.env.MEETING_LEAVE_SECRET,
+    SESSION_SECRET: process.env.SESSION_SECRET,
+  },
+): Promise<string> {
   const direct = env.MEETING_LEAVE_SECRET?.trim();
   if (direct) return direct;
   const session = env.SESSION_SECRET?.trim();

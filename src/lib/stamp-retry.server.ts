@@ -199,7 +199,7 @@ export async function retryStuckStampForVideo(cid: string): Promise<RetryResult>
       result.tStamp = { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
   } else {
-    result.tStamp = { ok: true, txid: existingT.tx_hash, metaCid: video.metadata_cid ?? undefined };
+    result.tStamp = { ok: true, txid: existingT.tx_hash ?? undefined, metaCid: video.metadata_cid ?? undefined };
   }
 
   return result;
