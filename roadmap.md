@@ -40,4 +40,4 @@
 - [x] Dependencies: zod deduped to 4.6.7, bitcoinjs-lib 7.0.5, bip322-js 4.0.1 (signature check verified)
 - [x] Lows: L-1 already closed (comments not readable by the public), L-2 bug reports record only signed-in wallet, L-3 Telegram titles escaped, L-5 docs fixed, L-8 exact address match
 - Not doing: H-7/N-10 rate limiting (platform has no rate limiter yet); separate admin/cron tokens (Bobby declined); script-src CSP (hm.js self-updates)
-- [ ] Bobby's earlier ask: move all videos from TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m to Thaotk2YYWiXG9EozU5dqABx7EB26fGrhn. Blocker: Bobby to confirm (113 videos still on Tmmoqq…, which is also his HME Wallet/branch 1105 wallet).
+- [x] Bobby's earlier ask: move all videos from TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m to Thaotk2YYWiXG9EozU5dqABx7EB26fGrhn. Closed Nov 15: Bobby said no transfer needed — the 113 videos stay on Tmmoqq…, which is also his HME Wallet / branch 1105 wallet.
