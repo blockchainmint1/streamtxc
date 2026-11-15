@@ -155,7 +155,9 @@ export async function deleteAttendee(meetingId: string, attendeeId: string): Pro
 
 /** Private bucket for meeting recordings (created by the AWS setup script). */
 export function recordingsBucket(): string {
-  return process.env.MEETING_RECORDINGS_BUCKET?.trim() || "streamtxc-meetings-150646524089";
+  const b = process.env.MEETING_RECORDINGS_BUCKET?.trim();
+  if (!b) throw new Error("Meeting recordings storage isn't configured.");
+  return b;
 }
 
 /** Turns on Amazon Transcribe for the meeting — every word is credited to the person who said it. */

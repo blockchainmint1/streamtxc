@@ -137,12 +137,12 @@ async function sessionsDb() {
   return supabaseAdmin;
 }
 
-export async function issueSessionToken(wallet: string, userAgent?: string | null): Promise<{
+export async function issueSessionToken(wallet: string, userAgent?: string | null, ttlSec: number = SESSION_TTL_SEC): Promise<{
   token: string;
   expiresAt: number;
 }> {
   const now = Math.floor(Date.now() / 1000);
-  const exp = now + SESSION_TTL_SEC;
+  const exp = now + Math.min(SESSION_TTL_SEC, Math.max(60, Math.floor(ttlSec)));
   const db = await sessionsDb();
   const { data: row, error } = await db
     .from("wallet_sessions")

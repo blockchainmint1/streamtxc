@@ -116,7 +116,8 @@ function RoomCard({ room: r, canDelete }: { room: RoomData; canDelete: boolean }
   const origin = publicOrigin();
   const approvals = r.approveTeam || r.approveViewers;
 
-  const setting = (patch: Partial<{ joinSound: boolean; approveTeam: boolean; approveViewers: boolean; autoRecord: boolean; autoNotes: boolean }>) =>
+  const [seatLimit, setSeatLimit] = useState(String(r.maxSeats));
+  const setting = (patch: Partial<{ joinSound: boolean; approveTeam: boolean; approveViewers: boolean; autoRecord: boolean; autoNotes: boolean; teamCanStart: boolean; maxSeats: number }>) =>
     run("setting", () => update({ data: { roomId: r.id, ...patch } }));
 
   return (
@@ -147,7 +148,11 @@ function RoomCard({ room: r, canDelete }: { room: RoomData; canDelete: boolean }
             </h2>
             {r.purpose && <p className="text-sm text-muted-foreground">{r.purpose}</p>}
             <p className="font-mono text-xs text-muted-foreground mt-1">
-              {r.live ? "● open right now" : "○ nobody's in — it opens when the first person joins"}
+              {r.live
+                ? `● open right now · ${r.seatsNow} connected`
+                : r.teamCanStart
+                  ? "○ nobody's in — it opens when the first person joins"
+                  : "○ closed — it opens when you join"}
               {r.broadcasting && " · on the live stream"}
               {r.recording && <span className="text-destructive">{` · ● ${recLabel(r.recording)}`}</span>}
             </p>
@@ -181,8 +186,34 @@ function RoomCard({ room: r, canDelete }: { room: RoomData; canDelete: boolean }
           checked={r.approveViewers} disabled={!!working} onChange={(v) => setting({ approveViewers: v })}
         />
         <SettingRow
+          label="My team can start the meeting without me"
+          hint="Off: the room only opens when you join, and closes if you've been gone 10 minutes. On: anyone with the team link can open it."
+          checked={r.teamCanStart} disabled={!!working} onChange={(v) => setting({ teamCanStart: v })}
+        />
+        <form
+          className="flex items-start justify-between gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const n = Math.round(Number(seatLimit));
+            if (!Number.isFinite(n) || n < 2 || n > 250) { toast.error("Pick a number from 2 to 250."); return; }
+            void run("setting", () => update({ data: { roomId: r.id, maxSeats: n } }), `Up to ${n} people can be in this meeting.`);
+          }}
+        >
+          <span>
+            <span className="block text-sm">Most people allowed in at once</span>
+            <span className="block text-xs text-muted-foreground">Includes view-only watchers. You always get in.</span>
+          </span>
+          <span className="flex items-center gap-2 shrink-0">
+            <Input
+              type="number" min={2} max={250} value={seatLimit} onChange={(e) => setSeatLimit(e.target.value)}
+              className="w-20" aria-label="Most people allowed in at once"
+            />
+            {String(r.maxSeats) !== seatLimit && <Button type="submit" size="sm" disabled={!!working}>Save</Button>}
+          </span>
+        </form>
+        <SettingRow
           label="Record every meeting automatically"
-          hint="Starts recording the video as soon as the meeting opens. Recordings stay private until you publish them."
+          hint="Starts recording once you're in (or as soon as the meeting opens, if your team can start without you). Recordings stay private until you publish them."
           checked={r.autoRecord} disabled={!!working} onChange={(v) => setting({ autoRecord: v })}
         />
         <SettingRow
@@ -449,7 +480,8 @@ function PriceBox({ billing: b }: { billing: Billing }) {
     <div className="border border-border bg-card rounded-sm p-3 text-sm space-y-1">
       <div className="font-medium">Meeting price</div>
       <div className="text-muted-foreground">
-        {fmt(b.seatMinuteTxc)} TXC (${b.seatMinuteUsd.toFixed(3)}) per person, per minute — view-only watchers count too.
+        {fmt(b.seatMinuteTxc)} TXC (${b.seatMinuteUsd.toFixed(3)}) per connected person, per minute — view-only watchers count too.
+        {" "}Only people who are really connected are charged.
         {" "}A 10-person, 1-hour meeting is about {fmt(tenHourTxc, 2)} TXC (${(b.seatMinuteUsd * 600).toFixed(2)}).
       </div>
       <div className="text-muted-foreground">

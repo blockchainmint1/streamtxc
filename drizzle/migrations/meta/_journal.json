@@ -71,6 +71,13 @@
       "when": 1794678284965,
       "tag": "0009_wallet_sessions_and_email_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794707007751,
+      "tag": "0010_meeting_seats_and_audit_round2",
+      "breakpoints": true
     }
   ]
 }

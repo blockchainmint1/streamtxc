@@ -71,7 +71,7 @@ export type Database = {
           op_return_payload: string
           status: string
           to_wallet: string | null
-          tx_hash: string
+          tx_hash: string | null
           video_cid: string
           video_wallet: string | null
         }
@@ -86,7 +86,7 @@ export type Database = {
           op_return_payload: string
           status?: string
           to_wallet?: string | null
-          tx_hash: string
+          tx_hash?: string | null
           video_cid: string
           video_wallet?: string | null
         }
@@ -101,7 +101,7 @@ export type Database = {
           op_return_payload?: string
           status?: string
           to_wallet?: string | null
-          tx_hash?: string
+          tx_hash?: string | null
           video_cid?: string
           video_wallet?: string | null
         }
@@ -711,8 +711,10 @@ export type Database = {
           key_points: Json | null
           notes_status: string
           owner_wallet: string
+          publish_description: string | null
           publish_job_id: string | null
           publish_status: string
+          publish_title: string | null
           published_cid: string | null
           record_video: boolean
           room_id: string
@@ -743,8 +745,10 @@ export type Database = {
           key_points?: Json | null
           notes_status?: string
           owner_wallet: string
+          publish_description?: string | null
           publish_job_id?: string | null
           publish_status?: string
+          publish_title?: string | null
           published_cid?: string | null
           record_video?: boolean
           room_id: string
@@ -775,8 +779,10 @@ export type Database = {
           key_points?: Json | null
           notes_status?: string
           owner_wallet?: string
+          publish_description?: string | null
           publish_job_id?: string | null
           publish_status?: string
+          publish_title?: string | null
           published_cid?: string | null
           record_video?: boolean
           room_id?: string
@@ -818,9 +824,11 @@ export type Database = {
           join_code: string
           join_sound: boolean
           last_joined_at: string | null
+          max_seats: number
           meeting_generation: number
           owner_wallet: string
           purpose: string | null
+          team_can_start: boolean
           title: string
           updated_at: string
           view_code: string
@@ -840,9 +848,11 @@ export type Database = {
           join_code: string
           join_sound?: boolean
           last_joined_at?: string | null
+          max_seats?: number
           meeting_generation?: number
           owner_wallet: string
           purpose?: string | null
+          team_can_start?: boolean
           title?: string
           updated_at?: string
           view_code: string
@@ -862,14 +872,57 @@ export type Database = {
           join_code?: string
           join_sound?: boolean
           last_joined_at?: string | null
+          max_seats?: number
           meeting_generation?: number
           owner_wallet?: string
           purpose?: string | null
+          team_can_start?: boolean
           title?: string
           updated_at?: string
           view_code?: string
         }
         Relationships: []
+      }
+      meeting_seats: {
+        Row: {
+          attendee_id: string
+          created_at: string
+          id: string
+          last_seen_at: string | null
+          left_at: string | null
+          meeting_id: string
+          role: string
+          room_id: string
+        }
+        Insert: {
+          attendee_id: string
+          created_at?: string
+          id?: string
+          last_seen_at?: string | null
+          left_at?: string | null
+          meeting_id: string
+          role: string
+          room_id: string
+        }
+        Update: {
+          attendee_id?: string
+          created_at?: string
+          id?: string
+          last_seen_at?: string | null
+          left_at?: string | null
+          meeting_id?: string
+          role?: string
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_seats_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payments: {
         Row: {

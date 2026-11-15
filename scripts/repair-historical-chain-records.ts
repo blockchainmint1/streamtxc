@@ -9,6 +9,11 @@ const url = process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !key) throw new Error("Missing privileged database configuration");
 const db = createClient(url, key, { auth: { persistSession: false } });
+function requiredGatewayDomain(): string {
+  const d = process.env.IPFS_GATEWAY_DOMAIN?.trim();
+  if (!d) throw new Error("Missing IPFS gateway configuration");
+  return d;
+}
 const limit = Number(process.argv[2] ?? 10);
 if (!Number.isInteger(limit) || limit < 1 || limit > 543) throw new Error("Invalid batch limit");
 function checked<T extends { error: unknown }>(result: T): T {
@@ -61,7 +66,7 @@ for (const event of events.filter(isLegacyRandomRecord)) {
     // first, then read it back on every attempt; never spend on an unread file.
     let verified = false;
     for (let attempt = 0; attempt < 5; attempt++) {
-      const response = await fetchGateway(`https://node.ipfs.honest.money/ipfs/${journal.record_cid}`);
+      const response = await fetchGateway(`https://${requiredGatewayDomain()}/ipfs/${journal.record_cid}`);
       if (response.ok) {
         if (JSON.stringify(await response.json()) !== JSON.stringify(journal.record_json)) throw new Error("Pinned record contents differ");
         verified = true;

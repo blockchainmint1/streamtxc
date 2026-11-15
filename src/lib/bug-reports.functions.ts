@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireWalletSession } from "./wallet-auth.functions";
+import { requireWalletSession, optionalWalletSession } from "./wallet-auth.functions";
 
 import { ADMIN_WALLET } from "./admin";
 
@@ -18,8 +18,9 @@ const SubmitSchema = z.object({
 });
 
 export const submitBugReport = createServerFn({ method: "POST" })
+  .middleware([optionalWalletSession])
   .inputValidator((input: unknown) => SubmitSchema.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("bug_reports").insert({
       name: data.name || null,
@@ -31,7 +32,8 @@ export const submitBugReport = createServerFn({ method: "POST" })
       attachment_data_url: data.attachment_data_url || null,
       page_url: data.page_url || null,
       user_agent: data.user_agent || null,
-      reporter_wallet: data.reporter_wallet || null,
+      // Only a signed-in wallet is recorded — never a wallet the browser claims.
+      reporter_wallet: context.wallet ?? null,
     });
     if (error) throw new Error(error.message);
     return { ok: true };

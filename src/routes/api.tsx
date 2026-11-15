@@ -237,13 +237,17 @@ curl -L ${base}/api/stream/{cid}    -o video.mp4`}</Code>
           </p>
           <Code>{`event tags broadcast in OP_RETURN
 
+payload: TXCV1<tag>|<record CID>   (the full JSON record is on IPFS)
+
   C  claim          — first time a video lands on the network
+  T  metadata       — title / description / thumbnail record
+  O  ownership      — owner proved control of their wallet
   P  payment        — hosting payment received
   R  renewal        — hosting prepaid for another period
-  T  takedown       — uploader took it down
-  D  DMCA           — moderator pulled it
-  M  metadata       — title/description/uploader update
-  X  comment        — IPFS CID of a new comment body`}</Code>
+  X  unpinned       — file removed from storage after the grace period
+  M  comment        — paid comment (IPFS CID of the comment body)
+  B  boost          — paid boost on a comment
+  S  split payout   — creator / hosting / platform share sent`}</Code>
           <p className="text-xs text-muted-foreground">
             Result: TXC proof is permanent — the timestamp does not expire
             even if our gateway goes away. Anyone can decode the OP_RETURN
@@ -268,24 +272,16 @@ curl -L ${base}/api/stream/{cid}    -o video.mp4`}</Code>
             a legacy "T…" address). We verify it server-side against the TXC
             node — no transaction, no spend, no gas.
           </p>
-          <Code>{`# Step 1 — request a challenge
-curl -X POST ${base}/_serverFn/requestWalletLogin \\
-  -H "content-type: application/json" \\
-  -d '{"data":{"wallet":"T9..."}}'
-
-# → { "message": "streamTXC — Sign in...", "challengeToken": "eyJhbGc..." }
-
-# Step 2 — sign \`message\` in TXC Core (File → Sign Message),
-# then hand the signature + challengeToken back:
-
-curl -X POST ${base}/_serverFn/completeWalletLogin \\
-  -H "content-type: application/json" \\
-  -d '{"data":{
-        "challengeToken": "eyJhbGc...",
-        "signature":      "H4r...=="
-      }}'
-
-# → session token (5 min challenge TTL, then verified)`}</Code>
+          <Code>{`# On the site:
+#   Sign in → Honest.Money (SSO), or scan the HME Wallet QR code.
+#
+# The wallet signs a one-time message that names streamtxc.com and a
+# fresh challenge; the server rebuilds that exact message and checks
+# the signature before a session starts. Sessions can be ended from
+# Manage → "Sign out everywhere".
+#
+# The browser calls behind these screens are internal and may change;
+# they are not a public API.`}</Code>
           <p className="text-xs text-muted-foreground">
             The challenge message explicitly says{" "}
             <em>"signing this does NOT authorize any transaction or spend

@@ -54,6 +54,7 @@ import { Route as ApiPublicHooksLiveBillingTickRouteImport } from './routes/api/
 import { Route as ApiPublicHooksMediaconvertRouteImport } from './routes/api/public/hooks/mediaconvert'
 import { Route as ApiPublicHooksPaymentWatcherRouteImport } from './routes/api/public/hooks/payment-watcher'
 import { Route as ApiPublicHooksTelegramRouteImport } from './routes/api/public/hooks/telegram'
+import { Route as ApiPublicMeetHeartbeatRouteImport } from './routes/api/public/meet/heartbeat'
 import { Route as ApiPublicMeetLeaveRouteImport } from './routes/api/public/meet/leave'
 import { Route as ApiPublicMinehmeProfileUpdateRouteImport } from './routes/api/public/minehme/profile-update'
 import { Route as ApiPublicNotifyVerifyEmailRouteImport } from './routes/api/public/notify/verify-email'
@@ -303,6 +304,11 @@ const ApiPublicHooksTelegramRoute = ApiPublicHooksTelegramRouteImport.update({
   path: '/public/hooks/telegram',
   getParentRoute: () => ApiRoute,
 } as any)
+const ApiPublicMeetHeartbeatRoute = ApiPublicMeetHeartbeatRouteImport.update({
+  id: '/public/meet/heartbeat',
+  path: '/public/meet/heartbeat',
+  getParentRoute: () => ApiRoute,
+} as any)
 const ApiPublicMeetLeaveRoute = ApiPublicMeetLeaveRouteImport.update({
   id: '/public/meet/leave',
   path: '/public/meet/leave',
@@ -382,6 +388,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
+  '/api/public/meet/heartbeat': typeof ApiPublicMeetHeartbeatRoute
   '/api/public/meet/leave': typeof ApiPublicMeetLeaveRoute
   '/api/public/minehme/profile-update': typeof ApiPublicMinehmeProfileUpdateRoute
   '/api/public/notify/verify-email': typeof ApiPublicNotifyVerifyEmailRoute
@@ -435,6 +442,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
+  '/api/public/meet/heartbeat': typeof ApiPublicMeetHeartbeatRoute
   '/api/public/meet/leave': typeof ApiPublicMeetLeaveRoute
   '/api/public/minehme/profile-update': typeof ApiPublicMinehmeProfileUpdateRoute
   '/api/public/notify/verify-email': typeof ApiPublicNotifyVerifyEmailRoute
@@ -489,6 +497,7 @@ export interface FileRoutesById {
   '/api/public/hooks/mediaconvert': typeof ApiPublicHooksMediaconvertRoute
   '/api/public/hooks/payment-watcher': typeof ApiPublicHooksPaymentWatcherRoute
   '/api/public/hooks/telegram': typeof ApiPublicHooksTelegramRoute
+  '/api/public/meet/heartbeat': typeof ApiPublicMeetHeartbeatRoute
   '/api/public/meet/leave': typeof ApiPublicMeetLeaveRoute
   '/api/public/minehme/profile-update': typeof ApiPublicMinehmeProfileUpdateRoute
   '/api/public/notify/verify-email': typeof ApiPublicNotifyVerifyEmailRoute
@@ -544,6 +553,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
+    | '/api/public/meet/heartbeat'
     | '/api/public/meet/leave'
     | '/api/public/minehme/profile-update'
     | '/api/public/notify/verify-email'
@@ -597,6 +607,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
+    | '/api/public/meet/heartbeat'
     | '/api/public/meet/leave'
     | '/api/public/minehme/profile-update'
     | '/api/public/notify/verify-email'
@@ -650,6 +661,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/mediaconvert'
     | '/api/public/hooks/payment-watcher'
     | '/api/public/hooks/telegram'
+    | '/api/public/meet/heartbeat'
     | '/api/public/meet/leave'
     | '/api/public/minehme/profile-update'
     | '/api/public/notify/verify-email'
@@ -1000,6 +1012,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksTelegramRouteImport
       parentRoute: typeof ApiRoute
     }
+    '/api/public/meet/heartbeat': {
+      id: '/api/public/meet/heartbeat'
+      path: '/public/meet/heartbeat'
+      fullPath: '/api/public/meet/heartbeat'
+      preLoaderRoute: typeof ApiPublicMeetHeartbeatRouteImport
+      parentRoute: typeof ApiRoute
+    }
     '/api/public/meet/leave': {
       id: '/api/public/meet/leave'
       path: '/public/meet/leave'
@@ -1081,6 +1100,7 @@ interface ApiRouteChildren {
   ApiPublicHooksMediaconvertRoute: typeof ApiPublicHooksMediaconvertRoute
   ApiPublicHooksPaymentWatcherRoute: typeof ApiPublicHooksPaymentWatcherRoute
   ApiPublicHooksTelegramRoute: typeof ApiPublicHooksTelegramRoute
+  ApiPublicMeetHeartbeatRoute: typeof ApiPublicMeetHeartbeatRoute
   ApiPublicMeetLeaveRoute: typeof ApiPublicMeetLeaveRoute
   ApiPublicMinehmeProfileUpdateRoute: typeof ApiPublicMinehmeProfileUpdateRoute
   ApiPublicNotifyVerifyEmailRoute: typeof ApiPublicNotifyVerifyEmailRoute
@@ -1113,6 +1133,7 @@ const ApiRouteChildren: ApiRouteChildren = {
   ApiPublicHooksMediaconvertRoute: ApiPublicHooksMediaconvertRoute,
   ApiPublicHooksPaymentWatcherRoute: ApiPublicHooksPaymentWatcherRoute,
   ApiPublicHooksTelegramRoute: ApiPublicHooksTelegramRoute,
+  ApiPublicMeetHeartbeatRoute: ApiPublicMeetHeartbeatRoute,
   ApiPublicMeetLeaveRoute: ApiPublicMeetLeaveRoute,
   ApiPublicMinehmeProfileUpdateRoute: ApiPublicMinehmeProfileUpdateRoute,
   ApiPublicNotifyVerifyEmailRoute: ApiPublicNotifyVerifyEmailRoute,

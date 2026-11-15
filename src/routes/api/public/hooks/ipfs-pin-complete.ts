@@ -62,7 +62,7 @@ export const Route = createFileRoute("/api/public/hooks/ipfs-pin-complete")({
           }
           const { data: rec } = await sb
             .from("meeting_recordings")
-            .select("id, owner_wallet, title, started_at, summary, transcript_text")
+            .select("id, owner_wallet, title, started_at, transcript_text, publish_title, publish_description")
             .eq("id", meetingRecordingId)
             .eq("publish_job_id", jobId)
             .maybeSingle();
@@ -75,8 +75,9 @@ export const Route = createFileRoute("/api/public/hooks/ipfs-pin-complete")({
             jobId,
             prefix,
             ownerWallet: rec.owner_wallet,
-            title: `${rec.title} — ${day}`,
-            description: rec.summary ?? "",
+            // Only the title/description the host reviewed before publishing — never raw AI text.
+            title: rec.publish_title || `${rec.title} — ${day}`,
+            description: rec.publish_description ?? "",
             transcriptText: rec.transcript_text ?? null,
             source: "meeting",
           });

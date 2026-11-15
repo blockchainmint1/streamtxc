@@ -9,7 +9,9 @@ import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { useWallet } from "@/lib/wallet";
 import { pageMeta } from "@/lib/page-meta";
-import { clockLabel } from "@/lib/meeting-rules";
+import { clockLabel, PUBLISH_DESCRIPTION_MAX, PUBLISH_TITLE_MAX } from "@/lib/meeting-rules";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   deleteMeetingRecording, getMeetingRecording, publishMeetingRecording, retryMeetingNotes,
 } from "@/lib/meetings.functions";
@@ -60,6 +62,7 @@ function RecordingView() {
   const qc = useQueryClient();
   const navigate = Route.useNavigate();
   const [busy, setBusy] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
   const key = ["meeting-recording", id];
   const q = useQuery({
     queryKey: key,
@@ -146,19 +149,24 @@ function RecordingView() {
                     <a href={r.downloadUrl}><Download /> Download video{r.videoBytes ? ` (${(r.videoBytes / 1024 ** 2).toFixed(0)} MB)` : ""}</a>
                   </Button>
                 )}
-                {canPublish && (
-                  <Button
-                    size="sm" disabled={!!busy}
-                    onClick={() => {
-                      if (confirm("Post this recording to your channel? Anyone will be able to watch it, and the AI summary becomes its description.")) {
-                        void act("publish", () => publish({ data: { id } }), "Publishing — it shows on your channel in about 10–20 minutes.");
-                      }
-                    }}
-                  >
+                {canPublish && !publishing && (
+                  <Button size="sm" disabled={!!busy} onClick={() => setPublishing(true)}>
                     <Send /> Publish to my channel
                   </Button>
                 )}
               </div>
+              {canPublish && publishing && (
+                <PublishForm
+                  defaultTitle={`${r.title} — ${started.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`}
+                  defaultDescription={r.summary ?? ""}
+                  busy={!!busy}
+                  onCancel={() => setPublishing(false)}
+                  onPublish={async (title, description) => {
+                    const ok = await act("publish", () => publish({ data: { id, title, description } }), "Publishing — it shows on your channel in about 10–20 minutes.");
+                    if (ok) setPublishing(false);
+                  }}
+                />
+              )}
               <p className="text-xs text-muted-foreground">
                 Private — only you can see this. The private video is kept for {r.keepDays} days; the transcript and notes are kept for good.
               </p>
@@ -271,5 +279,41 @@ function Notice({ children, tone }: { children: React.ReactNode; tone?: "bad" })
     <div className={tone === "bad" ? "border border-destructive/60 bg-card rounded-sm p-3 text-sm" : "border border-border bg-card rounded-sm p-3 text-sm text-muted-foreground"}>
       {children}
     </div>
+  );
+}
+
+/** The host checks (and can fix) the public title and description before anything is posted. */
+function PublishForm({ defaultTitle, defaultDescription, busy, onCancel, onPublish }: {
+  defaultTitle: string;
+  defaultDescription: string;
+  busy: boolean;
+  onCancel: () => void;
+  onPublish: (title: string, description: string) => void;
+}) {
+  const [title, setTitle] = useState(defaultTitle.slice(0, PUBLISH_TITLE_MAX));
+  const [description, setDescription] = useState(defaultDescription.slice(0, PUBLISH_DESCRIPTION_MAX));
+  return (
+    <form
+      className="border border-border bg-card rounded-sm p-4 space-y-3"
+      onSubmit={(e) => { e.preventDefault(); onPublish(title, description); }}
+    >
+      <div className="font-medium">Publish to your channel</div>
+      <p className="text-xs text-muted-foreground">
+        Anyone will be able to watch it. Check the title and description first — the description starts as the AI summary, so fix anything it got wrong.
+      </p>
+      <label className="block space-y-1">
+        <span className="text-sm">Title</span>
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={PUBLISH_TITLE_MAX} required />
+      </label>
+      <label className="block space-y-1">
+        <span className="text-sm">Description</span>
+        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength={PUBLISH_DESCRIPTION_MAX} rows={6} />
+        <span className="block text-xs text-muted-foreground text-right">{description.length}/{PUBLISH_DESCRIPTION_MAX}</span>
+      </label>
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" disabled={busy || !title.trim()}><Send /> Publish</Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+      </div>
+    </form>
   );
 }

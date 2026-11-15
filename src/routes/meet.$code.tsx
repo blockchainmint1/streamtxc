@@ -144,8 +144,8 @@ function JoinPage() {
               <p className="text-sm text-muted-foreground mt-1">
                 {d.live
                   ? "● The meeting is open now."
-                  : viewer
-                    ? "○ The meeting hasn't started yet — this page checks again every 20 seconds."
+                  : !d.canOpen
+                    ? "○ The host hasn't opened the meeting yet — this page checks again every 20 seconds."
                     : "○ Nobody's here yet — you'll open the room."}
               </p>
             </div>
@@ -179,7 +179,7 @@ function JoinPage() {
             )}
             {denied && <p role="alert" className="text-sm text-destructive">The host didn't let you in this time.</p>}
             {joinError && <p role="alert" className="text-sm text-destructive">{joinError}</p>}
-            <Button type="submit" size="lg" className="w-full" disabled={joining || !name.trim() || (viewer && !d.live && !d.needsApproval)}>
+            <Button type="submit" size="lg" className="w-full" disabled={joining || !name.trim() || (!d.canOpen && !d.live && !d.needsApproval)}>
               {joining ? "Joining…" : d.needsApproval ? "Ask to join" : viewer ? "Start watching" : "Join meeting"}
             </Button>
           </form>

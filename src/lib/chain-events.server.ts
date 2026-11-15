@@ -69,7 +69,8 @@ export async function recordChainEvent(
     video_cid: input.cid,
     video_wallet: input.videoWallet,
     event_type: input.eventType,
-    tx_hash: stamp.txid,
+    // A failed stamp stores no transaction id (never a look-alike placeholder).
+    tx_hash: stamp.real ? stamp.txid : null,
     op_return_payload: stamp.payload,
     from_wallet: input.fromWallet ?? null,
     to_wallet: input.videoWallet,
@@ -151,7 +152,8 @@ export async function recordMetadataAnchor(input: {
     video_cid: input.videoCid,
     video_wallet: input.videoWallet,
     event_type: "T",
-    tx_hash: stamp.txid,
+    // A failed stamp stores no transaction id (never a look-alike placeholder).
+    tx_hash: stamp.real ? stamp.txid : null,
     op_return_payload: stamp.payload,
     from_wallet: null,
     to_wallet: input.videoWallet,
@@ -198,7 +200,8 @@ export async function recordOwnershipAnchor(input: {
     video_cid: input.videoCid,
     video_wallet: input.videoWallet,
     event_type: "O",
-    tx_hash: stamp.txid,
+    // A failed stamp stores no transaction id (never a look-alike placeholder).
+    tx_hash: stamp.real ? stamp.txid : null,
     op_return_payload: stamp.payload,
     from_wallet: input.ownerWallet,
     to_wallet: input.videoWallet,

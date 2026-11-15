@@ -3,12 +3,8 @@ import { resolveGatewayUrl, serveGateway } from "@/lib/ipfs.server";
 import { recordView } from "@/lib/videos.functions";
 
 async function hashIp(ip: string): Promise<string> {
-  const data = new TextEncoder().encode(ip);
-  const buf = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(buf))
-    .slice(0, 12)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  const { keyedIpHash } = await import("@/lib/ip-hash");
+  return (await keyedIpHash("view", ip)).slice(0, 24);
 }
 
 export const Route = createFileRoute("/api/stream/$cid")({

@@ -72,12 +72,15 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 // route already set (media responses carry their own sandbox policy).
 function withSecurityHeaders(response: Response, request: Request): Response {
   let pathname = "/";
+  let host = "";
   try {
-    pathname = new URL(request.url).pathname;
+    const u = new URL(request.url);
+    pathname = u.pathname;
+    host = u.host;
   } catch {
     /* keep default */
   }
-  const extra = securityHeadersFor(pathname);
+  const extra = securityHeadersFor(pathname, request.headers.get("host") ?? host);
   let out = response;
   try {
     for (const [k, v] of Object.entries(extra)) {
