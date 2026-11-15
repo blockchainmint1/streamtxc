@@ -61,7 +61,7 @@ for (const event of events.filter(isLegacyRandomRecord)) {
     // first, then read it back on every attempt; never spend on an unread file.
     let verified = false;
     for (let attempt = 0; attempt < 5; attempt++) {
-      const response = await fetchGateway(`https://node.ipfs.honest.money/ipfs/${journal.record_cid}`);
+      const response = await fetchGateway(`https://${requiredGatewayDomain()}/ipfs/${journal.record_cid}`);
       if (response.ok) {
         if (JSON.stringify(await response.json()) !== JSON.stringify(journal.record_json)) throw new Error("Pinned record contents differ");
         verified = true;
