@@ -11,8 +11,7 @@ const SubmitSchema = z.object({
   details: z.string().trim().min(1, "details required").max(5000),
   attachment_name: z.string().max(255).optional().nullable(),
   attachment_type: z.string().max(120).optional().nullable(),
-  // A screenshot only: an image data URL, ~2.5MB at most.
-  attachment_data_url: z.string().max(3_500_000).regex(/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/).optional().nullable(),
+  attachment_data_url: z.string().max(3_500_000).optional().nullable(), // ~2.5MB base64
   page_url: z.string().max(500).optional().nullable(),
   user_agent: z.string().max(500).optional().nullable(),
   reporter_wallet: z.string().max(120).optional().nullable(),
