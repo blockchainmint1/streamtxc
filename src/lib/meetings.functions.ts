@@ -580,6 +580,7 @@ export const getMeetingInfo = createServerFn({ method: "POST" })
       role,
       live: await isMeetingLive(room),
       needsApproval: needsApproval(room, role),
+      canOpen: mayOpenRoom(role, room.team_can_start),
       recordingNotice: room.auto_record || room.auto_notes || !!(await activeRecordingFor(room.id)),
     };
   });
