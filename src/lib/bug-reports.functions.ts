@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireWalletSession } from "./wallet-auth.functions";
+import { requireWalletSession, optionalWalletSession } from "./wallet-auth.functions";
 
 import { ADMIN_WALLET } from "./admin";
 
@@ -11,15 +11,17 @@ const SubmitSchema = z.object({
   details: z.string().trim().min(1, "details required").max(5000),
   attachment_name: z.string().max(255).optional().nullable(),
   attachment_type: z.string().max(120).optional().nullable(),
-  attachment_data_url: z.string().max(3_500_000).optional().nullable(), // ~2.5MB base64
+  // A screenshot only: an image data URL, ~2.5MB at most.
+  attachment_data_url: z.string().max(3_500_000).regex(/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/).optional().nullable(),
   page_url: z.string().max(500).optional().nullable(),
   user_agent: z.string().max(500).optional().nullable(),
   reporter_wallet: z.string().max(120).optional().nullable(),
 });
 
 export const submitBugReport = createServerFn({ method: "POST" })
+  .middleware([optionalWalletSession])
   .inputValidator((input: unknown) => SubmitSchema.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("bug_reports").insert({
       name: data.name || null,
@@ -31,7 +33,8 @@ export const submitBugReport = createServerFn({ method: "POST" })
       attachment_data_url: data.attachment_data_url || null,
       page_url: data.page_url || null,
       user_agent: data.user_agent || null,
-      reporter_wallet: data.reporter_wallet || null,
+      // Only a signed-in wallet is recorded — never a wallet the browser claims.
+      reporter_wallet: context.wallet ?? null,
     });
     if (error) throw new Error(error.message);
     return { ok: true };
