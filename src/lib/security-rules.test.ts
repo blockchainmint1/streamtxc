@@ -34,7 +34,7 @@ test("anonymous fresh upload still works, but only within the window", () => {
 });
 
 // ---- Audit M-1/M-3/M-5/M-7/M-10 ----
-import { isDropboxDirectUrl, emailSendDecision, EMAIL_DAILY_MAX, newStreamKey, isWeakStreamKey, securityHeadersFor, escapeHtml } from "./security-limits";
+import { isDropboxDirectUrl, emailSendDecision, EMAIL_DAILY_MAX, newStreamKey, isWeakStreamKey, securityHeadersFor, escapeHtml, isLovableHost } from "./security-limits";
 import { readSessionClaims, issueWalletBrowserProof } from "./wallet-auth.server";
 
 test("Dropbox shortcut imports only accept Dropbox's own https download hosts", () => {
@@ -81,6 +81,20 @@ test("only /embed pages may be framed by other sites", () => {
   expect(securityHeadersFor("/meet/abc")["content-security-policy"]).toContain("frame-ancestors 'self'");
   expect(securityHeadersFor("/embed/bafy123")["content-security-policy"]).toContain("frame-ancestors *");
   expect(securityHeadersFor("/")["x-content-type-options"]).toBe("nosniff");
+});
+
+test("only Lovable's own preview hosts may frame the app; custom domains frame nothing but themselves", () => {
+  expect(securityHeadersFor("/manage", "streamtxc.com")["content-security-policy"]).toContain("frame-ancestors 'self';");
+  expect(securityHeadersFor("/manage", "streamtxc.com")["content-security-policy"]).not.toContain("lovable");
+  expect(securityHeadersFor("/manage", "id-preview--x.lovable.app")["content-security-policy"]).toContain("https://*.lovable.app");
+  expect(isLovableHost("streamtxc.com.lovable.app.evil.com")).toBe(false);
+});
+
+test("HSTS covers subdomains, and embeds on other sites never get camera or mic", () => {
+  expect(securityHeadersFor("/", "streamtxc.com")["strict-transport-security"]).toContain("includeSubDomains");
+  expect(securityHeadersFor("/embed/bafy", "streamtxc.com")["permissions-policy"]).toContain("camera=()");
+  expect(securityHeadersFor("/embed/bafy", "streamtxc.com")["permissions-policy"]).toContain("microphone=()");
+  expect(securityHeadersFor("/meet/abc", "streamtxc.com")["permissions-policy"]).toContain("camera=(self)");
 });
 
 test("emails shown on the verify page are escaped", () => {

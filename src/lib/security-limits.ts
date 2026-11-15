@@ -85,14 +85,16 @@ export function isLovableHost(host: string | null | undefined): boolean {
  * Baseline headers for every page. Only /embed/* may be framed by other
  * sites; everything else (manage, meetings, sign-in) may only be framed by
  * us — plus the Lovable editor when served from a Lovable preview host —
- * which blocks click-jacking. Camera, microphone and screen capture are only
- * available to the meeting pages.
+ * which blocks click-jacking. Camera, microphone and screen capture are
+ * never available to other sites' frames or to embeds.
  */
 export function securityHeadersFor(pathname: string, host?: string | null): Record<string, string> {
   const embeddable = pathname.startsWith("/embed/");
-  const meeting = pathname === "/meet" || pathname.startsWith("/meet/");
   const parents = isLovableHost(host) ? `'self' ${LOVABLE_FRAME_PARENTS}` : "'self'";
-  const media = meeting ? "camera=(self), microphone=(self), display-capture=(self)" : "camera=(), microphone=(), display-capture=()";
+  // In-app navigation keeps the first page's policy, so the whole site keeps
+  // camera/mic for itself (meetings) while every other site's frames get none;
+  // embeds on other sites never get them.
+  const media = embeddable ? "camera=(), microphone=(), display-capture=()" : "camera=(self), microphone=(self), display-capture=(self)";
   return {
     "x-content-type-options": "nosniff",
     "referrer-policy": "strict-origin-when-cross-origin",
