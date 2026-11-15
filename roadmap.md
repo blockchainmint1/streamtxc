@@ -29,3 +29,14 @@
 # Captions
 - [x] Transcription request used a format the AI service rejects (0 videos had transcripts); now saves transcript text.
 - [ ] Timed closed captions (.vtt). Blocker: AI service returns no timings; needs Amazon Transcribe (Bobby decision + AWS permission).
+# Audit round 2 (Nov 15)
+- [ ] N-1 meetings bill only seats that are really connected (heartbeat), drop never-connected seats, per-room seat cap, keep a live-stream reserve
+- [ ] N-2 only the host opens a paid room unless "team can start without me"; auto record/notes only once host is in; close if host gone 10 min
+- [ ] N-3 leave secret required (falls back to a key derived from SESSION_SECRET)
+- [ ] N-4 AI notes treat transcript as untrusted; host edits title/description before publish; length cap
+- [ ] N-7 delete all recording files; N-8 keyed IP hashes; N-9 SVG downloads only; N-12/H-5 null placeholder hashes
+- [ ] M-7/N-11 HSTS includeSubDomains, camera/mic only on /meet, Lovable framing only on Lovable hosts
+- [ ] Impersonation link: password no longer in the address (same password, per Bobby's no-new-admin-password rule), constant-time checks
+- [ ] Dependencies: zod override, bitcoinjs-lib patch
+- [ ] Lows: L-1 comments read policy, L-2 bug report caps, L-3 Telegram escaping, L-5 docs, L-8 exact address match, N-6 env-only bucket/gateway
+- Not doing: H-7/N-10 rate limiting (platform has no rate limiter yet); separate admin/cron tokens (Bobby declined); script-src CSP (hm.js self-updates)
