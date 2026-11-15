@@ -73,21 +73,31 @@ export function isWeakStreamKey(key: string | null | undefined): boolean {
 }
 
 // ---------- Browser security headers ----------
-const FRAME_PARENTS =
-  "'self' https://*.lovable.app https://*.lovable.dev https://lovable.dev https://*.lovableproject.com";
+const LOVABLE_FRAME_PARENTS = "https://*.lovable.app https://*.lovable.dev https://lovable.dev https://*.lovableproject.com";
+
+/** Lovable's own preview/published hosts (the editor frames these); custom domains are never framed by Lovable. */
+export function isLovableHost(host: string | null | undefined): boolean {
+  const h = (host ?? "").toLowerCase().split(":")[0];
+  return h === "localhost" || h.endsWith(".lovable.app") || h.endsWith(".lovableproject.com") || h.endsWith(".lovable.dev");
+}
 
 /**
  * Baseline headers for every page. Only /embed/* may be framed by other
  * sites; everything else (manage, meetings, sign-in) may only be framed by
- * us and the Lovable editor preview, which blocks click-jacking.
+ * us — plus the Lovable editor when served from a Lovable preview host —
+ * which blocks click-jacking. Camera, microphone and screen capture are only
+ * available to the meeting pages.
  */
-export function securityHeadersFor(pathname: string): Record<string, string> {
+export function securityHeadersFor(pathname: string, host?: string | null): Record<string, string> {
   const embeddable = pathname.startsWith("/embed/");
+  const meeting = pathname === "/meet" || pathname.startsWith("/meet/");
+  const parents = isLovableHost(host) ? `'self' ${LOVABLE_FRAME_PARENTS}` : "'self'";
+  const media = meeting ? "camera=(self), microphone=(self), display-capture=(self)" : "camera=(), microphone=(), display-capture=()";
   return {
     "x-content-type-options": "nosniff",
     "referrer-policy": "strict-origin-when-cross-origin",
-    "strict-transport-security": "max-age=31536000",
-    "content-security-policy": `frame-ancestors ${embeddable ? "*" : FRAME_PARENTS}; object-src 'none'; base-uri 'self'`,
-    "permissions-policy": "geolocation=(), payment=(), usb=()",
+    "strict-transport-security": "max-age=31536000; includeSubDomains",
+    "content-security-policy": `frame-ancestors ${embeddable ? "*" : parents}; object-src 'none'; base-uri 'self'`,
+    "permissions-policy": `geolocation=(), payment=(), usb=(), ${media}`,
   };
 }
