@@ -3,7 +3,7 @@ export function mediaResponseHeaders(contentType: string | null, pathname = ""):
   const type = contentType?.split(";")[0]?.trim().toLowerCase() ?? "";
   const segment = ["application/octet-stream", "text/vnd.trolltech.linguist", ""].includes(type) && /\.(ts|m4s)$/i.test(pathname);
   const safe = segment || /^(video|audio)\/[a-z0-9.+-]+$/.test(type) ||
-    ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/svg+xml", "image/x-icon", "text/vtt", "application/json", "application/vnd.apple.mpegurl", "application/x-mpegurl"].includes(type);
+    ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/x-icon", "text/vtt", "application/json", "application/vnd.apple.mpegurl", "application/x-mpegurl"].includes(type);
   const headers = new Headers({
     "content-type": segment ? (/\.ts$/i.test(pathname) ? "video/mp2t" : "video/mp4") : safe ? type : "application/octet-stream",
     "x-content-type-options": "nosniff",
