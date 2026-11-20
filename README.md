@@ -20,6 +20,7 @@ No platform lock-in. No silent takedowns. Every receipt is on the blockchain.
 ![IPFS](https://img.shields.io/badge/storage-IPFS-65c2cb?style=flat-square)
 ![TEXITcoin](https://img.shields.io/badge/chain-TEXITcoin-ff8a00?style=flat-square)
 ![AWS](https://img.shields.io/badge/media-AWS_MediaLive_·_Chime-232f3e?style=flat-square)
+![License: MIT](https://img.shields.io/badge/license-MIT-2c8a5a?style=flat-square)
 
 <br />
 
@@ -160,6 +161,22 @@ TXC, ISK and ZCU networks and the coins, wallets, tools and apps built on them.
 - ⛏️ [TEXITcoin](https://texitcoin.org/build) — the chain behind every receipt
 - 🧊 [Zero Chill (ZCU)](https://zerochill.com/build)
 - 🔑 [honest.money](https://honest.money) — single sign-on, wallets and ecosystem APIs
+
+---
+
+## 📜 License
+
+Released under the **MIT License** — the full text is in [LICENSE](LICENSE).
+
+In plain words: anyone may **use, copy, change, redistribute and even sell** this code,
+in source or in a product of their own, as long as the original copyright and permission
+notice stay with it. There is no warranty and no liability on our side — the usual MIT terms.
+
+Two things the MIT grant does **not** cover: the streamTXC name, logo and branding, and the
+honest.money / TEXITcoin trademarks. Those stay with their owners — use them to say where the
+code came from, not to pass your own project off as ours.
+
+Built on this? We'd genuinely like to hear about it.
 
 ---
 
