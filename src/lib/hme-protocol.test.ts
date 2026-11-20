@@ -28,7 +28,7 @@ describe("HME site tickets and permanent identity", () => {
   });
   test("unknown UUID cannot claim Bobby's wallet by his email", async () => {
     const links = new Map([[memberId, { wallet, status: "active" }]]);
-    const verified = await verifyHmeTicket(await ticket({ minerId: "affe34e8-891b-41c2-8405-d31df4dadb8c", email: "bobby@honest.money" }), fixtureKey, now);
+    const verified = await verifyHmeTicket(await ticket({ minerId: "affe34e8-891b-41c2-8405-d31df4dadb8c", email: "member@example.com" }), fixtureKey, now);
     expect(linkedHmeWallet(links.get(verified.minerId) ?? null)).toBeNull();
   });
   test("rejects another site's correctly signed ticket", async () => {
