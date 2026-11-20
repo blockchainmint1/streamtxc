@@ -20,3 +20,4 @@
 - Chat, comment and boost authorship comes only from the session-verified wallet, never from a wallet field the browser sends.
 - Admin/cron endpoints compare the operator password with secretMatches (admin-token.ts) and emergency impersonation takes it only in a POST body with a short labelled session, so the password never appears in URLs or logs.
 - Visitor IPs are stored only as keyed HMAC hashes (ip-hash.ts) and published meeting recordings use the host-reviewed title/description, never raw AI output.
+- The GitHub repository is public: roadmap.md, memory notes, code comments and test fixtures must never contain personal names or emails, labelled personal wallets, AWS/infra IDs, live secrets, or descriptions of unfixed security gaps, because every Lovable commit is published immediately.

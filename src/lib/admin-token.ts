@@ -1,5 +1,4 @@
-// Constant-time comparison for the operator password used by admin and cron
-// endpoints (same password as before — see project memory: no separate admin token).
+// Constant-time comparison for the operator password used by admin and cron endpoints.
 export function secretMatches(provided: string | null | undefined, expected: string | null | undefined): boolean {
   if (!expected || typeof provided !== "string") return false;
   const enc = new TextEncoder();

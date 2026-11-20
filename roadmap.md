@@ -1,43 +1,17 @@
-# HME API update
-- [x] Fix audit H-1 media execution, H-2 canonical wallet messages and browser-only exchange proof, M-4 fail-open signatures, M-6 branch identity binding, and H-3 confirmed-only renewals. 27 regression tests pass; real signed QR callback/exchange and replay rejection verified, plus actual archive thumbnail, playlist and segment reads. Publication and an HME Wallet phone check remain required; no real renewal payment or existing branch was changed during testing.
-- [x] Build and test append-only historical repair with IPFS read-back and persisted signed transactions; 362 records repaired, originals retained.
-- [x] Finish remaining historical records: all 543 complete, 543 unique transactions, total fees 0.01434591 TXC; script now pages past 1000 rows.
-- [x] Check current HME API instructions and existing member links; HME confirmed all four stored UUIDs.
-- [x] Switch SSO, Hub reporting, and profile updates to HME_ECOSYSTEM and permanent UUIDs without changing wallet ownership.
-- [x] Test real member lookup and Hub reporting; test signed site ticket through the browser to Bobby's 103-video account, replay rejection and profile sync; ten protocol tests pass.
-- [ ] Confirm an HME-issued sign-in after publishing and HME's automatic profile-update delivery. Blocker: no HME browser session; publication and sender registration are outside this turn. Test tickets were generated server-side, not issued through HME's login screen.
-# Audit medium items still open (verified in code Nov 11)
-- [x] M-1 Dropbox shortcut imports must be real Dropbox https links (tested)
-- [x] M-2 chat requires sign-in; comments/boosts credit only the signed-in wallet, else "anon"
-- [x] M-3 new channels get random keys; "Make a new stream key" button; no auto-created open groups
-- [ ] M-3 follow-up: replace Bobby's and TsNCJ…'s old "primary" keys. AWS permission done + tested. Waiting on Bobby: press the button on a non-stream day, update StreamYard.
-- [x] M-5 own SESSION_SECRET, server-side sessions (sign-out cancels, "Sign out everywhere"), import tokens off the service key, admin wallet in one place; revocation tested against the database
-- [x] M-7 site-wide headers (anti-framing except /embed, nosniff, referrer, HSTS); full script CSP / hm.js pinning not done (hm.js updates itself)
-- [x] M-10 link never returned, 1/min and 5/day per wallet, verify page escaped
-- [x] M-11 diagnostic tools now return only status/progress; raw errors owner-only; tests added
-# Team meetings (/meet)
-- [x] Build /meet host page, team link + view-only link, meeting screen (mic, camera, screen share, leave, end for all), send-to-live-stream button; 6 link-rule tests pass.
-- [x] AWS Chime permission granted; room join/roles verified in browser.
-- [ ] Live meeting test with real audio/video. Blocker: needs Bobby on real devices after publishing (test browser can't place calls).
-- [x] Charge hosts ~10x AWS cost from prepaid TXC balance (admin room free); seat freed on leave; real AWS seat count test passed.
-- [x] Meeting settings: multiple named rooms with own links, join sound (+ personal mute), approve team / view-only link with waiting room; browser-tested create → approve → admit → delete.
-- [x] Bobby's 4th/5th meeting settings: record option + transcript/meeting notes (room auto-settings + Record / Take notes buttons, private recording page, one-click publish, AI summary/decisions/to-dos). 33 meeting tests pass; AI notes tested live; Record button shows the AWS-setup message.
-- [x] Conference section on /manage (same rooms as /meet: create, rename, copy links, start/join).
-- [ ] Recording + notes end-to-end test. Blocker: Bobby must run the AWS setup command (recordings bucket + permissions), then a real meeting.
-- [x] Fixed duplicate "Daily team meeting" rooms (19 accidental copies archived; failed room lookups no longer create rooms).
-- [ ] Discuss with Bobby how people pay in TXC (top-up flow, pay-per-meeting, plans). Blocker: Bobby's decision.
-# Captions
-- [x] Transcription request used a format the AI service rejects (0 videos had transcripts); now saves transcript text.
-- [ ] Timed closed captions (.vtt). Blocker: AI service returns no timings; needs Amazon Transcribe (Bobby decision + AWS permission).
-# Audit round 2 (Nov 15)
-- [x] N-1 only connected seats are charged (check-in every 30s), unused seats removed, per-room people limit (25), meeting closes before eating a running live stream's last 30 min of funding
-- [x] N-2 only the host opens a room unless "team can start without me" (on for Bobby's rooms); auto record/notes only with host there; closes when host gone 10 min
-- [x] N-3 seat key required (falls back to a key derived from SESSION_SECRET)
-- [x] N-4 AI notes treat transcript as untrusted; host reviews title/description before publishing; 2000-char cap (publish form not browser-tested: no finished recording yet)
-- [x] N-7 full delete; N-8 keyed IP hashes; N-9 SVG downloads; N-12/H-5 failed stamps store no tx id; N-6 bucket/gateway from settings
-- [x] M-7/N-11 HSTS includeSubDomains, Lovable framing only on Lovable hosts, no camera/mic for embeds or other sites' frames
-- [x] Emergency sign-in: password typed in a box (POST), 12-hour labelled session, timing-safe checks on all admin/cron endpoints (same password, per Bobby)
-- [x] Dependencies: zod deduped to 4.6.7, bitcoinjs-lib 7.0.5, bip322-js 4.0.1 (signature check verified)
-- [x] Lows: L-1 already closed (comments not readable by the public), L-2 bug reports record only signed-in wallet, L-3 Telegram titles escaped, L-5 docs fixed, L-8 exact address match
-- Not doing: H-7/N-10 rate limiting (platform has no rate limiter yet); separate admin/cron tokens (Bobby declined); script-src CSP (hm.js self-updates)
-- [x] Bobby's earlier ask: move all videos from TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m to Thaotk2YYWiXG9EozU5dqABx7EB26fGrhn. Closed Nov 15: Bobby said no transfer needed — the 113 videos stay on Tmmoqq…, which is also his HME Wallet / branch 1105 wallet.
+# Roadmap
+
+Public repository — keep this list free of personal names, emails, wallet labels, infrastructure IDs and details of open security gaps.
+
+## Open
+- [ ] Rotate the remaining legacy live stream key on a non-streaming day (owner action on /manage, then update the streaming app).
+- [ ] Confirm a real Honest.Money-issued sign-in and automatic profile-update delivery after publishing.
+- [ ] Real-device meeting test with audio/video, recording and notes.
+- [ ] Decide how people pay for meetings in TXC (top-up, pay-per-meeting or plans).
+- [ ] Timed closed captions (.vtt) — needs a transcription service that returns timings.
+
+## Done
+- Wallet sign-in, Honest.Money SSO with permanent member IDs, HME Wallet branch filing and on-chain records (JSON on IPFS, compact pointer on chain).
+- Historical on-chain record supplements (append-only; originals preserved).
+- Team meetings at /meet: named rooms, waiting room, join sounds, view-only links, live-stream hand-off, recording and AI notes, prepaid TXC billing.
+- Security audit rounds 1 and 2 addressed; see SECURITY.md for reporting.
+- Public-release readiness: history scanned (no secrets), docs/LICENSE/SECURITY added, internal notes scrubbed.

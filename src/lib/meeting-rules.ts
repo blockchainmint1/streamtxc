@@ -85,7 +85,7 @@ export function usdToTxc8(usd: number, txcUsd: number): number {
   return +(usd / txcUsd).toFixed(8);
 }
 
-/** Bobby's own team room is paid by the company, never charged. */
+/** The platform owner's own team room is never charged. */
 export function isMeetingBillable(ownerWallet: string, adminWallet: string): boolean {
   return ownerWallet !== adminWallet;
 }
@@ -216,7 +216,7 @@ export function clockLabel(ms: number): string {
   return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
 }
 
-/** Plain-text transcript: "[12:05] Bobby: text". */
+/** Plain-text transcript: "[12:05] Alex: text". */
 export function transcriptToText(lines: TranscriptLine[]): string {
   return lines.map((l) => `[${clockLabel(l.atMs)}] ${l.speaker}: ${l.text}`).join("\n");
 }

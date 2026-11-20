@@ -1,5 +1,4 @@
-// Emergency admin sign-in as any wallet. Gated by TXC_RPC_PASS (Bobby's choice —
-// no separate admin password).
+// Emergency admin sign-in as any wallet, gated by the operator password.
 //
 // Usage: open https://streamtxc.com/api/public/admin/impersonate-wallet?wallet=T...
 // and type the password into the box. The password is sent in the form body, never

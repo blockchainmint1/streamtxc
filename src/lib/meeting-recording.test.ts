@@ -37,9 +37,9 @@ function result(id: string, startOffset: number, partial: boolean, words: Array<
 
 describe("who-said-what transcript", () => {
   const raw = [
-    result("r1", 1000, true, [["habc12345|Bobby", "Good"]]),
-    result("r1", 1000, false, [["habc12345|Bobby", "Good"], ["habc12345|Bobby", "morning."]]),
-    result("r2", 4000, false, [["habc12345|Bobby", "Let's"], ["habc12345|Bobby", "start."]]),
+    result("r1", 1000, true, [["habc12345|Alex", "Good"]]),
+    result("r1", 1000, false, [["habc12345|Alex", "Good"], ["habc12345|Alex", "morning."]]),
+    result("r2", 4000, false, [["habc12345|Alex", "Let's"], ["habc12345|Alex", "start."]]),
     result("r3", 9000, false, [["pzz998877|Maria", "Sales"], ["pzz998877|Maria", "are"], ["pzz998877|Maria", "up."]]),
     JSON.stringify({ transcriptionStatus: { type: "started" } }),
   ].join("\n");
@@ -47,14 +47,14 @@ describe("who-said-what transcript", () => {
   it("keeps only finished lines, credits each to the speaker, merges back-to-back lines", () => {
     const lines = parseChimeTranscript(raw, T0);
     expect(lines).toEqual([
-      { atMs: 1000, speaker: "Bobby", text: "Good morning. Let's start." },
+      { atMs: 1000, speaker: "Alex", text: "Good morning. Let's start." },
       { atMs: 9000, speaker: "Maria", text: "Sales are up." },
     ]);
   });
 
   it("prints as [time] Name: words", () => {
     expect(transcriptToText(parseChimeTranscript(raw, T0))).toBe(
-      "[0:01] Bobby: Good morning. Let's start.\n[0:09] Maria: Sales are up.",
+      "[0:01] Alex: Good morning. Let's start.\n[0:09] Maria: Sales are up.",
     );
   });
 

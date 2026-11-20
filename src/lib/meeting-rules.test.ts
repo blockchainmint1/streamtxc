@@ -28,9 +28,9 @@ describe("meeting links", () => {
     expect(newMeetingCode()).not.toBe(a);
   });
   it("names round-trip and fit AWS's 64-character limit", () => {
-    const ext = encodeExternalUserId("viewer", "Bobby <script>", "abcdef1234567890");
+    const ext = encodeExternalUserId("viewer", "Alex <script>", "abcdef1234567890");
     expect(ext.length).toBeLessThanOrEqual(64);
-    expect(decodeExternalUserId(ext)).toEqual({ role: "viewer", name: "Bobby script" });
+    expect(decodeExternalUserId(ext)).toEqual({ role: "viewer", name: "Alex script" });
     expect(cleanDisplayName("   ")).toBe("Guest");
   });
 });

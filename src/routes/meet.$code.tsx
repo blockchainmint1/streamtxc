@@ -157,7 +157,7 @@ function JoinPage() {
             )}
             <label className="block space-y-1.5">
               <span className="text-sm">Your name</span>
-              <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={32} placeholder="e.g. Bobby" required autoFocus />
+              <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={32} placeholder="e.g. Alex" required autoFocus />
             </label>
             {!viewer && (
               <div className="flex gap-2">

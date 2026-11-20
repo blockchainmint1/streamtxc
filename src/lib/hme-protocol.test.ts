@@ -5,7 +5,7 @@ import { HME_SITE, hmeRedirect, hmeProfileUpdateSchema, linkedHmeWallet, verifyH
 // Only a fake, local fixture key is used here. Never print a live credential or ticket.
 const fixtureKey = "local-hme-test-fixture-not-a-live-key";
 const now = 1_792_425_600_000;
-const memberId = "03ee869f-8726-48a7-80f8-286221d6436e";
+const memberId = "5b1f0c2e-7a44-4d8e-9c31-2f6a8d0e4b17";
 const wallet = "TmmoqqhcfBZWRG8feCTE2c4N4BsADgwD1m";
 async function ticket(overrides: Record<string, unknown> = {}) {
   const body = btoa(JSON.stringify({ iss: "honest.money", site: HME_SITE, minerId: memberId,
@@ -18,7 +18,7 @@ async function ticket(overrides: Record<string, unknown> = {}) {
 }
 
 describe("HME site tickets and permanent identity", () => {
-  test("changed email preserves the UUID lookup and Bobby's wallet", async () => {
+  test("changed email preserves the UUID lookup and the member's wallet", async () => {
     const links = new Map([[memberId, { wallet, status: "active" }]]);
     for (const email of ["before@example.com", "after@example.com", undefined]) {
       const verified = await verifyHmeTicket(await ticket({ email }), fixtureKey, now);
@@ -26,7 +26,7 @@ describe("HME site tickets and permanent identity", () => {
       expect(linkedHmeWallet(links.get(verified.minerId) ?? null)).toBe(wallet);
     }
   });
-  test("unknown UUID cannot claim Bobby's wallet by his email", async () => {
+  test("unknown UUID cannot claim a member's wallet by email", async () => {
     const links = new Map([[memberId, { wallet, status: "active" }]]);
     const verified = await verifyHmeTicket(await ticket({ minerId: "affe34e8-891b-41c2-8405-d31df4dadb8c", email: "member@example.com" }), fixtureKey, now);
     expect(linkedHmeWallet(links.get(verified.minerId) ?? null)).toBeNull();

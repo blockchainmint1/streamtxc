@@ -67,7 +67,7 @@ export function newStreamKey(): string {
   return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 }
 
-/** Old keys were the fixed word "primary" (or similar short words). */
+/** Anything shorter than a generated key is treated as weak and flagged for rotation. */
 export function isWeakStreamKey(key: string | null | undefined): boolean {
   return !key || key.length < 32;
 }
