@@ -103,3 +103,18 @@ export function securityHeadersFor(pathname: string, host?: string | null): Reco
     "permissions-policy": `geolocation=(), payment=(), usb=(), ${media}`,
   };
 }
+
+// ---------- Junk / probe uploads ----------
+/** Smallest file we accept as a real video (100 KB). Real clips are far bigger. */
+export const MIN_VIDEO_BYTES = 100 * 1024;
+
+/**
+ * True when a file looks like an actual video: at least MIN_VIDEO_BYTES and a
+ * video MIME type. Generic binary ("application/octet-stream") is allowed
+ * because some gateways can't sniff every container; size still applies.
+ */
+export function isPlausibleVideo(sizeBytes: number, mimeType: string | null | undefined): boolean {
+  if (!Number.isFinite(sizeBytes) || sizeBytes < MIN_VIDEO_BYTES) return false;
+  const base = (mimeType ?? "").split(";")[0]!.trim().toLowerCase();
+  return base.startsWith("video/") || base === "application/octet-stream";
+}

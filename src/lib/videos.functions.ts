@@ -30,6 +30,7 @@ import { retryStuckStampForVideo } from "./stamp-retry.server";
 import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES, MAX_S3_UPLOAD_BYTES, PAYMENT_GRACE_HOURS } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
 import { renewalPaymentConfirmed } from "./audit-access-rules";
+import { isPlausibleVideo, MIN_VIDEO_BYTES } from "./security-limits";
 
 /**
  * Admin wallet allowed to mirror any owned video's CIDs to the self-hosted
@@ -151,6 +152,34 @@ export const getQuote = createServerFn({ method: "POST" })
     };
   });
 
+const NOT_A_VIDEO_MSG =
+  "That file doesn't look like a video. Please upload an MP4, MOV or WebM video.";
+
+/**
+ * Reject probe/junk uploads: check what the browser claims, then (when our
+ * node answers quickly) what the node actually holds for that CID, so a
+ * caller can't register a 54-byte file by claiming it's a 50 MB video.
+ */
+async function assertVideoBytes(cid: string, claimedSize: number, claimedMime: string) {
+  if (!isPlausibleVideo(claimedSize, claimedMime)) throw new Error(NOT_A_VIDEO_MSG);
+  const node = process.env.IPFS_GATEWAY_DOMAIN;
+  if (!node) return;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 5000);
+  try {
+    const res = await fetchGateway(`https://${node}/ipfs/${cid}`, { method: "HEAD", signal: ctrl.signal });
+    const len = Number(res.headers.get("content-length") || 0);
+    if (res.ok && len > 0 && !isPlausibleVideo(len, res.headers.get("content-type") || claimedMime)) {
+      throw new Error(NOT_A_VIDEO_MSG);
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message === NOT_A_VIDEO_MSG) throw err;
+    // Node slow/unreachable: fall back to the claimed values checked above.
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 /** After the browser uploads, persist metadata + mock payment. */
 export const registerUpload = createServerFn({ method: "POST" })
   .middleware([optionalWalletSession])
@@ -181,6 +210,7 @@ export const registerUpload = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
+    await assertVideoBytes(data.cid, data.sizeBytes, data.mimeType);
     await assertCidUnclaimed(data.cid);
     // Draft (created at page load) is the source of truth for the chosen
     // thumbnail / title / description / NSFW flag — protects against
@@ -407,6 +437,9 @@ export const addByCid = createServerFn({ method: "POST" })
         }`,
       );
     }
+    if (!isPlausibleVideo(sizeBytes, mimeType)) {
+      throw new Error(NOT_A_VIDEO_MSG);
+    }
 
     const _price = (await getTxcUsdPrice()).usd;
     const fee = usdToTxc(quoteUsd(Math.max(sizeBytes, 1), data.months), _price);
@@ -504,7 +537,8 @@ export const listRecentVideos = createServerFn({ method: "POST" })
       )
       .in("status", ["active", "mempool"])
       .is("hidden_at", null)
-      .eq("is_nsfw", false);
+      .eq("is_nsfw", false)
+      .gte("size_bytes", MIN_VIDEO_BYTES);
 
     if (sort === "expensive") {
       query = query.order("payment_required_txc", {
@@ -528,7 +562,8 @@ export const listRecentVideos = createServerFn({ method: "POST" })
         .select("cid")
         .in("status", ["active", "mempool"])
         .is("hidden_at", null)
-        .eq("is_nsfw", false);
+        .eq("is_nsfw", false)
+        .gte("size_bytes", MIN_VIDEO_BYTES);
       const cids = (allRows ?? []).map((r) => r.cid);
       const { data: cmts } = await supabaseAdmin
         .from("comments")
