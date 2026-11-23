@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
+import { REAL_VIDEO_LIST_FILTER } from "@/lib/security-limits";
 
 const BASE_URL = "https://streamtxc.com";
 
@@ -41,6 +42,7 @@ export const Route = createFileRoute("/sitemap.xml")({
             .in("status", ["active", "mempool"])
             .is("hidden_at", null)
             .eq("is_nsfw", false)
+            .or(REAL_VIDEO_LIST_FILTER)
             .order("created_at", { ascending: false })
             .limit(5000);
 

@@ -30,7 +30,7 @@ import { retryStuckStampForVideo } from "./stamp-retry.server";
 import { quoteUsd, usdToTxc, MAX_UPLOAD_BYTES, MAX_S3_UPLOAD_BYTES, PAYMENT_GRACE_HOURS } from "./fees";
 import { getTxcUsdPrice } from "./txc-price.server";
 import { renewalPaymentConfirmed } from "./audit-access-rules";
-import { isPlausibleVideo, MIN_VIDEO_BYTES } from "./security-limits";
+import { isPlausibleVideo, REAL_VIDEO_LIST_FILTER } from "./security-limits";
 
 /**
  * Admin wallet allowed to mirror any owned video's CIDs to the self-hosted
@@ -538,7 +538,7 @@ export const listRecentVideos = createServerFn({ method: "POST" })
       .in("status", ["active", "mempool"])
       .is("hidden_at", null)
       .eq("is_nsfw", false)
-      .gte("size_bytes", MIN_VIDEO_BYTES);
+      .or(REAL_VIDEO_LIST_FILTER);
 
     if (sort === "expensive") {
       query = query.order("payment_required_txc", {
@@ -563,7 +563,7 @@ export const listRecentVideos = createServerFn({ method: "POST" })
         .in("status", ["active", "mempool"])
         .is("hidden_at", null)
         .eq("is_nsfw", false)
-        .gte("size_bytes", MIN_VIDEO_BYTES);
+        .or(REAL_VIDEO_LIST_FILTER);
       const cids = (allRows ?? []).map((r) => r.cid);
       const { data: cmts } = await supabaseAdmin
         .from("comments")
@@ -664,6 +664,7 @@ export const listVideosByOwner = createServerFn({ method: "POST" })
       .eq("owner_wallet", data.wallet)
       .in("status", ["active", "mempool", "unpinned"])
       .is("hidden_at", null)
+      .or(REAL_VIDEO_LIST_FILTER)
       .order("created_at", { ascending: false })
       .limit(100);
     if (error) throw new Error(error.message);

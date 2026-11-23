@@ -118,3 +118,11 @@ export function isPlausibleVideo(sizeBytes: number, mimeType: string | null | un
   const base = (mimeType ?? "").split(";")[0]!.trim().toLowerCase();
   return base.startsWith("video/") || base === "application/octet-stream";
 }
+
+/**
+ * Listing filter: visitor-submitted sources must meet MIN_VIDEO_BYTES; videos
+ * the server makes itself (live archives, published meetings) are trusted
+ * even if their size wasn't reported.
+ */
+export const REAL_VIDEO_LIST_FILTER =
+  `size_bytes.gte.${MIN_VIDEO_BYTES},source.not.in.(upload,url-import,dropbox,zoom)`;
