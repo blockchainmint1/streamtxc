@@ -3,8 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Bell, Check, Circle, FileText, Pencil, PhoneOff, Plus, Radio, RefreshCw, Square, Trash2, UserCheck, Video, X } from "lucide-react";
+import { Bell, Check, ChevronDown, Circle, FileText, Pencil, PhoneOff, Plus, Radio, RefreshCw, Square, Trash2, UserCheck, Video, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
@@ -59,9 +60,9 @@ export function MeetingRoomsManager() {
   }
   return (
     <div className="space-y-6">
+      <NewRoomForm />
       <PriceBox billing={rooms.data.billing} />
       {rooms.data.rooms.map((r) => <RoomCard key={r.id} room={r} canDelete={rooms.data.rooms.length > 1} />)}
-      <NewRoomForm />
     </div>
   );
 }
@@ -74,7 +75,7 @@ function NewRoomForm() {
   const [purpose, setPurpose] = useState("");
   if (!open) {
     return (
-      <Button variant="outline" onClick={() => setOpen(true)}>
+      <Button onClick={() => setOpen(true)}>
         <Plus /> New meeting room
       </Button>
     );
@@ -113,6 +114,8 @@ function RoomCard({ room: r, canDelete }: { room: RoomData; canDelete: boolean }
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(r.title);
   const [purpose, setPurpose] = useState(r.purpose);
+  const [open, setOpen] = useState(false);
+  const panelId = `room-details-${r.id}`;
   const origin = publicOrigin();
   const approvals = r.approveTeam || r.approveViewers;
 
@@ -121,8 +124,8 @@ function RoomCard({ room: r, canDelete }: { room: RoomData; canDelete: boolean }
     run("setting", () => update({ data: { roomId: r.id, ...patch } }));
 
   return (
-    <section className="border border-border bg-card/40 rounded-sm p-4 space-y-4" aria-label={r.title}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <section className="border border-border bg-card/40 rounded-sm" aria-label={r.title}>
+      <div className="flex flex-wrap items-start justify-between gap-3 p-4">
         {editing ? (
           <form
             className="flex-1 space-y-2"
@@ -140,22 +143,35 @@ function RoomCard({ room: r, canDelete }: { room: RoomData; canDelete: boolean }
           </form>
         ) : (
           <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              {r.title}
-              <button type="button" onClick={() => setEditing(true)} className="text-muted-foreground hover:text-foreground" aria-label="Rename meeting">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                aria-expanded={open}
+                aria-controls={panelId}
+                className="min-w-0 flex-1 text-left"
+              >
+                <span className="flex items-center gap-2 text-xl font-bold">
+                  <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", !open && "-rotate-90")} />
+                  <span className="truncate">{r.title}</span>
+                </span>
+                {r.purpose && <span className="block text-sm text-muted-foreground mt-0.5">{r.purpose}</span>}
+                <span className="block font-mono text-xs text-muted-foreground mt-1">
+                  {r.live
+                    ? `● open right now · ${r.seatsNow} connected`
+                    : r.teamCanStart
+                      ? "○ nobody's in — it opens when the first person joins"
+                      : "○ closed — it opens when you join"}
+                  {r.broadcasting && " · on the live stream"}
+                  {r.recording && <span className="text-destructive">{` · ● ${recLabel(r.recording)}`}</span>}
+                  {r.waitingCount > 0 && <span className="text-primary">{` · ${r.waitingCount} waiting to get in`}</span>}
+                  {r.recordings.length > 0 && ` · ${r.recordings.length} recording${r.recordings.length === 1 ? "" : "s"} saved`}
+                </span>
+              </button>
+              <button type="button" onClick={() => setEditing(true)} className="text-muted-foreground hover:text-foreground shrink-0" aria-label="Rename meeting">
                 <Pencil className="h-4 w-4" />
               </button>
-            </h2>
-            {r.purpose && <p className="text-sm text-muted-foreground">{r.purpose}</p>}
-            <p className="font-mono text-xs text-muted-foreground mt-1">
-              {r.live
-                ? `● open right now · ${r.seatsNow} connected`
-                : r.teamCanStart
-                  ? "○ nobody's in — it opens when the first person joins"
-                  : "○ closed — it opens when you join"}
-              {r.broadcasting && " · on the live stream"}
-              {r.recording && <span className="text-destructive">{` · ● ${recLabel(r.recording)}`}</span>}
-            </p>
+            </div>
           </div>
         )}
         <Button asChild>
@@ -165,94 +181,97 @@ function RoomCard({ room: r, canDelete }: { room: RoomData; canDelete: boolean }
         </Button>
       </div>
 
-      <LinkRow label="Team link — people can talk, use camera and share screen" url={`${origin}/meet/${r.joinCode}`} />
-      <LinkRow label="View-only link — people can watch and listen, but can't be seen or heard" url={`${origin}/meet/${r.viewCode}`} />
+      {/* Kept mounted when closed so the waiting-room knock sound still plays. */}
+      <div id={panelId} className={cn("px-4 pb-4 space-y-4", !open && "hidden")}>
+        <LinkRow label="Team link — people can talk, use camera and share screen" url={`${origin}/meet/${r.joinCode}`} />
+        <LinkRow label="View-only link — people can watch and listen, but can't be seen or heard" url={`${origin}/meet/${r.viewCode}`} />
 
-      <div className="border border-border bg-card rounded-sm p-3 space-y-3">
-        <div className="text-sm font-medium">Settings</div>
-        <SettingRow
-          label="Play a sound when someone joins"
-          hint="Everyone in the meeting hears a soft chime. You also hear a knock when someone is waiting."
-          checked={r.joinSound} disabled={!!working} onChange={(v) => setting({ joinSound: v })}
-        />
-        <SettingRow
-          label="I approve people on the team link"
-          hint="Off: anyone with the link walks right in. On: they wait until you let them in."
-          checked={r.approveTeam} disabled={!!working} onChange={(v) => setting({ approveTeam: v })}
-        />
-        <SettingRow
-          label="I approve people on the view-only link"
-          hint="Off: watchers get in automatically."
-          checked={r.approveViewers} disabled={!!working} onChange={(v) => setting({ approveViewers: v })}
-        />
-        <SettingRow
-          label="My team can start the meeting without me"
-          hint="Off: the room only opens when you join, and closes if you've been gone 10 minutes. On: anyone with the team link can open it."
-          checked={r.teamCanStart} disabled={!!working} onChange={(v) => setting({ teamCanStart: v })}
-        />
-        <form
-          className="flex items-start justify-between gap-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const n = Math.round(Number(seatLimit));
-            if (!Number.isFinite(n) || n < 2 || n > 250) { toast.error("Pick a number from 2 to 250."); return; }
-            void run("setting", () => update({ data: { roomId: r.id, maxSeats: n } }), `Up to ${n} people can be in this meeting.`);
-          }}
-        >
-          <span>
-            <span className="block text-sm">Most people allowed in at once</span>
-            <span className="block text-xs text-muted-foreground">Includes view-only watchers. You always get in.</span>
-          </span>
-          <span className="flex items-center gap-2 shrink-0">
-            <Input
-              type="number" min={2} max={250} value={seatLimit} onChange={(e) => setSeatLimit(e.target.value)}
-              className="w-20" aria-label="Most people allowed in at once"
-            />
-            {String(r.maxSeats) !== seatLimit && <Button type="submit" size="sm" disabled={!!working}>Save</Button>}
-          </span>
-        </form>
-        <SettingRow
-          label="Record every meeting automatically"
-          hint="Starts recording once you're in (or as soon as the meeting opens, if your team can start without you). Recordings stay private until you publish them."
-          checked={r.autoRecord} disabled={!!working} onChange={(v) => setting({ autoRecord: v })}
-        />
-        <SettingRow
-          label="Take meeting notes automatically"
-          hint="A word-for-word transcript of who said what, plus an AI summary, decisions and to-do list."
-          checked={r.autoNotes} disabled={!!working} onChange={(v) => setting({ autoNotes: v })}
-        />
-      </div>
-
-      {(approvals || r.waitingCount > 0) && <WaitingList roomId={r.id} sound={r.joinSound} />}
-
-      {r.recordings.length > 0 && <RecordingsList recordings={r.recordings} />}
-
-      <div className="flex flex-wrap gap-2">
-        {r.live && <RecordControls room={r} />}
-        <BroadcastButton room={r} />
-        <Button
-          variant="ghost" size="sm" disabled={!!working}
-          onClick={() => {
-            if (confirm("Make new links for this room? Its old team and view-only links will stop working.")) {
-              void run("rotate", () => update({ data: { roomId: r.id, rotateLinks: true } }), "New links made. Send them to your team.");
-            }
-          }}
-        >
-          <RefreshCw /> Make new links
-        </Button>
-        {r.live && (
-          <Button variant="ghost" size="sm" disabled={!!working} onClick={() => { if (confirm("End this meeting for everyone?")) void run("end", () => end({ data: { roomId: r.id } }), "Meeting ended for everyone."); }}>
-            <PhoneOff /> End for everyone
-          </Button>
-        )}
-        {canDelete && (
-          <Button
-            variant="ghost" size="sm" disabled={!!working} className="text-destructive"
-            onClick={() => { if (confirm(`Delete "${r.title}"? Its links stop working right away.`)) void run("del", () => del({ data: { roomId: r.id } }), "Meeting room deleted."); }}
+        <div className="border border-border bg-card rounded-sm p-3 space-y-3">
+          <div className="text-sm font-medium">Settings</div>
+          <SettingRow
+            label="Play a sound when someone joins"
+            hint="Everyone in the meeting hears a soft chime. You also hear a knock when someone is waiting."
+            checked={r.joinSound} disabled={!!working} onChange={(v) => setting({ joinSound: v })}
+          />
+          <SettingRow
+            label="I approve people on the team link"
+            hint="Off: anyone with the link walks right in. On: they wait until you let them in."
+            checked={r.approveTeam} disabled={!!working} onChange={(v) => setting({ approveTeam: v })}
+          />
+          <SettingRow
+            label="I approve people on the view-only link"
+            hint="Off: watchers get in automatically."
+            checked={r.approveViewers} disabled={!!working} onChange={(v) => setting({ approveViewers: v })}
+          />
+          <SettingRow
+            label="My team can start the meeting without me"
+            hint="Off: the room only opens when you join, and closes if you've been gone 10 minutes. On: anyone with the team link can open it."
+            checked={r.teamCanStart} disabled={!!working} onChange={(v) => setting({ teamCanStart: v })}
+          />
+          <form
+            className="flex items-start justify-between gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const n = Math.round(Number(seatLimit));
+              if (!Number.isFinite(n) || n < 2 || n > 250) { toast.error("Pick a number from 2 to 250."); return; }
+              void run("setting", () => update({ data: { roomId: r.id, maxSeats: n } }), `Up to ${n} people can be in this meeting.`);
+            }}
           >
-            <Trash2 /> Delete room
+            <span>
+              <span className="block text-sm">Most people allowed in at once</span>
+              <span className="block text-xs text-muted-foreground">Includes view-only watchers. You always get in.</span>
+            </span>
+            <span className="flex items-center gap-2 shrink-0">
+              <Input
+                type="number" min={2} max={250} value={seatLimit} onChange={(e) => setSeatLimit(e.target.value)}
+                className="w-20" aria-label="Most people allowed in at once"
+              />
+              {String(r.maxSeats) !== seatLimit && <Button type="submit" size="sm" disabled={!!working}>Save</Button>}
+            </span>
+          </form>
+          <SettingRow
+            label="Record every meeting automatically"
+            hint="Starts recording once you're in (or as soon as the meeting opens, if your team can start without you). Recordings stay private until you publish them."
+            checked={r.autoRecord} disabled={!!working} onChange={(v) => setting({ autoRecord: v })}
+          />
+          <SettingRow
+            label="Take meeting notes automatically"
+            hint="A word-for-word transcript of who said what, plus an AI summary, decisions and to-do list."
+            checked={r.autoNotes} disabled={!!working} onChange={(v) => setting({ autoNotes: v })}
+          />
+        </div>
+
+        {(approvals || r.waitingCount > 0) && <WaitingList roomId={r.id} sound={r.joinSound} />}
+
+        {r.recordings.length > 0 && <RecordingsList recordings={r.recordings} />}
+
+        <div className="flex flex-wrap gap-2">
+          {r.live && <RecordControls room={r} />}
+          <BroadcastButton room={r} />
+          <Button
+            variant="ghost" size="sm" disabled={!!working}
+            onClick={() => {
+              if (confirm("Make new links for this room? Its old team and view-only links will stop working.")) {
+                void run("rotate", () => update({ data: { roomId: r.id, rotateLinks: true } }), "New links made. Send them to your team.");
+              }
+            }}
+          >
+            <RefreshCw /> Make new links
           </Button>
-        )}
+          {r.live && (
+            <Button variant="ghost" size="sm" disabled={!!working} onClick={() => { if (confirm("End this meeting for everyone?")) void run("end", () => end({ data: { roomId: r.id } }), "Meeting ended for everyone."); }}>
+              <PhoneOff /> End for everyone
+            </Button>
+          )}
+          {canDelete && (
+            <Button
+              variant="ghost" size="sm" disabled={!!working} className="text-destructive"
+              onClick={() => { if (confirm(`Delete "${r.title}"? Its links stop working right away.`)) void run("del", () => del({ data: { roomId: r.id } }), "Meeting room deleted."); }}
+            >
+              <Trash2 /> Delete room
+            </Button>
+          )}
+        </div>
       </div>
     </section>
   );
