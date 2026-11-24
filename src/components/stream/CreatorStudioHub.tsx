@@ -2,7 +2,6 @@ import { Link } from "@tanstack/react-router";
 import { Clapperboard, MonitorPlay, Radio, Users, Layers, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMyMeetingRooms } from "@/components/meet/HostPanel";
-import { LivePushSites } from "./LivePushSites";
 import { RestreamDestinations } from "@/components/RestreamDestinations";
 
 /** Creator home: launch the browser studio, manage destinations, or use your own encoder. */
@@ -59,11 +58,9 @@ export function CreatorStudioHub(_props: { wallet: string }) {
         )}
       </section>
 
-      <LivePushSites />
-
       <section className="space-y-3">
         <h2 className="text-2xl font-bold">Destinations</h2>
-        <p className="text-sm text-muted-foreground">Send your show to YouTube, Facebook, Twitch or any RTMP server at the same time as streamTXC.</p>
+        <p className="text-sm text-muted-foreground">Send your show to YouTube, Facebook, Twitch, any RTMP server, or partner websites like Honest.Money and TEXITcoin.org. Website switches start off so tests stay private.</p>
         <RestreamDestinations />
       </section>
 
