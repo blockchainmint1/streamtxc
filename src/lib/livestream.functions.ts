@@ -315,7 +315,12 @@ export const getRtmpConfig = createServerFn({ method: "POST" })
       }
       return { serverUrl: full, streamKey: "", fullUrl: full };
     });
-    return { endpoints: split };
+    const { prettifyRtmpUrl, resolveFriendlyHost } = await import("./rtmp-host");
+    const ips = await resolveFriendlyHost();
+    return { endpoints: split.map((e) => {
+      const serverUrl = prettifyRtmpUrl(e.serverUrl, ips);
+      return { ...e, serverUrl, fullUrl: `${serverUrl}/${e.streamKey}` };
+    }) };
   });
 
 /** Admin: replace the main channel's stream key with a new random one. */
@@ -328,7 +333,9 @@ export const rotateAdminStreamKey = createServerFn({ method: "POST" })
     if (!inputId || !channelId) throw new Error("Main live channel isn't configured.");
     const { rotateRtmpStreamKey } = await import("./aws-medialive.server");
     const { newStreamKey } = await import("./security-limits");
-    return rotateRtmpStreamKey({ inputId, channelId, newKey: newStreamKey() });
+    const r = await rotateRtmpStreamKey({ inputId, channelId, newKey: newStreamKey() });
+    const { prettifyRtmpUrl, resolveFriendlyHost } = await import("./rtmp-host");
+    return { ...r, serverUrl: prettifyRtmpUrl(r.serverUrl, await resolveFriendlyHost()) };
   });
 
 // ---------- Admin: archive consent flow ----------
