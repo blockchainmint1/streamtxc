@@ -177,10 +177,18 @@ export function StudioPanel({
   }, [av, roomId]);
   const cue = (id: string, name: string) => { sendSignal({ onAir, stage, cue: id }); toast.success(`Told ${name} to get ready.`); };
 
+  // Hand the shared screen and studio picture back when leaving the studio.
+  const screenRef = useRef<MediaStream | null>(null); screenRef.current = screen;
+  const programRef = useRef<MediaStream | null>(null);
+  useEffect(() => () => {
+    screenRef.current?.getTracks().forEach((t) => t.stop());
+    programRef.current?.getTracks().forEach((t) => t.stop());
+  }, []);
   async function goOnAir() {
     const c = canvasRef.current; if (!c || !av) return;
     try {
-      await av.startContentShare(c.captureStream(30));
+      const prog = c.captureStream(30); programRef.current = prog;
+      await av.startContentShare(prog);
       setOnAir(true);
       toast.success("Studio picture is on. Use “Send to live stream” to broadcast it.");
     } catch { toast.error("Couldn't start the studio picture."); }

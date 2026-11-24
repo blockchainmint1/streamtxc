@@ -103,6 +103,25 @@ export function MeetingRoom({
     soundsOffRef.current = next;
     setSoundsMutedLocally(next);
   }
+  // Every camera/mic stream we ever open, so leaving always hands them back
+  // to the browser (the tab's camera/mic light goes off).
+  const openStreams = useRef(new Set<MediaStream>());
+  const grab = async (c: MediaStreamConstraints) => {
+    const st = await navigator.mediaDevices.getUserMedia(c);
+    if (leftRef.current) { st.getTracks().forEach((t) => t.stop()); throw new Error("left"); }
+    openStreams.current.add(st);
+    return st;
+  };
+  function releaseDevices() {
+    const av = avRef.current;
+    try { av?.stopLocalVideoTile(); } catch { /* noop */ }
+    try { void av?.stopVideoInput(); } catch { /* noop */ }
+    try { void av?.stopAudioInput(); } catch { /* noop */ }
+    for (const st of openStreams.current) st.getTracks().forEach((t) => t.stop());
+    openStreams.current.clear();
+    camStream.current = null;
+    micStream.current = null;
+  }
   const leftRef = useRef(false);
   // Check in while connected (starts once the meeting connection is up).
   useEffect(() => {
@@ -118,7 +137,7 @@ export function MeetingRoom({
     sendLeave(join);
   };
   useEffect(() => {
-    const onHide = (e: PageTransitionEvent) => { if (!e.persisted) leaveOnce(); };
+    const onHide = (e: PageTransitionEvent) => { if (!e.persisted) { leaveOnce(); releaseDevices(); } };
     window.addEventListener("pagehide", onHide);
     return () => {
       window.removeEventListener("pagehide", onHide);
@@ -130,12 +149,7 @@ export function MeetingRoom({
   useEffect(() => {
     let cancelled = false;
     let av: any = null;
-    const stopStreams = () => {
-      camStream.current?.getTracks().forEach((t) => t.stop());
-      micStream.current?.getTracks().forEach((t) => t.stop());
-      camStream.current = null;
-      micStream.current = null;
-    };
+    const stopStreams = releaseDevices;
 
     (async () => {
       try {
@@ -225,7 +239,7 @@ export function MeetingRoom({
 
         if (!viewer) {
           try {
-            micStream.current = await navigator.mediaDevices.getUserMedia({
+            micStream.current = await grab({
               audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
             });
             if (cancelled) return stopStreams();
@@ -255,8 +269,8 @@ export function MeetingRoom({
     return () => {
       cancelled = true;
       try { av?.stopContentShare(); } catch { /* not sharing */ }
-      try { av?.stop(); } catch { /* already stopped */ }
       stopStreams();
+      try { av?.stop(); } catch { /* already stopped */ }
       avRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -265,7 +279,8 @@ export function MeetingRoom({
   async function cameraOn(av = avRef.current) {
     if (!av) return;
     try {
-      camStream.current = await navigator.mediaDevices.getUserMedia({
+      camStream.current?.getTracks().forEach((t) => t.stop());
+      camStream.current = await grab({
         video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 24 } },
       });
       await av.startVideoInput(camStream.current);
@@ -281,7 +296,7 @@ export function MeetingRoom({
     if (!av) return;
     if (!hasMic) {
       try {
-        micStream.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micStream.current = await grab({ audio: true });
         await av.startAudioInput(micStream.current);
         setHasMic(true);
         av.realtimeUnmuteLocalAudio();
@@ -346,6 +361,7 @@ export function MeetingRoom({
   function leave() {
     leaveOnce();
     try { avRef.current?.stopContentShare(); } catch { /* noop */ }
+    releaseDevices();
     try { avRef.current?.stop(); } catch { /* noop */ }
     setStatus("left");
   }
