@@ -3,6 +3,7 @@ import { useState, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
+import { UploadSignInGate } from "@/components/UploadSignInGate";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,7 +65,7 @@ function UploadPage() {
       <main className="mx-auto w-full max-w-3xl px-6 py-12 flex-1 space-y-8">
         <div>
           <div className="font-mono text-xs text-primary mb-3">
-            [ PAY-AS-YOU-GO · NO ACCOUNT REQUIRED ]
+            [ PAY-AS-YOU-GO · HONEST.MONEY ACCOUNT ]
           </div>
           <h1 className="text-4xl font-bold tracking-tight mb-2">Upload video</h1>
           <p className="text-muted-foreground">
@@ -101,6 +102,7 @@ function UploadPage() {
           </div>
         )}
 
+        <UploadSignInGate>
         <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-6">
             <TabsTrigger value="file" className="font-mono text-xs">
@@ -159,6 +161,7 @@ function UploadPage() {
             />
           </TabsContent>
         </Tabs>
+        </UploadSignInGate>
       </main>
       <Footer />
     </div>

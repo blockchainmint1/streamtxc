@@ -3,12 +3,13 @@ import { useState, useEffect, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
+import { UploadSignInGate } from "@/components/UploadSignInGate";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useWallet } from "@/lib/wallet";
+import { useWallet, getWalletToken } from "@/lib/wallet";
 import { formatBytes, formatDate, formatTxc, MAX_UPLOAD_BYTES } from "@/lib/fees";
 import {
   registerUpload,
@@ -104,6 +105,7 @@ async function uploadViaWorker(
   return await new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/public/upload");
+    { const t = getWalletToken(); if (t) xhr.setRequestHeader("Authorization", `Bearer ${t}`); }
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress((e.loaded / e.total) * 100);
     };
@@ -143,7 +145,7 @@ function UploadPage() {
   const startTx = useServerFn(startTranscode);
   const checkTxConfig = useServerFn(isTranscodeConfigured);
 
-  // No auto-connect: anonymous uploads are allowed. Users can paste a TXC
+  // Uploading requires a signed-in session (UploadSignInGate). Users may still paste a TXC
   // address (and optionally a signature) to claim ownership.
 
   const [file, setFile] = useState<File | null>(null);
@@ -512,7 +514,7 @@ function UploadPage() {
       <Header />
       <main className="mx-auto w-full max-w-3xl px-6 py-12 flex-1">
         <div className="font-mono text-xs text-primary mb-3">
-          [ PAY-AS-YOU-GO · NO ACCOUNT REQUIRED ]
+          [ PAY-AS-YOU-GO · HONEST.MONEY ACCOUNT ]
         </div>
         <h1 className="text-4xl font-bold tracking-tight mb-2">Upload video</h1>
         <p className="text-muted-foreground mb-10">
@@ -520,6 +522,7 @@ function UploadPage() {
           timestamp receipt.
         </p>
 
+        <UploadSignInGate>
         <Tabs
           value={tab}
           onValueChange={(v) => setActiveTab(v as TabKey)}
@@ -1027,6 +1030,7 @@ function UploadPage() {
             />
           </TabsContent>
         </Tabs>
+        </UploadSignInGate>
       </main>
       <Footer />
     </div>

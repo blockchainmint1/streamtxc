@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { MAX_UPLOAD_BYTES } from "@/lib/fees";
+import { verifySessionToken } from "@/lib/wallet-auth.server";
 
 // Allow common browser video formats only. Blocks abuse of the platform's
 // IPFS node for arbitrary content pinning.
@@ -27,6 +28,14 @@ export const Route = createFileRoute("/api/public/upload")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // Uploads need a signed-in Honest.Money account (no anonymous pins).
+        const auth = request.headers.get("authorization") ?? "";
+        const claims = auth.toLowerCase().startsWith("bearer ")
+          ? await verifySessionToken(auth.slice(7).trim())
+          : null;
+        if (!claims) {
+          return Response.json({ error: "Sign in with your Honest.Money account to upload." }, { status: 401 });
+        }
         const ct = request.headers.get("content-type") ?? "";
         if (!ct.includes("multipart/form-data")) {
           return Response.json(

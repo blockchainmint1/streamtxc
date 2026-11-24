@@ -6,7 +6,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { useWallet } from "@/lib/wallet";
+import { useWallet, getWalletToken } from "@/lib/wallet";
 import { getVideo, reseedVideo } from "@/lib/videos.functions";
 import { computeCids } from "@/lib/ipfs-cid";
 import { formatBytes, MAX_UPLOAD_BYTES } from "@/lib/fees";
@@ -91,6 +91,7 @@ function RestorePage() {
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", "/api/public/upload");
+    { const t = getWalletToken(); if (t) xhr.setRequestHeader("Authorization", `Bearer ${t}`); }
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) setProgress((e.loaded / e.total) * 100);
         };

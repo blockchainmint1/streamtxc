@@ -1,7 +1,11 @@
 {
   "name": "streamtxc",
-  "description": "Decentralized video hosting, live streaming and team meetings on IPFS + the TEXITcoin blockchain \u2014 part of the Honest Money Ecosystem.",
+  "description": "Decentralized video hosting, live streaming and team meetings on IPFS + the TEXITcoin blockchain — part of the Honest Money Ecosystem.",
   "license": "MIT",
+  "homepage": "https://streamtxc.com",
+  "bugs": {
+    "email": "support@honest.money"
+  },
   "private": true,
   "sideEffects": false,
   "type": "module",

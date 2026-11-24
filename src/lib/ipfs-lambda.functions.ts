@@ -9,7 +9,7 @@
 //   IPFS_LAMBDA_TOKEN  bearer token printed by the deploy script
 
 import { createServerFn } from "@tanstack/react-start";
-import { optionalWalletSession } from "./wallet-auth.functions";
+import { requireWalletSession } from "./wallet-auth.functions";
 import { transcodeAllowed, isValidCid, type TranscodeGuardRow } from "./transcode-guard";
 
 async function assertPinAllowed(cid: string, wallet: string | null) {
@@ -66,7 +66,7 @@ export const isIpfsLambdaConfigured = createServerFn({ method: "GET" }).handler(
  * the inner file CIDs.
  */
 export const pinS3ToIpfs = createServerFn({ method: "POST" })
-  .middleware([optionalWalletSession])
+  .middleware([requireWalletSession])
   .inputValidator(
     (d: { bucket?: string; prefix?: string; keys?: string[] }) => {
       if (d.bucket && d.bucket.length > 200) throw new Error("Invalid bucket");
@@ -192,7 +192,7 @@ export const ipfsLambdaHealth = createServerFn({ method: "GET" }).handler(async 
  *   AWS_S3_OUTPUT_BUCKET, AWS_S3_INPUT_BUCKET
  */
 export const kickHlsPinAsync = createServerFn({ method: "POST" })
-  .middleware([optionalWalletSession])
+  .middleware([requireWalletSession])
   .inputValidator((d: { cid: string; jobId: string }) => {
     if (!d.cid || d.cid.length > 200) throw new Error("Invalid cid");
     if (!d.jobId || d.jobId.length > 200) throw new Error("Invalid jobId");

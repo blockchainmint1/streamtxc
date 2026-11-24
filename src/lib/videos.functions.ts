@@ -4,7 +4,7 @@ import { getRequestIP, getRequestHeader } from "@tanstack/react-start/server";
 import { createHash } from "crypto";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { requireWalletSession, optionalWalletSession } from "./wallet-auth.functions";
+import { requireWalletSession } from "./wallet-auth.functions";
 
 /** The owner of a new upload is the signed-in wallet — never a typed-in address. */
 function verifiedOwner(claimed: string | null | undefined, session: string | null): string | null {
@@ -182,7 +182,7 @@ async function assertVideoBytes(cid: string, claimedSize: number, claimedMime: s
 
 /** After the browser uploads, persist metadata + mock payment. */
 export const registerUpload = createServerFn({ method: "POST" })
-  .middleware([optionalWalletSession])
+  .middleware([requireWalletSession])
   .inputValidator((input) =>
     z
       .object({
@@ -352,7 +352,7 @@ export const lookupPinnedCid = createServerFn({ method: "POST" })
   });
 
 export const addByCid = createServerFn({ method: "POST" })
-  .middleware([optionalWalletSession])
+  .middleware([requireWalletSession])
   .inputValidator((input) =>
     z
       .object({
@@ -1670,6 +1670,7 @@ export async function recordView(cid: string, ipHash: string) {
  * as base64 to keep the server fn payload simple — these are ~50–150 KB.
  */
 export const pinThumbnail = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input) =>
     z
       .object({
@@ -2295,14 +2296,15 @@ function randomToken(): string {
 }
 
 export const createUploadDraft = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input) =>
     z.object({ wallet: optionalWalletSchema }).parse(input ?? {}),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ context }) => {
     const token = randomToken();
     const { data: row, error } = await supabaseAdmin
       .from("video_drafts")
-      .insert({ owner_token: token, wallet: data.wallet ?? null })
+      .insert({ owner_token: token, wallet: context.wallet })
       .select("id")
       .single();
     if (error || !row) throw new Error(`Failed to create draft: ${error?.message ?? "unknown"}`);

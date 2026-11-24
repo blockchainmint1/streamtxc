@@ -12,7 +12,7 @@
 // vars aren't set yet, so legacy single-MP4 playback keeps working.
 
 import { createServerFn } from "@tanstack/react-start";
-import { optionalWalletSession } from "./wallet-auth.functions";
+import { requireWalletSession } from "./wallet-auth.functions";
 import { transcodeAllowed, isValidCid, type TranscodeGuardRow } from "./transcode-guard";
 import { publicJobSummary, publicTranscodeError } from "./audit-access-rules";
 
@@ -63,7 +63,7 @@ export const isTranscodeConfigured = createServerFn({ method: "GET" }).handler(
  * addByCid finishes.
  */
 export const kickoffHlsFromCid = createServerFn({ method: "POST" })
-  .middleware([optionalWalletSession])
+  .middleware([requireWalletSession])
   .inputValidator((d: { cid: string }) => {
     if (!d.cid || typeof d.cid !== "string" || d.cid.length > 200) {
       throw new Error("Invalid cid");
@@ -88,7 +88,7 @@ export const kickoffHlsFromCid = createServerFn({ method: "POST" })
   });
 
 export const getTranscodeUploadUrl = createServerFn({ method: "POST" })
-  .middleware([optionalWalletSession])
+  .middleware([requireWalletSession])
   .inputValidator((d: { cid: string; contentType: string }) => {
     if (!d.cid || d.cid.length > 200) throw new Error("Invalid cid");
     if (!d.contentType || d.contentType.length > 100) throw new Error("Invalid contentType");
@@ -119,7 +119,7 @@ export const getTranscodeUploadUrl = createServerFn({ method: "POST" })
  * `{ exists: true, key, bucket, size, contentType }` when present.
  */
 export const checkS3InputExists = createServerFn({ method: "POST" })
-  .middleware([optionalWalletSession])
+  .middleware([requireWalletSession])
   .inputValidator((d: { cid: string }) => {
     if (!d.cid || typeof d.cid !== "string" || d.cid.length > 200) {
       throw new Error("Invalid cid");
@@ -144,7 +144,7 @@ export const checkS3InputExists = createServerFn({ method: "POST" })
   });
 
 export const startTranscode = createServerFn({ method: "POST" })
-  .middleware([optionalWalletSession])
+  .middleware([requireWalletSession])
   .inputValidator((d: { cid: string }) => {
     if (!d.cid || d.cid.length > 200) throw new Error("Invalid cid");
     return d;
@@ -185,7 +185,7 @@ export const startTranscode = createServerFn({ method: "POST" })
   });
 
 export const getTranscodeStatus = createServerFn({ method: "GET" })
-  .middleware([optionalWalletSession])
+  .middleware([requireWalletSession])
   .inputValidator((d: { cid: string }) => {
     if (!d.cid || d.cid.length > 200) throw new Error("Invalid cid");
     return d;

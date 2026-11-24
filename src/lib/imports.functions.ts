@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { resolveImport } from "./import-sources.server";
 import { signImportToken, IMPORT_MAX_BYTES } from "./imports.server";
 import { isDropboxDirectUrl } from "./security-limits";
+import { requireWalletSession } from "./wallet-auth.functions";
 
 export const getDropboxAppKey = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -14,6 +15,7 @@ export const getDropboxAppKey = createServerFn({ method: "GET" }).handler(
 );
 
 export const resolveImportUrl = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
   .inputValidator((input) =>
     z
       .object({

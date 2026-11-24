@@ -15,3 +15,5 @@ Public repository — keep this list free of personal names, emails, wallet labe
 - Team meetings at /meet: named rooms, waiting room, join sounds, view-only links, live-stream hand-off, recording and AI notes, prepaid TXC billing.
 - Security audit rounds 1 and 2 addressed; see SECURITY.md for reporting.
 - Public-release readiness: history scanned (no secrets), docs/LICENSE/SECURITY added, internal notes scrubbed.
+- [ ] Upload payment packs (prepaid TXC bundles, modelled on File Fingerprint / Passage) — waiting on pack sizes and prices
+- [ ] Rotate the remaining legacy live stream key (next session)
