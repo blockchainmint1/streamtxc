@@ -173,8 +173,24 @@ export const requestTelegramPairing = createServerFn({ method: "POST" })
       { onConflict: "wallet" },
     );
     if (error) throw new Error(error.message);
-    const botUsername =
-      process.env.TELEGRAM_BOT_USERNAME ?? "TXC_notify_bot";
+    // Ask Telegram which bot is actually connected, so the link always matches it.
+    let botUsername = process.env.TELEGRAM_BOT_USERNAME ?? "";
+    if (!botUsername) {
+      try {
+        const r = await fetch("https://connector-gateway.lovable.dev/telegram/getMe", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.LOVABLE_API_KEY ?? ""}`,
+            "X-Connection-Api-Key": process.env.TELEGRAM_API_KEY ?? "",
+            "Content-Type": "application/json",
+          },
+          body: "{}",
+        });
+        const j = (await r.json()) as { ok?: boolean; result?: { username?: string } };
+        if (j.ok && j.result?.username) botUsername = j.result.username;
+      } catch { /* fall back below */ }
+    }
+    if (!botUsername) botUsername = "streamtxc_bot";
     const deepLink = botUsername
       ? `https://t.me/${botUsername}?start=${code}`
       : null;
