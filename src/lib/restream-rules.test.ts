@@ -37,3 +37,14 @@ describe("restream rules", () => {
     expect(maskKey("abcdefgh")).toBe("••••efgh");
   });
 });
+
+import { countRestreamOutputs, restreamMinuteUsd, PRICE_USD_PER_RESTREAM_MINUTE } from "./restream-rules";
+test("extra destinations cost 10x AWS: about $7 per destination-hour", () => {
+  expect(PRICE_USD_PER_RESTREAM_MINUTE * 60).toBeCloseTo(7, 2);
+  expect(restreamMinuteUsd(3) * 60).toBeCloseTo(21, 2);
+  expect(restreamMinuteUsd(0)).toBe(0);
+});
+test("only our restream outputs are counted, not the site's own live/archive outputs", () => {
+  expect(countRestreamOutputs({ destinations: [{ id: "hls" }, { id: "archive" }, { id: "restream-1" }, { id: "restream-2" }] })).toBe(2);
+  expect(countRestreamOutputs({})).toBe(0);
+});

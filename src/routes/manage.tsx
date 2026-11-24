@@ -1014,7 +1014,7 @@ function RestreamSection() {
       <div className="font-mono text-xs text-primary mb-3">[ MULTISTREAM ]</div>
       <h2 className="text-2xl font-bold mb-2">Also stream to…</h2>
       <p className="text-sm text-muted-foreground mb-6 max-w-2xl">
-        Send every broadcast to YouTube, Facebook, Twitch and other sites at the same time as streamTXC — up to 10 places.
+        Send every broadcast to YouTube, Facebook, Twitch and other sites at the same time as streamTXC — up to 10 places. Each extra destination costs about $7 per hour, paid in TXC from your live balance while you are on air.
       </p>
       <RestreamDestinations />
     </section>

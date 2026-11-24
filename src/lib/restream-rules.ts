@@ -108,3 +108,20 @@ export function withRestreamOutputs(
     encoderSettings: { ...encoderSettings, outputGroups: [...groups, group] },
   };
 }
+
+// ---- Extra-destination pricing (10x AWS, same rule as meetings) ----
+/** AWS MediaLive cost per extra RTMP output, per minute (~$0.70/hr). */
+export const AWS_USD_PER_RESTREAM_OUTPUT_MINUTE = 0.7 / 60;
+export const RESTREAM_MARKUP = 10;
+/** What the creator pays per extra destination per minute (~$7/hr). */
+export const PRICE_USD_PER_RESTREAM_MINUTE = +(AWS_USD_PER_RESTREAM_OUTPUT_MINUTE * RESTREAM_MARKUP).toFixed(6);
+
+/** Number of our extra destinations currently written into a MediaLive channel. */
+export function countRestreamOutputs(channelRaw: any): number {
+  return (channelRaw?.destinations ?? []).filter((d: any) => String(d?.id ?? "").startsWith(RESTREAM_DEST_PREFIX)).length;
+}
+
+/** USD per minute for `count` extra destinations. */
+export function restreamMinuteUsd(count: number): number {
+  return Math.max(0, Math.floor(count)) * PRICE_USD_PER_RESTREAM_MINUTE;
+}

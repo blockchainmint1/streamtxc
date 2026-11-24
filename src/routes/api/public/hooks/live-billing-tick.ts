@@ -60,7 +60,18 @@ export const Route = createFileRoute("/api/public/hooks/live-billing-tick")({
               continue;
             }
 
-            const rate = await getWalletRatePerMin(ch.owner_wallet);
+            const baseRate = await getWalletRatePerMin(ch.owner_wallet);
+            // Extra destinations (YouTube, Facebook…) are charged per output per minute.
+            const { countRestreamOutputs, restreamMinuteUsd } = await import("@/lib/restream-rules");
+            const { ADMIN_WALLET } = await import("@/lib/admin");
+            const extraOutputs = countRestreamOutputs((state as any).raw);
+            let extraTxc = 0;
+            if (extraOutputs > 0 && ch.owner_wallet !== ADMIN_WALLET) {
+              const { getTxcUsdPrice } = await import("@/lib/txc-price.server");
+              const { usdToTxc8 } = await import("@/lib/meeting-rules");
+              extraTxc = usdToTxc8(restreamMinuteUsd(extraOutputs), (await getTxcUsdPrice()).usd);
+            }
+            const rate = +(baseRate + extraTxc).toFixed(8);
             const { data: activeStream } = await (supabaseAdmin as any)
               .from("live_streams")
               .select("id, started_at")
@@ -75,7 +86,7 @@ export const Route = createFileRoute("/api/public/hooks/live-billing-tick")({
               delta_txc: -rate,
               kind: "consumption",
               stream_id: activeStream?.id ?? null,
-              note: "1m tick",
+              note: extraOutputs > 0 ? `1m tick + ${extraOutputs} extra destination(s)` : "1m tick",
             });
             const newBalance = await computeBalance(ch.owner_wallet);
 
