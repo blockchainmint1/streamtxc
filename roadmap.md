@@ -20,3 +20,5 @@ Public repository — keep this list free of personal names, emails, wallet labe
 - [ ] Studio: real-device rehearsal (studio picture → Send to live stream → YouTube/Facebook)
 - [ ] Multistream: confirm the AWS user may update live channels (UpdateChannel); check per-output cost before charging TXC for it
 - [ ] One-click "connect your YouTube/Facebook/Twitch" for guests — needs each platform's app approval
+
+- [ ] Manage page UX/UI overhaul (waiting on what bothers Bobby most)
