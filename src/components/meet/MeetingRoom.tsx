@@ -68,8 +68,8 @@ function useRecordingState(code: string) {
 }
 
 export function MeetingRoom({
-  join, code, startMic, startCam, onExit,
-}: { join: JoinResult; code: string; startMic: boolean; startCam: boolean; onExit: () => void }) {
+  join, code, startMic, startCam, startStudio = false, onExit,
+}: { join: JoinResult; code: string; startMic: boolean; startCam: boolean; startStudio?: boolean; onExit: () => void }) {
   const viewer = join.role === "viewer";
   const rec = useRecordingState(code);
   const selfId = join.attendee.AttendeeId;
@@ -86,7 +86,7 @@ export function MeetingRoom({
   const [sharing, setSharing] = useState(false);
   const [needsSoundTap, setNeedsSoundTap] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [studio, setStudio] = useState(false);
+  const [studio, setStudio] = useState(startStudio && join.role === "host");
   const canShare = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
 
   const [soundsOff, setSoundsOff] = useState(false);

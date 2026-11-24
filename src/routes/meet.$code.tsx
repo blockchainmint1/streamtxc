@@ -20,6 +20,8 @@ export const Route = createFileRoute("/meet/$code")({
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
+  validateSearch: (s: Record<string, unknown>): { studio?: boolean } =>
+    s.studio === true || s.studio === "1" || s.studio === 1 ? { studio: true } : {},
   component: JoinPage,
 });
 
@@ -27,6 +29,7 @@ const NAME_KEY = "meet:name";
 
 function JoinPage() {
   const { code } = Route.useParams();
+  const { studio: openStudio } = Route.useSearch();
   const { address } = useWallet();
   const fetchInfo = useServerFn(getMeetingInfo);
   const doJoin = useServerFn(joinMeeting);
@@ -101,6 +104,7 @@ function JoinPage() {
         code={code}
         startMic={mic}
         startCam={cam}
+        startStudio={!!openStudio}
         onExit={() => { setJoined(null); void info.refetch(); }}
       />
     );

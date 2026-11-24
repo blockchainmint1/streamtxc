@@ -103,6 +103,7 @@ import {
   rotateAdminStreamKey,
 } from "@/lib/livestream.functions";
 import { Radio, MoreHorizontal, Check } from "lucide-react";
+import { CreatorStudioHub } from "@/components/stream/CreatorStudioHub";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -124,10 +125,11 @@ export const Route = createFileRoute("/manage")({
   component: ManagePage,
 });
 
-const MANAGE_TABS = ["videos", "live", "meetings", "alerts", "account"] as const;
+const MANAGE_TABS = ["videos", "stream", "live", "meetings", "alerts", "account"] as const;
 type ManageTab = (typeof MANAGE_TABS)[number];
 const TAB_LABELS: Record<ManageTab, string> = {
   videos: "Videos",
+  stream: "Stream",
   live: "Live",
   meetings: "Meetings",
   alerts: "Alerts",
@@ -965,12 +967,16 @@ function ManagePageInner() {
         )}
         </TabsContent>
 
+        <TabsContent value="stream" className="mt-0">
+          {address ? <CreatorStudioHub wallet={address} /> : <SignInFirst />}
+        </TabsContent>
+
         <TabsContent value="live" className="mt-0 [&>section:first-child]:mt-0 [&>section:first-child]:border-t-0 [&>section:first-child]:pt-0">
           {address ? (
             <>
               <GoLiveAdminSection wallet={address} />
               <MyGoLiveSection wallet={address} />
-              <RestreamSection />
+              <p className="text-sm text-muted-foreground mt-8">Multistream destinations moved to the Stream tab.</p>
             </>
           ) : <SignInFirst />}
         </TabsContent>
