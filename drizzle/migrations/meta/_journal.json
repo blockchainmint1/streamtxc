@@ -113,6 +113,13 @@
       "when": 1795548801338,
       "tag": "0015_live_push_sites",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1795549571999,
+      "tag": "0016_meeting_rooms_studio_state",
+      "breakpoints": true
     }
   ]
 }

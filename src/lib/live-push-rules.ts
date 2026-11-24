@@ -19,7 +19,7 @@ export function validatePushEndpoint(raw: string): string {
 
 export function validatePushKey(raw: string): string {
   const k = raw.trim();
-  if (k.length < 16 || k.length > 400 || /\s/.test(k)) throw new Error("The key must be at least 16 characters with no spaces.");
+  if (k.length < 32 || k.length > 400 || /\s/.test(k)) throw new Error("The key must be at least 32 characters with no spaces.");
   return k;
 }
 

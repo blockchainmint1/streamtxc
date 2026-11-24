@@ -1,9 +1,15 @@
 // Green room: while the studio is on air, guests who are not on stage wait
-// backstage with their mic held muted so the audience can't hear them.
+// backstage. The server switches their seat to receive-only (setStudioStage),
+// so this signal only drives the on-screen notices.
 export const STUDIO_TOPIC = "studio";
 
 export type StudioSignal = { onAir: boolean; stage: string[]; cue?: string };
 export type GuestSpot = "meeting" | "backstage" | "on-stage";
+
+/** Only the host's seat (role set by the server in its Chime id) may steer the studio. */
+export function isHostSender(senderExternalUserId: unknown): boolean {
+  return typeof senderExternalUserId === "string" && senderExternalUserId.startsWith("h");
+}
 
 export function parseStudioSignal(text: string): StudioSignal | null {
   try {

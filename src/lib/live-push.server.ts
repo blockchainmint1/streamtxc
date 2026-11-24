@@ -1,5 +1,5 @@
 import { decidePush, signBody } from "./live-push-rules";
-import { openStreamKey } from "./restream-crypto.server";
+import { openPushKey } from "./push-crypto.server";
 
 const ORIGIN = "https://streamtxc.com";
 
@@ -10,7 +10,15 @@ export async function runLivePushTick() {
   const { data: targets } = await db.from("live_push_sites").select("*");
   const out: Array<Record<string, unknown>> = [];
   const liveCache = new Map<string, any>();
-  for (const t of targets ?? []) {
+  const owners = [...new Set((targets ?? []).map((t: any) => t.owner_wallet as string))];
+  await Promise.all(owners.map(async (w) => {
+    const { data } = await db.from("live_streams")
+      .select("id, title, started_at").eq("owner_wallet", w).eq("status", "live")
+      .order("started_at", { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
+    liveCache.set(w as string, data ?? null);
+  }));
+  // All sites at once, so a few slow or dead sites can't stretch the tick.
+  await Promise.all((targets ?? []).map(async (t: any) => {
     if (!liveCache.has(t.owner_wallet)) {
       const { data } = await db.from("live_streams")
         .select("id, title, started_at").eq("owner_wallet", t.owner_wallet).eq("status", "live")
@@ -23,13 +31,13 @@ export async function runLivePushTick() {
       enabled: t.enabled, lastState: t.last_state, lastStreamId: t.last_stream_id,
       lastPushedAt: t.last_pushed_at ? Date.parse(t.last_pushed_at) : null, lastError: t.last_error,
     }, s?.id ?? null, now);
-    if (!action) continue;
+    if (!action) return;
     const streamId = action === "live" ? s.id : t.last_stream_id;
     let err: string | null = null;
     try {
-      const secret = await openStreamKey(t.secret_sealed);
+      const secret = await openPushKey(t.secret_sealed);
       const body = JSON.stringify({
-        event: action, siteId: t.id, streamId,
+        event: action, siteId: t.id, wallet: t.owner_wallet, streamId,
         title: action === "live" ? s.title : null,
         startedAt: action === "live" ? s.started_at : null,
         embedUrl: streamId ? `${ORIGIN}/embed/live/${streamId}` : null,
@@ -49,6 +57,6 @@ export async function runLivePushTick() {
       last_stream_id: streamId, last_pushed_at: new Date(now).toISOString(), last_error: err, updated_at: new Date(now).toISOString(),
     }).eq("id", t.id);
     out.push({ site: t.id, action, ok: !err });
-  }
+  }));
   return out;
 }

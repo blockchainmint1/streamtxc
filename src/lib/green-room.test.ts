@@ -19,3 +19,19 @@ describe("green room", () => {
     expect(parseStudioSignal(JSON.stringify({ onAir: "yes", stage: [] }))).toBeNull();
   });
 });
+
+import { isHostSender } from "./green-room";
+import { seatCapabilities } from "./meeting-rules";
+describe("studio enforcement", () => {
+  test("only the host may send studio signals", () => {
+    expect(isHostSender("habc12345|Host")).toBe(true);
+    expect(isHostSender("pabc12345|Guest")).toBe(false);
+    expect(isHostSender(undefined)).toBe(false);
+  });
+  test("backstage guests are receive-only while on air", () => {
+    expect(seatCapabilities("participant", true, false)).toEqual({ Audio: "Receive", Video: "Receive", Content: "Receive" });
+    expect(seatCapabilities("participant", true, true).Audio).toBe("SendReceive");
+    expect(seatCapabilities("participant", false, false).Audio).toBe("SendReceive");
+    expect(seatCapabilities("host", true, false).Audio).toBe("SendReceive");
+  });
+});

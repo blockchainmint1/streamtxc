@@ -1,0 +1,2 @@
+ALTER TABLE public.meeting_rooms ADD COLUMN IF NOT EXISTS studio_on_air boolean NOT NULL DEFAULT false;
+ALTER TABLE public.meeting_rooms ADD COLUMN IF NOT EXISTS studio_stage text[] NOT NULL DEFAULT '{}';

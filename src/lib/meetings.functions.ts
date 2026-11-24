@@ -9,6 +9,7 @@ import { requireWalletSession, optionalWalletSession } from "./wallet-auth.funct
 import {
   MEETING_CODE_RE,
   capabilitiesFor,
+  seatCapabilities,
   encodeExternalUserId,
   newMeetingCode,
   roleForCode,
@@ -44,6 +45,7 @@ type Room = {
   title: string;
   join_code: string;
   view_code: string;
+  studio_on_air?: boolean;
   chime_meeting_id: string | null;
   chime_meeting: any;
   meeting_generation: number;
@@ -177,6 +179,8 @@ async function ensureMeeting(room: Room, allowCreate: boolean): Promise<Room> {
     .from("meeting_rooms")
     .update({
       chime_meeting_id: meeting.MeetingId,
+      studio_on_air: false,
+      studio_stage: [],
       chime_meeting: meeting,
       meeting_generation: gen,
       broadcast_pipeline_id: null,
@@ -423,7 +427,7 @@ async function closeMeeting(room: Room) {
   }
   await sb
     .from("meeting_rooms")
-    .update({ chime_meeting_id: null, chime_meeting: null, broadcast_pipeline_id: null, broadcast_started_at: null })
+    .update({ chime_meeting_id: null, chime_meeting: null, broadcast_pipeline_id: null, broadcast_started_at: null, studio_on_air: false, studio_stage: [] })
     .eq("id", room.id);
   await sb.from("meeting_join_requests").update({ status: "denied", decided_at: new Date().toISOString() })
     .eq("room_id", room.id).in("status", ["waiting", "admitted"]);
@@ -611,7 +615,7 @@ async function seat(found: Room, role: "host" | "participant" | "viewer", name: 
   }
   const chime = await import("./aws-chime.server");
   const rand = crypto.randomUUID().replace(/-/g, "");
-  const attendee = await chime.createAttendee(room.chime_meeting_id!, encodeExternalUserId(role, name, rand), capabilitiesFor(role));
+  const attendee = await chime.createAttendee(room.chime_meeting_id!, encodeExternalUserId(role, name, rand), seatCapabilities(role, !!room.studio_on_air, false));
   await sb.from("meeting_seats").insert({
     room_id: room.id, meeting_id: room.chime_meeting_id, attendee_id: attendee.AttendeeId, role,
   });
@@ -874,4 +878,33 @@ export const deleteMeetingRecording = createServerFn({ method: "POST" })
       .update({ deleted_at: new Date().toISOString(), video_key: null, transcript: null, transcript_text: null, summary: null, key_points: null, decisions: null, action_items: null })
       .eq("id", r.id);
     return { ok: true };
+  });
+
+/** Host-only: makes backstage real. While the studio is on air, every non-host
+ *  seat not on stage is switched by Amazon to receive-only (no mic, camera or
+ *  screen reaches anyone); on-stage guests and everyone after off-air get it back. */
+export const setStudioStage = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
+  .inputValidator((i: unknown) => z.object({
+    roomId: z.string().uuid(),
+    onAir: z.boolean(),
+    stage: z.array(z.string().min(1).max(64)).max(50),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const room = await ownedRoom(context.wallet, data.roomId);
+    if (!room.chime_meeting_id) return { ok: true, updated: 0 };
+    const sb = await db();
+    await sb.from("meeting_rooms").update({ studio_on_air: data.onAir, studio_stage: data.stage }).eq("id", room.id);
+    const { data: seats } = await sb.from("meeting_seats").select("attendee_id, role")
+      .eq("room_id", room.id).eq("meeting_id", room.chime_meeting_id).is("left_at", null);
+    const chime = await import("./aws-chime.server");
+    let updated = 0;
+    await Promise.all((seats ?? []).filter((s: any) => s.role === "participant").map(async (s: any) => {
+      try {
+        await chime.updateAttendeeCapabilities(room.chime_meeting_id!, s.attendee_id,
+          seatCapabilities("participant", data.onAir, data.stage.includes(s.attendee_id)));
+        updated++;
+      } catch { /* seat already gone */ }
+    }));
+    return { ok: true, updated };
   });

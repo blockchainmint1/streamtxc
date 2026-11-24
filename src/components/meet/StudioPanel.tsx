@@ -3,6 +3,8 @@
 // meeting as "content". The live connector uses the presenter-only layout,
 // so whatever this canvas shows is exactly what the live stream shows.
 import { STUDIO_TOPIC, type StudioSignal } from "@/lib/green-room";
+import { useServerFn } from "@tanstack/react-start";
+import { setStudioStage } from "@/lib/meetings.functions";
 import { useEffect, useRef, useState } from "react";
 import { MonitorUp, Radio, Square, ImagePlus, X } from "lucide-react";
 import { toast } from "sonner";
@@ -52,8 +54,8 @@ function drawCover(ctx: CanvasRenderingContext2D, v: HTMLVideoElement, x: number
 }
 
 export function StudioPanel({
-  av, code, people, localSharing, othersSharing,
-}: { av: any; code: string; people: StudioPerson[]; localSharing: boolean; othersSharing: boolean }) {
+  av, code, roomId, people, localSharing, othersSharing,
+}: { av: any; code: string; roomId: string | null; people: StudioPerson[]; localSharing: boolean; othersSharing: boolean }) {
   const [b, setB] = useBranding(code);
   const [stage, setStage] = useState<string[]>([]);
   const [screen, setScreen] = useState<MediaStream | null>(null);
@@ -151,7 +153,19 @@ export function StudioPanel({
     const t = setInterval(() => sendSignal(sig), 5000);
     return () => clearInterval(t);
   }, [onAir, stage, av]);
-  useEffect(() => () => sendSignal({ onAir: false, stage: [] }), [av]);
+  // The real lock: the server switches backstage seats to receive-only.
+  const applyStage = useServerFn(setStudioStage);
+  useEffect(() => {
+    if (!roomId) return;
+    const run = () => applyStage({ data: { roomId, onAir, stage } }).catch(() => toast.error("Couldn't update who's on stage — check your connection."));
+    void run();
+    const t = onAir ? setInterval(run, 30_000) : undefined;
+    return () => { if (t) clearInterval(t); };
+  }, [onAir, stage.join(","), roomId]);
+  useEffect(() => () => {
+    sendSignal({ onAir: false, stage: [] });
+    if (roomId) void applyStage({ data: { roomId, onAir: false, stage: [] } }).catch(() => {});
+  }, [av, roomId]);
   const cue = (id: string, name: string) => { sendSignal({ onAir, stage, cue: id }); toast.success(`Told ${name} to get ready.`); };
 
   async function goOnAir() {
@@ -199,7 +213,7 @@ export function StudioPanel({
         </p>
         <div>
           <div className="font-mono text-xs text-primary mb-2">[ GREEN ROOM · click to put on stage ]</div>
-          {onAir && <p className="text-xs text-muted-foreground mb-2">Guests not on stage are muted for the audience and see a "you're backstage" notice.</p>}
+          {onAir && <p className="text-xs text-muted-foreground mb-2">Guests not on stage have their mic and camera paused by the server until you bring them on.</p>}
           <div className="flex gap-2 overflow-x-auto pb-1">
             {people.map((p) => (
               <button

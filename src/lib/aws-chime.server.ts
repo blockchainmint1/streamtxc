@@ -142,6 +142,12 @@ export async function countAttendees(meetingId: string): Promise<number> {
   return total;
 }
 
+export async function updateAttendeeCapabilities(
+  meetingId: string, attendeeId: string, capabilities: { Audio: string; Video: string; Content: string },
+): Promise<void> {
+  await call("meetings", "PUT", `/meetings/${encodeURIComponent(meetingId)}/attendees/${encodeURIComponent(attendeeId)}/capabilities`, { Capabilities: capabilities });
+}
+
 export async function deleteAttendee(meetingId: string, attendeeId: string): Promise<void> {
   try {
     await call("meetings", "DELETE", `/meetings/${encodeURIComponent(meetingId)}/attendees/${encodeURIComponent(attendeeId)}`);

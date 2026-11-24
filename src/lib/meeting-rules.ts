@@ -37,6 +37,12 @@ export function capabilitiesFor(role: MeetingRole) {
   return { Audio: "SendReceive", Video: "SendReceive", Content: "SendReceive" } as const;
 }
 
+/** Seat rights: viewers only receive; while the studio is on air, guests not on stage only receive too. */
+export function seatCapabilities(role: MeetingRole, onAir: boolean, onStage: boolean) {
+  if (role === "participant" && onAir && !onStage) return capabilitiesFor("viewer");
+  return capabilitiesFor(role);
+}
+
 export function cleanDisplayName(raw: string): string {
   const s = raw
     .normalize("NFKC")

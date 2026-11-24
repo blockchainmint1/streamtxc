@@ -1,6 +1,6 @@
 // Live meeting screen. amazon-chime-sdk-js is browser-only, so it is loaded
 // with a dynamic import inside an effect (never at module scope).
-import { STUDIO_TOPIC, guestSpot, parseStudioSignal, type StudioSignal } from "@/lib/green-room";
+import { STUDIO_TOPIC, guestSpot, isHostSender, parseStudioSignal, type StudioSignal } from "@/lib/green-room";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -216,6 +216,7 @@ export function MeetingRoom({
         av.realtimeSubscribeToMuteAndUnmuteLocalAudio((muted: boolean) => setMicOn(!muted));
         av.realtimeSubscribeToReceiveDataMessage(STUDIO_TOPIC, (m: any) => {
           if (m?.senderAttendeeId?.split("#")[0] === selfId) return;
+          if (!isHostSender(m?.senderExternalUserId)) return; // only the host steers the studio
           const sig = parseStudioSignal(typeof m?.text === "function" ? m.text() : "");
           if (!sig) return;
           setStudioSig(sig);
@@ -298,7 +299,10 @@ export function MeetingRoom({
   const prevSpot = useRef(spot);
   useEffect(() => {
     const av = avRef.current; if (!av) return;
-    if (spot === "backstage") { try { av.realtimeMuteLocalAudio(); } catch { /* noop */ } }
+    if (spot === "backstage") {
+      try { av.realtimeMuteLocalAudio(); } catch { /* noop */ }
+      if (camOn) void toggleCam();
+    }
     else if (prevSpot.current === "backstage" && spot === "on-stage" && hasMic) {
       try { av.realtimeUnmuteLocalAudio(); } catch { /* noop */ }
       toast.success("You're on stage — the audience can see and hear you.");
@@ -421,7 +425,7 @@ export function MeetingRoom({
       {spot !== "meeting" && (
         <div role="status" className={cn("mx-4 mt-3 rounded-sm px-4 py-2 font-mono text-sm font-bold text-center",
           spot === "on-stage" ? "bg-destructive text-destructive-foreground" : "border border-primary text-primary")}>
-          {spot === "on-stage" ? "● YOU'RE LIVE ON STAGE" : "GREEN ROOM — you're backstage. The audience can't see or hear you yet."}
+          {spot === "on-stage" ? "● YOU'RE LIVE ON STAGE" : "GREEN ROOM — you're backstage. Your mic and camera are paused until the host brings you on stage."}
         </div>
       )}
 
@@ -438,6 +442,7 @@ export function MeetingRoom({
         <StudioPanel
           av={avRef.current}
           code={code}
+          roomId={join.roomId ?? null}
           localSharing={sharing}
           othersSharing={!!contentTile && contentTile.attendeeId.split("#")[0] !== selfId}
           people={speakers.map((p) => ({ attendeeId: p.attendeeId, name: p.name, tileId: cameraByAttendee.get(p.attendeeId)?.tileId, isSelf: p.attendeeId === selfId }))}
@@ -500,10 +505,10 @@ export function MeetingRoom({
       <div className="flex items-center justify-center gap-2 border-t border-border px-4 py-3">
         {!viewer && (
           <>
-            <Button variant={micOn ? "secondary" : "destructive"} size="lg" className="px-4" onClick={toggleMic} aria-label={micOn ? "Mute microphone" : "Unmute microphone"}>
+            <Button variant={micOn ? "secondary" : "destructive"} size="lg" className="px-4" onClick={toggleMic} disabled={spot === "backstage" && !micOn} aria-label={spot === "backstage" && !micOn ? "Microphone paused while backstage" : micOn ? "Mute microphone" : "Unmute microphone"}>
               {micOn ? <Mic /> : <MicOff />}<span className="hidden sm:inline">{micOn ? "Mute" : "Unmute"}</span>
             </Button>
-            <Button variant={camOn ? "secondary" : "outline"} size="lg" className="px-4" onClick={toggleCam} disabled={busy} aria-label={camOn ? "Turn camera off" : "Turn camera on"}>
+            <Button variant={camOn ? "secondary" : "outline"} size="lg" className="px-4" onClick={toggleCam} disabled={busy || (spot === "backstage" && !camOn)} aria-label={camOn ? "Turn camera off" : "Turn camera on"}>
               {camOn ? <Video /> : <VideoOff />}<span className="hidden sm:inline">{camOn ? "Camera off" : "Camera on"}</span>
             </Button>
             {canShare && (

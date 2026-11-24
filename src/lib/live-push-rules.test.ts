@@ -33,8 +33,9 @@ describe("live push", () => {
     expect(() => validatePushEndpoint("https://localhost/x")).toThrow();
     expect(() => validatePushEndpoint("https://example.com:8443/x")).toThrow();
   });
-  test("key needs 16+ characters", () => {
+  test("key needs 32+ characters", () => {
     expect(() => validatePushKey("short")).toThrow();
-    expect(validatePushKey("a".repeat(16))).toHaveLength(16);
+    expect(() => validatePushKey("a".repeat(31))).toThrow();
+    expect(validatePushKey("a".repeat(32))).toHaveLength(32);
   });
 });

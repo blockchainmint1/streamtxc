@@ -38,7 +38,7 @@ export async function runMeetingBillingTick() {
     await recording.stopRoomRecordings(room.id).catch(() => {});
     await chime.deleteMeeting(room.chime_meeting_id).catch(() => {});
     await sb.from("meeting_rooms")
-      .update({ chime_meeting_id: null, chime_meeting: null, broadcast_pipeline_id: null, broadcast_started_at: null })
+      .update({ chime_meeting_id: null, chime_meeting: null, broadcast_pipeline_id: null, broadcast_started_at: null, studio_on_air: false, studio_stage: [] })
       .eq("id", room.id);
     await sb.from("meeting_seats").update({ left_at: new Date().toISOString() })
       .eq("meeting_id", room.chime_meeting_id).is("left_at", null);
@@ -50,7 +50,7 @@ export async function runMeetingBillingTick() {
       if (!live) {
         await recording.stopRoomRecordings(room.id).catch(() => {});
         await sb.from("meeting_rooms")
-          .update({ chime_meeting_id: null, chime_meeting: null, broadcast_pipeline_id: null, broadcast_started_at: null })
+          .update({ chime_meeting_id: null, chime_meeting: null, broadcast_pipeline_id: null, broadcast_started_at: null, studio_on_air: false, studio_stage: [] })
           .eq("id", room.id);
         await sb.from("meeting_seats").update({ left_at: new Date().toISOString() })
           .eq("meeting_id", room.chime_meeting_id).is("left_at", null);

@@ -38,8 +38,8 @@ export const saveLivePushSite = createServerFn({ method: "POST" })
     const row: Record<string, unknown> = { name: data.name, endpoint, updated_at: new Date().toISOString() };
     if (data.key) {
       const key = validatePushKey(data.key);
-      const { sealStreamKey } = await import("./restream-crypto.server");
-      row.secret_sealed = await sealStreamKey(key);
+      const { sealPushKey } = await import("./push-crypto.server");
+      row.secret_sealed = await sealPushKey(key);
       row.key_hint = key.slice(-4);
     }
     if (data.id) {

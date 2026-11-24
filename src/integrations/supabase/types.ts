@@ -909,6 +909,8 @@ export type Database = {
           meeting_generation: number
           owner_wallet: string
           purpose: string | null
+          studio_on_air: boolean
+          studio_stage: string[]
           team_can_start: boolean
           title: string
           updated_at: string
@@ -933,6 +935,8 @@ export type Database = {
           meeting_generation?: number
           owner_wallet: string
           purpose?: string | null
+          studio_on_air?: boolean
+          studio_stage?: string[]
           team_can_start?: boolean
           title?: string
           updated_at?: string
@@ -957,6 +961,8 @@ export type Database = {
           meeting_generation?: number
           owner_wallet?: string
           purpose?: string | null
+          studio_on_air?: boolean
+          studio_stage?: string[]
           team_can_start?: boolean
           title?: string
           updated_at?: string
