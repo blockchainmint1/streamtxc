@@ -2664,7 +2664,7 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
 
             <div className="border-t border-border pt-4 space-y-2">
               <Label className="font-mono text-xs text-muted-foreground">
-                paste txid to verify (mempool is fine — no need to wait for a block)
+                optional: paste txid to check it (payments credit on their own once mined in a block)
               </Label>
               <div className="flex gap-2">
                 <Input
@@ -2692,7 +2692,7 @@ function BulkExtendDialog({ wallet }: { wallet: string }) {
                 <div className="text-xs font-mono space-y-1 pt-2">
                   {verifyResult.pending ? (
                     <p className="text-amber-500">
-                      TX found but not yet confirmed. Wait for the next block.
+                      Payment found and waiting for its first block. It will credit on its own within a few minutes, no need to come back.
                     </p>
                   ) : (
                     <>
