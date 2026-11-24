@@ -31,7 +31,9 @@ export async function runLivePushTick() {
       liveCache.set(t.owner_wallet, data ?? null);
     }
     const live = liveCache.get(t.owner_wallet);
-    const s = !t.room_id || onAirRoom.get(t.owner_wallet) === t.room_id ? live : null;
+    // Studio sites follow their studio; saved (no-studio) sites follow streams sent without a studio.
+    const onAir = onAirRoom.get(t.owner_wallet) ?? null;
+    const s = (t.room_id ? onAir === t.room_id : !onAir) ? live : null;
     const now = Date.now();
     const action = decidePush({
       enabled: t.enabled, lastState: t.last_state, lastStreamId: t.last_stream_id,

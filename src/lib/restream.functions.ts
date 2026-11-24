@@ -103,13 +103,13 @@ export const applyRestreamDestinations = createServerFn({ method: "POST" })
   .handler(async ({ context, data: input }) => {
     const sb = await db();
     const roomId = await checkRoom(context.wallet, input.roomId);
-    // A studio sends to its own destinations plus the "every stream" ones.
+    // A studio sends only to its own destinations; without a studio (OBS etc.) the saved list is used.
     let q = sb
       .from("restream_destinations")
       .select("server_url, stream_key_enc")
       .eq("owner_wallet", context.wallet)
       .eq("enabled", true);
-    q = roomId ? q.or(`room_id.is.null,room_id.eq.${roomId}`) : q.is("room_id", null);
+    q = roomId ? q.eq("room_id", roomId) : q.is("room_id", null);
     const { data: rows } = await q
       .order("created_at");
     const { openStreamKey } = await import("./restream-crypto.server");
@@ -121,4 +121,21 @@ export const applyRestreamDestinations = createServerFn({ method: "POST" })
     const ml = await import("./aws-medialive.server");
     await ml.updateChannelRestream(channelId, (dest, encSettings) => withRestreamOutputs(dest, encSettings, targets));
     return { ok: true, count: targets.length };
+  });
+
+/** Copy a saved destination into a studio (the locked key is copied server-side, never shown). */
+export const useSavedRestreamDestination = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
+  .inputValidator((i: unknown) => z.object({ roomId: z.string().uuid(), savedId: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const sb = await db();
+    const roomId = await checkRoom(context.wallet, data.roomId);
+    const { data: src } = await sb.from("restream_destinations").select("name, platform, server_url, stream_key_enc, key_hint")
+      .eq("id", data.savedId).eq("owner_wallet", context.wallet).is("room_id", null).maybeSingle();
+    if (!src) throw new Error("That saved destination is gone.");
+    const { count } = await scope(sb.from("restream_destinations").select("id", { count: "exact", head: true }).eq("owner_wallet", context.wallet), roomId);
+    if ((count ?? 0) >= MAX_RESTREAM_DESTINATIONS) throw new Error(`A studio can have up to ${MAX_RESTREAM_DESTINATIONS} destinations.`);
+    const { error } = await sb.from("restream_destinations").insert({ ...src, enabled: true, owner_wallet: context.wallet, room_id: roomId });
+    if (error) throw new Error("Couldn't add that destination.");
+    return { ok: true };
   });

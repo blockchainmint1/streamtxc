@@ -86,3 +86,20 @@ export const deleteLivePushSite = createServerFn({ method: "POST" })
     await d.from("live_push_sites").delete().eq("id", data.id).eq("owner_wallet", context.wallet);
     return { ok: true };
   });
+
+/** Copy a saved partner website into a studio (locked key copied server-side). */
+export const useSavedLivePushSite = createServerFn({ method: "POST" })
+  .middleware([requireWalletSession])
+  .inputValidator((d: unknown) => z.object({ roomId: z.string().uuid(), savedId: z.string().uuid() }).parse(d))
+  .handler(async ({ context, data }) => {
+    const d = await db();
+    const roomId = await checkRoom(context.wallet, data.roomId);
+    const { data: src } = await d.from("live_push_sites").select("name, endpoint, secret_sealed, key_hint")
+      .eq("id", data.savedId).eq("owner_wallet", context.wallet).is("room_id", null).maybeSingle();
+    if (!src) throw new Error("That saved site is gone.");
+    const { count } = await scope(d.from("live_push_sites").select("id", { count: "exact", head: true }).eq("owner_wallet", context.wallet), roomId);
+    if ((count ?? 0) >= MAX_LIVE_PUSH_SITES) throw new Error(`A studio can have up to ${MAX_LIVE_PUSH_SITES} sites.`);
+    const { error } = await d.from("live_push_sites").insert({ ...src, owner_wallet: context.wallet, room_id: roomId, enabled: true });
+    if (error) throw new Error("Couldn't add that site.");
+    return { ok: true };
+  });

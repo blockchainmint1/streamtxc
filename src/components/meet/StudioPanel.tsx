@@ -249,7 +249,6 @@ export function StudioPanel({
       {roomId && (
         <section className="lg:col-span-2 lg:row-start-2 border border-border rounded-sm p-4 bg-card space-y-3 order-last">
           <div className="font-mono text-xs text-primary">[ THIS STUDIO'S DESTINATIONS ]</div>
-          <p className="text-xs text-muted-foreground">Where this studio sends its show, on top of streamTXC. Destinations on the Manage → Stream tab go out from every studio.</p>
           <RestreamDestinations roomId={roomId} />
         </section>
       )}

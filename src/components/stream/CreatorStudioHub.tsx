@@ -9,6 +9,7 @@ import { Clapperboard, MonitorPlay, Radio, Users, Layers, Palette } from "lucide
 import { Button } from "@/components/ui/button";
 import { useMyMeetingRooms } from "@/components/meet/HostPanel";
 import { RestreamDestinations } from "@/components/RestreamDestinations";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 /** Creator home: launch the browser studio, manage destinations, or use your own encoder. */
 export function CreatorStudioHub(_props: { wallet: string }) {
@@ -19,6 +20,7 @@ export function CreatorStudioHub(_props: { wallet: string }) {
   const [naming, setNaming] = useState(false);
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
+  const [destFor, setDestFor] = useState<{ id: string; title: string } | null>(null);
   async function makeStudio(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -78,11 +80,16 @@ export function CreatorStudioHub(_props: { wallet: string }) {
                     {r.live ? `open · ${r.seatsNow} in` : "closed"}{r.broadcasting ? " · LIVE" : ""}
                   </div>
                 </div>
-                <Button asChild>
-                  <Link to="/meet/$code" params={{ code: r.joinCode }} search={{ studio: true }}>
-                    <MonitorPlay /> Open studio
-                  </Link>
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={() => setDestFor({ id: r.id, title: r.title })}>
+                    <Radio /> Destinations
+                  </Button>
+                  <Button asChild>
+                    <Link to="/meet/$code" params={{ code: r.joinCode }} search={{ studio: true }}>
+                      <MonitorPlay /> Open studio
+                    </Link>
+                  </Button>
+                </div>
               </div>
             ))}
             <p className="text-xs text-muted-foreground">
@@ -95,8 +102,17 @@ export function CreatorStudioHub(_props: { wallet: string }) {
 
       <section className="space-y-3">
         <h2 className="text-2xl font-bold">Destinations</h2>
-        <p className="text-sm text-muted-foreground">Send your show to YouTube, Facebook, Twitch, any RTMP server, or partner websites like Honest.Money and TEXITcoin.org. Website switches start off so tests stay private. These go out from every stream; to send only one studio somewhere, add it inside that studio.</p>
+        <p className="text-sm text-muted-foreground">Send your show to YouTube, Facebook, Twitch, any RTMP server, or partner websites like Honest.Money and TEXITcoin.org. Website switches start off so tests stay private. Save them here once, then add them to any studio with its Destinations button.</p>
         <RestreamDestinations />
+        <Dialog open={!!destFor} onOpenChange={(v) => !v && setDestFor(null)}>
+          <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Destinations · {destFor?.title}</DialogTitle>
+              <DialogDescription>Pick from your saved destinations or add a new one. Set these up before you open the studio.</DialogDescription>
+            </DialogHeader>
+            {destFor && <RestreamDestinations roomId={destFor.id} />}
+          </DialogContent>
+        </Dialog>
       </section>
 
       <section className="border border-border bg-card/40 rounded-sm p-5 space-y-2">
