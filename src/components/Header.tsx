@@ -38,8 +38,8 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-        <Link to="/" className="flex items-center gap-2 group">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
+        <Link to="/" className="flex shrink-0 items-center gap-2 group">
           <div
             className="flex h-8 w-8 items-center justify-center rounded-sm"
             style={{ background: "var(--gradient-primary)" }}
@@ -51,7 +51,7 @@ export function Header() {
           </span>
         </Link>
 
-        <nav className="ml-auto flex items-center gap-2 text-sm font-mono">
+        <nav className="ml-auto flex min-w-0 items-center gap-1 sm:gap-2 overflow-x-auto whitespace-nowrap text-xs sm:text-sm font-mono [scrollbar-width:none]">
           <LiveBadge />
           <Link
             to="/about"

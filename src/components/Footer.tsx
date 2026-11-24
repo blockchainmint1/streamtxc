@@ -4,7 +4,7 @@ import { BugReportDialog } from "@/components/BugReportDialog";
 export function Footer() {
   return (
     <footer className="border-t border-border mt-24">
-      <div className="mx-auto max-w-7xl px-6 py-8 font-mono text-xs text-muted-foreground flex flex-wrap items-center justify-between gap-4">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8 font-mono text-xs text-muted-foreground flex flex-wrap items-center justify-between gap-4">
         <div>
           streamTXC.com — part of the{" "}
           <a
@@ -17,7 +17,7 @@ export function Footer() {
           </a>{" "}
           ecosystem
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
           <span className="text-muted-foreground">pinned to node.ipfs.honest.money</span>
           <a
             href="https://ipfs.io"

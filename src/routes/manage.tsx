@@ -102,7 +102,9 @@ import {
   getLiveSignalHealth,
   rotateAdminStreamKey,
 } from "@/lib/livestream.functions";
-import { Radio } from "lucide-react";
+import { Radio, MoreHorizontal, Check } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 export const Route = createFileRoute("/manage")({
   head: () => ({
@@ -115,8 +117,22 @@ export const Route = createFileRoute("/manage")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
+  validateSearch: (s: Record<string, unknown>): { tab?: ManageTab } =>
+    typeof s.tab === "string" && (MANAGE_TABS as readonly string[]).includes(s.tab)
+      ? { tab: s.tab as ManageTab }
+      : {},
   component: ManagePage,
 });
+
+const MANAGE_TABS = ["videos", "live", "meetings", "alerts", "account"] as const;
+type ManageTab = (typeof MANAGE_TABS)[number];
+const TAB_LABELS: Record<ManageTab, string> = {
+  videos: "Videos",
+  live: "Live",
+  meetings: "Meetings",
+  alerts: "Alerts",
+  account: "Account",
+};
 
 function ManagePage() {
   return <ManagePageInner />;
@@ -421,7 +437,80 @@ function ForceCaptionsButton({
   );
 }
 
+function SignInFirst() {
+  return (
+    <div className="border border-dashed border-border rounded-sm p-10 text-center font-mono text-sm text-muted-foreground">
+      Sign in to see this.
+    </div>
+  );
+}
+
+/** Edit + view stay visible; every other per-video tool lives in a "more" menu. */
+function VideoRowActions({ v, wallet }: { v: any; wallet: string }) {
+  const needsAttention =
+    v.status === "stamp_failed" ||
+    (!v.hls_cid && (v.transcode_status === "processing" || v.transcode_status === "failed"));
+  return (
+    <div className="flex items-center justify-end gap-2">
+      {v.status === "stamp_failed" && <RetryStampButton cid={v.cid} wallet={wallet} />}
+      <EditVideoDialog
+        cid={v.cid}
+        playSrc={hlsUrlForVideo(v) ?? null}
+        initialTitle={v.title}
+        initialDescription={v.description ?? ""}
+        initialThumbCid={v.thumbnail_cid ?? null}
+        wallet={wallet}
+      />
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-7 w-7 relative"
+            aria-label="More actions"
+            title="More actions"
+          >
+            <MoreHorizontal className="h-3.5 w-3.5" />
+            {needsAttention && (
+              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-destructive" />
+            )}
+          </Button>
+        </PopoverTrigger>
+        {/* forceMount keeps in-flight actions and their dialogs alive when the menu closes */}
+        <PopoverContent
+          forceMount
+          align="end"
+          className="w-56 p-2 data-[state=closed]:hidden"
+        >
+          <div className="flex flex-col items-stretch gap-1.5 [&_button]:w-full [&_button]:justify-start">
+            {!v.hls_cid && (v.transcode_status === "processing" || v.transcode_status === "failed") && (
+              <>
+                <FinalizeTranscodeButton cid={v.cid} wallet={wallet} />
+                <RetryTranscodeButton cid={v.cid} wallet={wallet} />
+              </>
+            )}
+            <ToggleVisibilityButton cid={v.cid} wallet={wallet} hidden={!!v.hidden_at} />
+            <ForceCaptionsButton
+              cid={v.cid}
+              wallet={wallet}
+              hasTranscript={!!(v.transcript_cid || v.transcript_text)}
+            />
+            <MirrorToSelfNodeButton cid={v.cid} wallet={wallet} />
+            <Link to="/v/$cid" params={{ cid: v.cid }}>
+              <Button size="sm" variant="ghost" className="font-mono text-xs">
+                <ArrowUpRight className="h-3 w-3 mr-1" /> open video page
+              </Button>
+            </Link>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 function ManagePageInner() {
+  const { tab = "videos" } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const { address, isAuthenticated } = useWallet();
   const fetchMine = useServerFn(listMyVideos);
   const fetchByCids = useServerFn(listVideosByCids);
@@ -565,23 +654,38 @@ function ManagePageInner() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="mx-auto w-full max-w-6xl px-6 py-12 flex-1">
-        <div className="font-mono text-xs text-primary mb-3">[ MY VIDEOS ]</div>
-        <div className="flex items-start justify-between gap-4 mb-10">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight mb-2">Manage</h1>
-            <p className="text-muted-foreground">
-              Videos uploaded from this browser.
-            </p>
-          </div>
-          {address && videos && videos.length > 0 && (
-            <BulkExtendDialog wallet={address} />
-          )}
+      <main className="mx-auto w-full max-w-6xl px-4 sm:px-6 py-8 sm:py-12 flex-1">
+        <div className="font-mono text-xs text-primary mb-3">[ MANAGE ]</div>
+        <div className="mb-6">
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">Manage</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
+            Your videos, live shows, meetings, alerts and account in one place.
+          </p>
         </div>
 
-        {address && isAuthenticated && <BranchSharePanel />}
+        <Tabs
+          value={tab}
+          onValueChange={(t) => navigate({ search: { tab: t as ManageTab }, replace: true })}
+        >
+          <div className="sticky top-0 z-20 -mx-4 sm:mx-0 mb-8 bg-background/95 backdrop-blur border-b border-border px-4 sm:px-0 py-2 overflow-x-auto">
+            <TabsList className="font-mono">
+              {MANAGE_TABS.map((t) => (
+                <TabsTrigger key={t} value={t} className="font-mono text-xs sm:text-sm">
+                  {TAB_LABELS[t]}
+                  {t === "videos" && videos ? (
+                    <span className="ml-1.5 text-muted-foreground">{videos.length}</span>
+                  ) : null}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
 
-        {address && <NotificationPrefs wallet={address} />}
+        <TabsContent value="videos" className="mt-0">
+        {address && videos && videos.length > 0 && (
+          <div className="flex justify-end mb-4">
+            <BulkExtendDialog wallet={address} />
+          </div>
+        )}
 
         {unclaimedAnon.length > 0 && (
           <div className="mb-10 border-2 border-amber-500/40 bg-amber-500/5 rounded-sm p-5">
@@ -663,7 +767,49 @@ function ManagePageInner() {
           </div>
         ) : (
           <>
-          <div className="border border-border rounded-sm overflow-x-auto">
+          <div className="md:hidden space-y-3">
+            {pagedVideos.map((v) => {
+              const daysLeft = Math.ceil((new Date(v.expires_at).getTime() - Date.now()) / 86400000);
+              return (
+                <div
+                  key={v.cid}
+                  className={"border border-border rounded-sm p-3 bg-card " + (v.hidden_at ? "opacity-60" : "")}
+                >
+                  <div className="flex gap-3 min-w-0">
+                    <Link to="/v/$cid" params={{ cid: v.cid }} className="shrink-0">
+                      {v.thumbnail_cid ? (
+                        <img
+                          src={ipfsThumbUrl(v.thumbnail_cid)}
+                          alt=""
+                          className="h-14 w-24 object-cover rounded-sm border border-border bg-secondary"
+                        />
+                      ) : (
+                        <div className="h-14 w-24 rounded-sm border border-dashed border-border bg-secondary" />
+                      )}
+                    </Link>
+                    <div className="min-w-0 flex-1">
+                      <Link to="/v/$cid" params={{ cid: v.cid }} className="font-bold line-clamp-2 hover:underline">
+                        {v.title}
+                      </Link>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] text-muted-foreground">
+                        <span className={v.hidden_at ? "" : v.status === "active" ? "text-primary" : ""}>
+                          {v.hidden_at ? "hidden" : v.status}
+                        </span>
+                        <span>{v.view_count} views</span>
+                        <span>{formatBytes(v.size_bytes)}</span>
+                        <span className={daysLeft < 7 ? "text-destructive" : ""}>{daysLeft}d left</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <TranscodeBadge status={v.transcode_status ?? null} hlsCid={v.hls_cid ?? null} cid={v.cid} />
+                    <VideoRowActions v={v} wallet={address!} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="hidden md:block border border-border rounded-sm overflow-x-auto">
             <table className="w-full text-sm min-w-[800px]">
               <thead className="bg-card font-mono text-xs text-muted-foreground">
                 <tr>
@@ -758,48 +904,7 @@ function ManagePageInner() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {v.status === "stamp_failed" && (
-                            <RetryStampButton cid={v.cid} wallet={address!} />
-                          )}
-                          {!v.hls_cid &&
-                            (v.transcode_status === "processing" ||
-                              v.transcode_status === "failed") && (
-                              <>
-                                <FinalizeTranscodeButton cid={v.cid} wallet={address!} />
-                                <RetryTranscodeButton cid={v.cid} wallet={address!} />
-                              </>
-                            )}
-                          <ToggleVisibilityButton
-                            cid={v.cid}
-                            wallet={address!}
-                            hidden={!!v.hidden_at}
-                          />
-                          <MirrorToSelfNodeButton cid={v.cid} wallet={address!} />
-                          <ForceCaptionsButton
-                            cid={v.cid}
-                            wallet={address!}
-                            hasTranscript={!!(v.transcript_cid || (v as { transcript_text?: string | null }).transcript_text)}
-                          />
-                          <EditVideoDialog
-                            cid={v.cid}
-                            playSrc={hlsUrlForVideo(v) ?? null}
-                            initialTitle={v.title}
-                            initialDescription={v.description ?? ""}
-                            initialThumbCid={v.thumbnail_cid ?? null}
-                            wallet={address!}
-                          />
-                          <Link to="/v/$cid" params={{ cid: v.cid }}>
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              className="font-mono h-7 w-7"
-                              title="View"
-                            >
-                              <ArrowUpRight className="h-3 w-3" />
-                            </Button>
-                          </Link>
-                        </div>
+                        <VideoRowActions v={v} wallet={address!} />
                       </td>
                     </tr>
                   );
@@ -858,13 +963,37 @@ function ManagePageInner() {
           )}
           </>
         )}
-        {address && <BugReportsAdminSection wallet={address} />}
-        {address && <LiveEligibilityAdminSection wallet={address} />}
-        {address && <GoLiveAdminSection wallet={address} />}
-        {address && <MyGoLiveSection wallet={address} />}
-        {address && <ConferenceSection />}
-        {address && <RestreamSection />}
-        {address && <SignInSecuritySection />}
+        </TabsContent>
+
+        <TabsContent value="live" className="mt-0 [&>section:first-child]:mt-0 [&>section:first-child]:border-t-0 [&>section:first-child]:pt-0">
+          {address ? (
+            <>
+              <GoLiveAdminSection wallet={address} />
+              <MyGoLiveSection wallet={address} />
+              <RestreamSection />
+            </>
+          ) : <SignInFirst />}
+        </TabsContent>
+
+        <TabsContent value="meetings" className="mt-0 [&>section:first-child]:mt-0 [&>section:first-child]:border-t-0 [&>section:first-child]:pt-0">
+          {address ? <ConferenceSection /> : <SignInFirst />}
+        </TabsContent>
+
+        <TabsContent value="alerts" className="mt-0">
+          {address ? <NotificationPrefs wallet={address} /> : <SignInFirst />}
+        </TabsContent>
+
+        <TabsContent value="account" className="mt-0">
+          {address ? (
+            <>
+              {isAuthenticated && <BranchSharePanel />}
+              <SignInSecuritySection />
+              <LiveEligibilityAdminSection wallet={address} />
+              <BugReportsAdminSection wallet={address} />
+            </>
+          ) : <SignInFirst />}
+        </TabsContent>
+        </Tabs>
       </main>
       <Footer />
     </div>
@@ -1699,6 +1828,46 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
             <div className="text-lg font-bold">{headline}</div>
             <div className="text-xs mt-1 opacity-90">{detail}</div>
           </div>
+        );
+      })()}
+
+      {(() => {
+        const keyOk = !!primary && primary.streamKey.length >= 32;
+        const warm = channelState === "STARTING" || channelState === "RUNNING";
+        const ready = channelState === "RUNNING";
+        const onAir = ready && !!signal?.receiving;
+        const isLive = (data ?? []).some((s: any) => s.status === "live");
+        const steps: { done: boolean; title: string; hint: string }[] = [
+          { done: keyOk, title: "Secure stream key", hint: keyOk ? "Your key is strong." : "Click “Make a new stream key” below, then paste it into StreamYard." },
+          { done: warm, title: "Warm up AWS", hint: "Click Warm up AWS (or set a showtime) 5+ minutes before the show." },
+          { done: ready, title: "Wait for the green READY light", hint: "Usually 2–5 minutes. Don't start StreamYard before this." },
+          { done: onAir, title: "Start StreamYard", hint: "Press Go Live in StreamYard. The light turns red when video arrives." },
+          { done: isLive, title: "Click Go Live here", hint: "This announces the show on streamTXC." },
+        ];
+        const next = steps.findIndex((s) => !s.done);
+        return (
+          <ol className="mb-6 border border-border rounded-sm bg-card divide-y divide-border">
+            {steps.map((s, i) => (
+              <li key={s.title} className={"flex gap-3 p-3 " + (i === next ? "bg-primary/5" : "")}>
+                <span
+                  className={
+                    "mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border font-mono text-xs " +
+                    (s.done
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : i === next
+                      ? "border-primary text-primary"
+                      : "border-border text-muted-foreground")
+                  }
+                >
+                  {s.done ? <Check className="h-3.5 w-3.5" /> : i + 1}
+                </span>
+                <div className="min-w-0">
+                  <div className={"font-bold text-sm " + (s.done ? "text-muted-foreground line-through" : "")}>{s.title}</div>
+                  {!s.done && <div className="text-xs text-muted-foreground mt-0.5">{s.hint}</div>}
+                </div>
+              </li>
+            ))}
+          </ol>
         );
       })()}
 
