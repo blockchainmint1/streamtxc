@@ -19,3 +19,20 @@ describe("studio layouts", () => {
     }
   });
 });
+
+describe("screen share modes", () => {
+  test("split gives the screen half the picture and the cams the other half", () => {
+    const r = layoutRects("grid", 1, true, 1280, 720, 12, "split");
+    expect(r.screenRect!.w).toBe(r.slots[0]!.w);
+    expect(r.slots[0]!.x).toBeGreaterThan(r.screenRect!.w);
+  });
+  test("bubble follows the dragged position and never leaves the picture", () => {
+    const r = layoutRects("grid", 1, true, 1280, 720, 12, "pip", { x: 0.1, y: 0.1 });
+    expect(r.slots[0]!.x).toBe(128);
+    const far = layoutRects("grid", 1, true, 1280, 720, 12, "pip", { x: 5, y: 5 }).slots[0]!;
+    expect(far.x + far.w).toBeLessThanOrEqual(1280); expect(far.y + far.h).toBeLessThanOrEqual(720);
+  });
+  test("screen only hides the cams", () => {
+    expect(layoutRects("grid", 3, true, 1280, 720, 12, "full").slots.length).toBe(0);
+  });
+});

@@ -14,17 +14,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { STUDIO_LAYOUTS, layoutRects, type StudioLayout } from "@/lib/studio-layout";
+import { STUDIO_LAYOUTS, SCREEN_MODES, DEFAULT_PIP, layoutRects, type StudioLayout, type ScreenMode, type PipPos } from "@/lib/studio-layout";
 
 export interface StudioPerson { attendeeId: string; name: string; tileId?: number; isSelf: boolean }
 
 interface Branding {
   layout: StudioLayout; color: string; logo: string | null; showNames: boolean;
   banner: string; showBanner: boolean; ticker: string; showTicker: boolean;
+  screenMode: ScreenMode; pip: PipPos;
 }
 const W = 1280, H = 720;
 const DEFAULTS: Branding = {
   layout: "grid", color: "#e8a33d", logo: null, showNames: true, banner: "", showBanner: false, ticker: "", showTicker: false,
+  screenMode: "side", pip: DEFAULT_PIP,
 };
 
 function useBranding(code: string) {
@@ -67,6 +69,9 @@ export function StudioPanel({
   const screenVid = useRef<HTMLVideoElement | null>(null);
   const logoImg = useRef<HTMLImageElement | null>(null);
   const tickerX = useRef(W);
+  const dragPip = useRef<PipPos | null>(null);
+  const dragOff = useRef({ x: 0, y: 0 });
+  const lastSlots = useRef<{ x: number; y: number; w: number; h: number }[]>([]);
   const liveScreen = screen && screenOn ? screen : null;
   const state = useRef({ b, stage, people, screen: liveScreen });
   state.current = { b, stage, people, screen: liveScreen };
@@ -99,7 +104,8 @@ export function StudioPanel({
       ctx.fillStyle = "#101114"; ctx.fillRect(0, 0, W, H);
       const onStage = stage.map((id) => people.find((p) => p.attendeeId === id)).filter(Boolean) as StudioPerson[];
       const reserve = (b.showBanner && b.banner ? 70 : 0) + (b.showTicker && b.ticker ? 40 : 0);
-      const { screenRect, slots } = layoutRects(b.layout, onStage.length, !!screen, W, H - reserve);
+      const { screenRect, slots } = layoutRects(b.layout, onStage.length, !!screen, W, H - reserve, 12, b.screenMode, dragPip.current ?? b.pip);
+      lastSlots.current = slots;
       if (screenRect && screenVid.current) drawCover(ctx, screenVid.current, screenRect.x, screenRect.y, screenRect.w, screenRect.h, true);
       onStage.forEach((p, i) => {
         const r = slots[i]; if (!r) return;
@@ -189,13 +195,40 @@ export function StudioPanel({
     if (f.size > 400_000) { toast.error("Use a logo under 400 KB."); return; }
     const r = new FileReader(); r.onload = () => setB({ logo: String(r.result) }); r.readAsDataURL(f);
   }
+  const canDrag = !!(screen && screenOn) && b.screenMode === "pip" && stage.length > 0;
+  const toCanvas = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H };
+  };
+  function onDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!canDrag) return;
+    const p = toCanvas(e); const s0 = lastSlots.current[0]; if (!s0) return;
+    const hit = lastSlots.current.some((s) => p.x >= s.x && p.x <= s.x + s.w && p.y >= s.y && p.y <= s.y + s.h);
+    if (!hit) return;
+    dragOff.current = { x: p.x - s0.x, y: p.y - s0.y };
+    dragPip.current = { x: s0.x / W, y: s0.y / H };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+  function onMove(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!dragPip.current) return;
+    const p = toCanvas(e);
+    dragPip.current = { x: (p.x - dragOff.current.x) / W, y: (p.y - dragOff.current.y) / H };
+  }
+  function onUp() {
+    if (!dragPip.current) return;
+    const s0 = lastSlots.current[0];
+    setB({ pip: s0 ? { x: s0.x / W, y: s0.y / H } : dragPip.current });
+    dragPip.current = null;
+  }
   const toggleStage = (id: string) => setStage((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
   return (
     <div className="flex-1 min-h-0 overflow-auto p-3 grid gap-3 lg:grid-cols-[1fr_320px]">
       <div className="space-y-3 min-w-0">
         <div className="relative rounded-sm border border-border overflow-hidden bg-card">
-          <canvas ref={canvasRef} width={W} height={H} className="w-full h-auto block" aria-label="Studio program picture" />
+          <canvas ref={canvasRef} width={W} height={H} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+            className={cn("w-full h-auto block touch-none", canDrag && "cursor-move")} aria-label="Studio program picture" />
+          {canDrag && <span className="absolute right-2 top-2 rounded-sm bg-background/80 px-2 py-0.5 font-mono text-[11px]">Drag the cams to move them</span>}
           {onAir && <span className="absolute left-2 top-2 rounded-sm bg-destructive px-2 py-0.5 font-mono text-xs font-bold text-destructive-foreground">● ON AIR</span>}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -265,6 +298,18 @@ export function StudioPanel({
               ))}
             </div>
           </div>
+          {screen && (
+            <div>
+              <Label className="mb-2 block">With a screen shared</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {SCREEN_MODES.map((m) => (
+                  <Button key={m.id} type="button" size="sm" variant={b.screenMode === m.id ? "default" : "outline"} onClick={() => setB({ screenMode: m.id })} className="font-mono text-xs">
+                    {m.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between"><Label htmlFor="st-names">Name tags</Label><Switch id="st-names" checked={b.showNames} onCheckedChange={(v) => setB({ showNames: v })} /></div>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between"><Label htmlFor="st-banner">Banner</Label><Switch aria-label="Show banner" checked={b.showBanner} onCheckedChange={(v) => setB({ showBanner: v })} /></div>
