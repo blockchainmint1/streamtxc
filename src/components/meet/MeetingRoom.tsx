@@ -1,5 +1,6 @@
 // Live meeting screen. amazon-chime-sdk-js is browser-only, so it is loaded
 // with a dynamic import inside an effect (never at module scope).
+import { STUDIO_TOPIC, guestSpot, parseStudioSignal, type StudioSignal } from "@/lib/green-room";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -87,6 +88,9 @@ export function MeetingRoom({
   const [needsSoundTap, setNeedsSoundTap] = useState(false);
   const [busy, setBusy] = useState(false);
   const [studio, setStudio] = useState(startStudio && join.role === "host");
+  const [studioSig, setStudioSig] = useState<StudioSignal | null>(null);
+  const spot = guestSpot(studioSig, selfId, join.role === "host");
+  const spotRef = useRef(spot); spotRef.current = spot;
   const canShare = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
 
   const [soundsOff, setSoundsOff] = useState(false);
@@ -210,6 +214,13 @@ export function MeetingRoom({
           });
         });
         av.realtimeSubscribeToMuteAndUnmuteLocalAudio((muted: boolean) => setMicOn(!muted));
+        av.realtimeSubscribeToReceiveDataMessage(STUDIO_TOPIC, (m: any) => {
+          if (m?.senderAttendeeId?.split("#")[0] === selfId) return;
+          const sig = parseStudioSignal(typeof m?.text === "function" ? m.text() : "");
+          if (!sig) return;
+          setStudioSig(sig);
+          if (sig.cue === selfId) toast("🎬 Get ready — the host is bringing you on stage next.", { duration: 8000 });
+        });
 
         if (!viewer) {
           try {
@@ -279,8 +290,21 @@ export function MeetingRoom({
       return;
     }
     if (micOn) av.realtimeMuteLocalAudio();
+    else if (spotRef.current === "backstage") toast("You're in the green room — the host will unmute you when you go on stage.");
     else av.realtimeUnmuteLocalAudio();
   }
+
+  // Hold the mic muted while backstage; give it back when brought on stage.
+  const prevSpot = useRef(spot);
+  useEffect(() => {
+    const av = avRef.current; if (!av) return;
+    if (spot === "backstage") { try { av.realtimeMuteLocalAudio(); } catch { /* noop */ } }
+    else if (prevSpot.current === "backstage" && spot === "on-stage" && hasMic) {
+      try { av.realtimeUnmuteLocalAudio(); } catch { /* noop */ }
+      toast.success("You're on stage — the audience can see and hear you.");
+    }
+    prevSpot.current = spot;
+  }, [spot, hasMic]);
 
   async function toggleCam() {
     const av = avRef.current;
@@ -393,6 +417,13 @@ export function MeetingRoom({
           {status === "connecting" && <span className="text-primary">connecting…</span>}
         </div>
       </div>
+
+      {spot !== "meeting" && (
+        <div role="status" className={cn("mx-4 mt-3 rounded-sm px-4 py-2 font-mono text-sm font-bold text-center",
+          spot === "on-stage" ? "bg-destructive text-destructive-foreground" : "border border-primary text-primary")}>
+          {spot === "on-stage" ? "● YOU'RE LIVE ON STAGE" : "GREEN ROOM — you're backstage. The audience can't see or hear you yet."}
+        </div>
+      )}
 
       {needsSoundTap && (
         <button

@@ -2,6 +2,7 @@
 // browser paints the finished picture on a canvas and shares it into the
 // meeting as "content". The live connector uses the presenter-only layout,
 // so whatever this canvas shows is exactly what the live stream shows.
+import { STUDIO_TOPIC, type StudioSignal } from "@/lib/green-room";
 import { useEffect, useRef, useState } from "react";
 import { MonitorUp, Radio, Square, ImagePlus, X } from "lucide-react";
 import { toast } from "sonner";
@@ -142,6 +143,17 @@ export function StudioPanel({
 
   useEffect(() => { if (!localSharing) setOnAir(false); }, [localSharing]);
 
+  // Green room: tell guests who's on stage (repeated so late joiners hear it).
+  const sendSignal = (sig: StudioSignal) => { try { av?.realtimeSendDataMessage(STUDIO_TOPIC, JSON.stringify(sig), 10_000); } catch { /* noop */ } };
+  useEffect(() => {
+    const sig = { onAir, stage };
+    sendSignal(sig);
+    const t = setInterval(() => sendSignal(sig), 5000);
+    return () => clearInterval(t);
+  }, [onAir, stage, av]);
+  useEffect(() => () => sendSignal({ onAir: false, stage: [] }), [av]);
+  const cue = (id: string, name: string) => { sendSignal({ onAir, stage, cue: id }); toast.success(`Told ${name} to get ready.`); };
+
   async function goOnAir() {
     const c = canvasRef.current; if (!c || !av) return;
     try {
@@ -186,7 +198,8 @@ export function StudioPanel({
           {othersSharing ? " Someone is sharing their screen; stop that first." : ""}
         </p>
         <div>
-          <div className="font-mono text-xs text-primary mb-2">[ BACKSTAGE · click to put on stage ]</div>
+          <div className="font-mono text-xs text-primary mb-2">[ GREEN ROOM · click to put on stage ]</div>
+          {onAir && <p className="text-xs text-muted-foreground mb-2">Guests not on stage are muted for the audience and see a "you're backstage" notice.</p>}
           <div className="flex gap-2 overflow-x-auto pb-1">
             {people.map((p) => (
               <button
@@ -203,6 +216,14 @@ export function StudioPanel({
                 <span className="absolute bottom-1 left-1 rounded-sm bg-background/80 px-1.5 font-mono text-[11px]">
                   {stage.includes(p.attendeeId) ? "● " : ""}{p.name}
                 </span>
+                {!p.isSelf && !stage.includes(p.attendeeId) && (
+                  <span
+                    role="button" tabIndex={0}
+                    onClick={(e) => { e.stopPropagation(); cue(p.attendeeId, p.name); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); cue(p.attendeeId, p.name); } }}
+                    className="absolute top-1 right-1 rounded-sm bg-primary px-1.5 font-mono text-[10px] font-bold text-primary-foreground"
+                  >cue</span>
+                )}
               </button>
             ))}
             <video ref={screenVid} autoPlay playsInline muted className={cn("shrink-0 w-40 aspect-video rounded-sm border border-border bg-card", !screen && "hidden")} />
