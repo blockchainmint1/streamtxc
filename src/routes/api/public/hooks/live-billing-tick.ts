@@ -156,7 +156,16 @@ export const Route = createFileRoute("/api/public/hooks/live-billing-tick")({
         } catch (err) {
           recordings = { error: err instanceof Error ? err.message : String(err) };
         }
-        return Response.json({ ok: true, considered: channels?.length ?? 0, results, warmup, meetings, recordings });
+        // Partner sites (honest.money, texitcoin.org): push live/ended to the ones switched on.
+        let pushes: unknown = null;
+        try {
+          const { runLivePushTick } = await import("@/lib/live-push.server");
+          pushes = await runLivePushTick();
+        } catch (err) {
+          pushes = { error: err instanceof Error ? err.message : String(err) };
+        }
+
+        return Response.json({ ok: true, considered: channels?.length ?? 0, results, warmup, meetings, recordings, pushes });
       },
     },
   },

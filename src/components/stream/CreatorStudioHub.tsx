@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Clapperboard, MonitorPlay, Radio, Users, Layers, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMyMeetingRooms } from "@/components/meet/HostPanel";
+import { LivePushSites } from "./LivePushSites";
 import { RestreamDestinations } from "@/components/RestreamDestinations";
 
 /** Creator home: launch the browser studio, manage destinations, or use your own encoder. */
@@ -57,6 +58,8 @@ export function CreatorStudioHub(_props: { wallet: string }) {
           </div>
         )}
       </section>
+
+      <LivePushSites />
 
       <section className="space-y-3">
         <h2 className="text-2xl font-bold">Destinations</h2>

@@ -556,6 +556,39 @@ export type Database = {
           },
         ]
       }
+      live_push_targets: {
+        Row: {
+          enabled: boolean
+          last_error: string | null
+          last_pushed_at: string | null
+          last_state: string
+          last_stream_id: string | null
+          owner_wallet: string
+          site: string
+          updated_at: string
+        }
+        Insert: {
+          enabled?: boolean
+          last_error?: string | null
+          last_pushed_at?: string | null
+          last_state?: string
+          last_stream_id?: string | null
+          owner_wallet: string
+          site: string
+          updated_at?: string
+        }
+        Update: {
+          enabled?: boolean
+          last_error?: string | null
+          last_pushed_at?: string | null
+          last_state?: string
+          last_stream_id?: string | null
+          owner_wallet?: string
+          site?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       live_streams: {
         Row: {
           archive_error: string | null
