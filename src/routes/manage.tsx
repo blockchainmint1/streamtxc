@@ -2179,12 +2179,6 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
                       retry archive
                     </Button>
                   )}
-                  <Link
-                    to="/live"
-                    className="inline-flex items-center rounded-sm border border-border bg-background px-3 py-1.5 font-mono text-xs hover:border-primary hover:text-primary transition-colors"
-                  >
-                    view
-                  </Link>
                 </div>
               </div>
             );
