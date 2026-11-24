@@ -1,5 +1,5 @@
 // Notification delivery helpers — Telegram (via connector gateway) and email
-// (Lovable Emails via the scaffolded /lovable/email/transactional/send route).
+// (Amazon SES).
 //
 // Both functions are best-effort: they swallow errors and return a status so
 // the caller (cron, etc.) can record whether the alert went out without
@@ -64,61 +64,39 @@ export async function sendTelegramMessage(
   }
 }
 
-/**
- * Send an app email via the scaffolded Lovable Emails route. Templates live
- * in src/lib/email-templates/ and are registered in registry.ts. If the email
- * infrastructure hasn't been set up yet, this returns a "skipped" result so
- * cron keeps running.
- */
+/** Send an app email through Amazon SES from the verified streamtxc.com domain. */
 export async function sendAppEmail(args: {
   templateName: string;
   recipientEmail: string;
   templateData?: Record<string, unknown>;
   idempotencyKey?: string;
 }): Promise<DeliveryResult> {
-  const baseUrl =
-    process.env.APP_PUBLIC_URL ??
-    "https://project--d4d0978e-e0a5-482f-8316-fceaa9ec6a46.lovable.app";
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  if (!lovableKey) {
-    return { channel: "email", ok: false, skipped: "LOVABLE_API_KEY missing" };
-  }
+  const id = process.env.AWS_SES_ACCESS_KEY_ID;
+  const secret = process.env.AWS_SES_SECRET_ACCESS_KEY;
+  const region = process.env.AWS_SES_REGION || "us-east-1";
+  if (!id || !secret) return { channel: "email", ok: false, skipped: "Amazon email keys missing" };
+  const { renderAppEmail } = await import("./app-email-content");
+  const msg = renderAppEmail(args.templateName, args.templateData ?? {});
+  if (!msg) return { channel: "email", ok: false, error: `unknown email ${args.templateName}` };
   try {
-    const res = await fetch(`${baseUrl}/lovable/email/transactional/send`, {
+    const { AwsClient } = await import("aws4fetch");
+    const aws = new AwsClient({ accessKeyId: id, secretAccessKey: secret, region, service: "ses" });
+    const res = await aws.fetch(`https://email.${region}.amazonaws.com/v2/email/outbound-emails`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${lovableKey}`,
-      },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        templateName: args.templateName,
-        recipientEmail: args.recipientEmail,
-        templateData: args.templateData ?? {},
-        idempotencyKey: args.idempotencyKey,
+        FromEmailAddress: process.env.EMAIL_FROM || "streamTXC <no-reply@streamtxc.com>",
+        Destination: { ToAddresses: [args.recipientEmail] },
+        Content: { Simple: {
+          Subject: { Data: msg.subject, Charset: "UTF-8" },
+          Body: { Html: { Data: msg.html, Charset: "UTF-8" }, Text: { Data: msg.text, Charset: "UTF-8" } },
+        } },
       }),
     });
-    if (res.status === 404) {
-      return {
-        channel: "email",
-        ok: false,
-        skipped: "Email infrastructure not yet set up",
-      };
-    }
-    if (!res.ok) {
-      const body = await res.text();
-      return {
-        channel: "email",
-        ok: false,
-        error: `${res.status}: ${body.slice(0, 300)}`,
-      };
-    }
+    if (!res.ok) return { channel: "email", ok: false, error: `${res.status}: ${(await res.text()).slice(0, 300)}` };
     return { channel: "email", ok: true };
   } catch (err) {
-    return {
-      channel: "email",
-      ok: false,
-      error: err instanceof Error ? err.message : String(err),
-    };
+    return { channel: "email", ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
