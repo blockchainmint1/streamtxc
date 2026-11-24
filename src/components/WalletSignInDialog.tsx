@@ -33,6 +33,12 @@ type QrState =
 
 function openHonestMoneyPopup() {
   const returnTo = `${publicOrigin()}/sso`;
+  // Remember where the member started so /sso can send them straight back.
+  try {
+    const here = window.location.pathname + window.location.search;
+    const back = here === "/" || here.startsWith("/sso") || here.startsWith("/auth") ? "/manage" : here;
+    localStorage.setItem("hm:return-to", back);
+  } catch { /* ignore */ }
   let prompt = "";
   try {
     if (localStorage.getItem("hm:signed-out")) prompt = "&prompt=login";

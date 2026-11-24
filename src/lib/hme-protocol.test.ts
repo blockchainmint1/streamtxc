@@ -56,6 +56,8 @@ describe("HME site tickets and permanent identity", () => {
   });
   test("redirect stays on streamTXC", () => {
     expect(hmeRedirect("/manage")).toBe("/manage");
+    expect(hmeRedirect("/")).toBeNull();
+    expect(hmeRedirect("/my")).toBeNull();
     for (const url of ["//evil.example", "/\\evil.example", "https://evil.example"]) expect(hmeRedirect(url)).toBeNull();
   });
 });

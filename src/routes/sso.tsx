@@ -1,3 +1,4 @@
+import { hmeRedirect } from "@/lib/hme-protocol";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -44,17 +45,23 @@ function SsoPage() {
 
   function finish(redirect?: string | null) {
     setState({ kind: "done" });
-    if (popup === "1" && window.opener) {
+    let stored: string | null = null;
+    try {
+      stored = hmeRedirect(localStorage.getItem("hm:return-to") ?? undefined);
+      localStorage.removeItem("hm:return-to");
+    } catch { /* ignore */ }
+    const dest = stored ?? redirect ?? "/manage";
+    if (popup === "1" && window.opener && !window.opener.closed) {
       try {
         window.opener.postMessage({ type: "hm-sso-done" }, window.location.origin);
-        if (window.opener.location.origin === window.location.origin) {
-          window.opener.location.replace(redirect ?? "/manage");
-        }
-      } catch { /* opener may be on a different domain */ }
-      setTimeout(() => window.close(), 600);
-    } else {
-      setTimeout(() => window.location.replace(redirect ?? "/manage"), 600);
+        // Navigating the opener is allowed even when it's on another of our domains;
+        // always land it on this (signed-in) origin's page.
+        window.opener.location.href = `${window.location.origin}${dest}`;
+        setTimeout(() => window.close(), 600);
+        return;
+      } catch { /* fall through to navigating this window */ }
     }
+    setTimeout(() => window.location.replace(dest), 600);
   }
 
   useEffect(() => {

@@ -55,7 +55,8 @@ const HME_REDIRECT_PAGES = ["about", "brand", "embed", "live", "manage", "manife
 export function hmeRedirect(redirect?: string): string | null {
   if (!redirect || !redirect.startsWith("/") || redirect.startsWith("//") || /[\\\u0000-\u001f]/.test(redirect)) return null;
   const first = redirect.slice(1).split(/[/?#]/)[0];
-  if (first !== "" && !HME_REDIRECT_PAGES.includes(first)) return null;
+  // "/" (home) isn't a useful landing page after sign-in; fall back to the account page.
+  if (first === "" || !HME_REDIRECT_PAGES.includes(first)) return null;
   return redirect;
 }
 
