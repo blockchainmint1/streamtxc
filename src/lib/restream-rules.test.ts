@@ -24,9 +24,9 @@ describe("restream rules", () => {
     expect(off.destinations).toEqual(dest);
     expect(off.encoderSettings.outputGroups.length).toBe(2);
   });
-  test("caps destinations at 5", () => {
-    expect(MAX_RESTREAM_DESTINATIONS).toBe(5);
-    expect(() => withRestreamOutputs(dest, enc, Array(6).fill(t))).toThrow();
+  test("caps destinations at 10", () => {
+    expect(MAX_RESTREAM_DESTINATIONS).toBe(10);
+    expect(() => withRestreamOutputs(dest, enc, Array(11).fill(t))).toThrow();
   });
   test("only rtmp/rtmps server URLs are accepted", () => {
     expect(validateServerUrl("rtmps://live-api-s.facebook.com:443/rtmp/")).toBe("rtmps://live-api-s.facebook.com:443/rtmp");

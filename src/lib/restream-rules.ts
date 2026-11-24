@@ -1,7 +1,7 @@
 // Multi-destination ("restream") rules: presets, validation and the
 // MediaLive output-group JSON. Pure — safe to import anywhere and to test.
 
-export const MAX_RESTREAM_DESTINATIONS = 5;
+export const MAX_RESTREAM_DESTINATIONS = 10;
 export const RESTREAM_GROUP_NAME = "restream";
 export const RESTREAM_DEST_PREFIX = "restream-";
 
