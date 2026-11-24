@@ -1,20 +1,27 @@
 // Pushed "go live" alerts to partner sites. streamTXC tells a site when a
 // stream starts/ends only if the creator switched that site on, so tests and
-// unchosen streams never appear there. Messages are HMAC-signed per site.
-export const LIVE_PUSH_SITES = {
-  "honest-money": {
-    label: "honest.money/live",
-    endpoint: "https://honest.money/api/public/streamtxc-live",
-    secretEnv: "LIVE_PUSH_SECRET_HONEST_MONEY",
-  },
-  texitcoin: {
-    label: "texitcoin.org/zoom",
-    endpoint: "https://texitcoin.org/api/public/streamtxc-live",
-    secretEnv: "LIVE_PUSH_SECRET_TEXITCOIN",
-  },
-} as const;
-export type LivePushSite = keyof typeof LIVE_PUSH_SITES;
-export const isLivePushSite = (s: string): s is LivePushSite => Object.hasOwn(LIVE_PUSH_SITES, s);
+// unchosen streams never appear there. Each creator enters the site's address
+// and a shared key; messages are HMAC-signed with that key.
+export const MAX_LIVE_PUSH_SITES = 5;
+
+/** Partner listener address: public https host only (no IPs, localhost or internal names). */
+export function validatePushEndpoint(raw: string): string {
+  const url = raw.trim();
+  let u: URL;
+  try { u = new URL(url); } catch { throw new Error("Enter the full web address, like https://example.com/api/public/streamtxc-live."); }
+  const h = u.hostname.toLowerCase();
+  if (u.protocol !== "https:" || u.username || u.password || u.port) throw new Error("The address must start with https:// (no port or login).");
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(h) || /^[0-9.]+$/.test(h) || h.includes(":")) throw new Error("Use a normal website name, not a number address.");
+  if (h === "localhost" || /\.(local|internal|localhost|lan|home|arpa)$/.test(h)) throw new Error("That address isn't on the public internet.");
+  if (url.length > 300) throw new Error("That address is too long.");
+  return u.toString();
+}
+
+export function validatePushKey(raw: string): string {
+  const k = raw.trim();
+  if (k.length < 16 || k.length > 400 || /\s/.test(k)) throw new Error("The key must be at least 16 characters with no spaces.");
+  return k;
+}
 
 /** While live, re-send every 5 minutes so receivers can expire a missed "ended". */
 export const LIVE_HEARTBEAT_MS = 5 * 60_000;

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { decidePush, signBody, LIVE_HEARTBEAT_MS } from "./live-push-rules";
+import { decidePush, signBody, LIVE_HEARTBEAT_MS, validatePushEndpoint, validatePushKey } from "./live-push-rules";
 
 const base = { enabled: true, lastState: "off", lastStreamId: null, lastPushedAt: null, lastError: null };
 
@@ -25,5 +25,16 @@ describe("live push", () => {
     const { createHmac } = await import("node:crypto");
     expect(await signBody("k", 1, "{}")).toBe(createHmac("sha256", "k").update("1.{}").digest("hex"));
     expect(await signBody("k", 1, "{}")).not.toBe(await signBody("k", 2, "{}"));
+  });
+  test("partner address must be public https", () => {
+    expect(validatePushEndpoint("https://honest.money/api/public/streamtxc-live")).toBe("https://honest.money/api/public/streamtxc-live");
+    expect(() => validatePushEndpoint("http://honest.money/x")).toThrow();
+    expect(() => validatePushEndpoint("https://169.254.169.254/latest")).toThrow();
+    expect(() => validatePushEndpoint("https://localhost/x")).toThrow();
+    expect(() => validatePushEndpoint("https://example.com:8443/x")).toThrow();
+  });
+  test("key needs 16+ characters", () => {
+    expect(() => validatePushKey("short")).toThrow();
+    expect(validatePushKey("a".repeat(16))).toHaveLength(16);
   });
 });

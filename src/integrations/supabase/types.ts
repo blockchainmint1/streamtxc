@@ -556,6 +556,54 @@ export type Database = {
           },
         ]
       }
+      live_push_sites: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          endpoint: string
+          id: string
+          key_hint: string
+          last_error: string | null
+          last_pushed_at: string | null
+          last_state: string
+          last_stream_id: string | null
+          name: string
+          owner_wallet: string
+          secret_sealed: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          endpoint: string
+          id?: string
+          key_hint: string
+          last_error?: string | null
+          last_pushed_at?: string | null
+          last_state?: string
+          last_stream_id?: string | null
+          name: string
+          owner_wallet: string
+          secret_sealed: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          endpoint?: string
+          id?: string
+          key_hint?: string
+          last_error?: string | null
+          last_pushed_at?: string | null
+          last_state?: string
+          last_stream_id?: string | null
+          name?: string
+          owner_wallet?: string
+          secret_sealed?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       live_push_targets: {
         Row: {
           enabled: boolean
