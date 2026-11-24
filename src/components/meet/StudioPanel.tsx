@@ -246,47 +246,49 @@ export function StudioPanel({
         </div>
       </div>
 
-      {roomId && (
-        <section className="lg:col-span-2 lg:row-start-2 border border-border rounded-sm p-4 bg-card space-y-3 order-last">
-          <div className="font-mono text-xs text-primary">[ THIS STUDIO'S DESTINATIONS ]</div>
-          <RestreamDestinations roomId={roomId} />
-        </section>
-      )}
-      <aside className="space-y-4 border border-border rounded-sm p-4 bg-card h-fit">
-        <div>
-          <Label className="mb-2 block">Layout</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {STUDIO_LAYOUTS.map((l) => (
-              <Button key={l.id} type="button" size="sm" variant={b.layout === l.id ? "default" : "outline"} onClick={() => setB({ layout: l.id })} className="font-mono text-xs">
-                {l.label}
-              </Button>
-            ))}
+      <div className="space-y-3 min-w-0">
+        <aside className="space-y-4 border border-border rounded-sm p-4 bg-card">
+          <div>
+            <Label className="mb-2 block">Layout</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {STUDIO_LAYOUTS.map((l) => (
+                <Button key={l.id} type="button" size="sm" variant={b.layout === l.id ? "default" : "outline"} onClick={() => setB({ layout: l.id })} className="font-mono text-xs">
+                  {l.label}
+                </Button>
+              ))}
+            </div>
           </div>
-        </div>
-        <div className="flex items-center justify-between"><Label htmlFor="st-names">Name tags</Label><Switch id="st-names" checked={b.showNames} onCheckedChange={(v) => setB({ showNames: v })} /></div>
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between"><Label htmlFor="st-banner">Banner</Label><Switch aria-label="Show banner" checked={b.showBanner} onCheckedChange={(v) => setB({ showBanner: v })} /></div>
-          <Input id="st-banner" value={b.banner} maxLength={90} onChange={(e) => setB({ banner: e.target.value })} placeholder="Daily Executive Meeting" />
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between"><Label htmlFor="st-ticker">Scrolling ticker</Label><Switch aria-label="Show ticker" checked={b.showTicker} onCheckedChange={(v) => setB({ showTicker: v })} /></div>
-          <Input id="st-ticker" value={b.ticker} maxLength={240} onChange={(e) => setB({ ticker: e.target.value })} placeholder="Get TXC at swap.texitcoin.org" />
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <Label htmlFor="st-color">Brand color</Label>
-          <input id="st-color" type="color" value={b.color} onChange={(e) => setB({ color: e.target.value })} className="h-8 w-14 rounded-sm border border-border bg-background" />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Logo</Label>
-          <div className="flex items-center gap-2">
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-sm border border-border px-3 py-1.5 text-sm hover:border-primary">
-              <ImagePlus className="h-4 w-4" /> {b.logo ? "Change" : "Upload"}
-              <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => pickLogo(e.target.files?.[0])} />
-            </label>
-            {b.logo && <Button size="sm" variant="ghost" onClick={() => setB({ logo: null })}>Remove</Button>}
+          <div className="flex items-center justify-between"><Label htmlFor="st-names">Name tags</Label><Switch id="st-names" checked={b.showNames} onCheckedChange={(v) => setB({ showNames: v })} /></div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between"><Label htmlFor="st-banner">Banner</Label><Switch aria-label="Show banner" checked={b.showBanner} onCheckedChange={(v) => setB({ showBanner: v })} /></div>
+            <Input id="st-banner" value={b.banner} maxLength={90} onChange={(e) => setB({ banner: e.target.value })} placeholder="Daily Executive Meeting" />
           </div>
-        </div>
-      </aside>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between"><Label htmlFor="st-ticker">Scrolling ticker</Label><Switch aria-label="Show ticker" checked={b.showTicker} onCheckedChange={(v) => setB({ showTicker: v })} /></div>
+            <Input id="st-ticker" value={b.ticker} maxLength={240} onChange={(e) => setB({ ticker: e.target.value })} placeholder="Get TXC at swap.texitcoin.org" />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="st-color">Brand color</Label>
+            <input id="st-color" type="color" value={b.color} onChange={(e) => setB({ color: e.target.value })} className="h-8 w-14 rounded-sm border border-border bg-background" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Logo</Label>
+            <div className="flex items-center gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-sm border border-border px-3 py-1.5 text-sm hover:border-primary">
+                <ImagePlus className="h-4 w-4" /> {b.logo ? "Change" : "Upload"}
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => pickLogo(e.target.files?.[0])} />
+              </label>
+              {b.logo && <Button size="sm" variant="ghost" onClick={() => setB({ logo: null })}>Remove</Button>}
+            </div>
+          </div>
+        </aside>
+        {roomId && (
+          <section className="border border-border rounded-sm p-3 bg-card">
+            <div className="font-mono text-xs text-primary mb-2">[ THIS STUDIO'S DESTINATIONS ]</div>
+            <RestreamDestinations roomId={roomId} compact />
+          </section>
+        )}
+      </div>
     </div>
   );
 }

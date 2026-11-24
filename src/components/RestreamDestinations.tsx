@@ -14,6 +14,7 @@ import {
 } from "@/lib/restream.functions";
 import { deleteLivePushSite, listLivePushSites, saveLivePushSite, toggleLivePushSite, useSavedLivePushSite } from "@/lib/live-push.functions";
 import { RESTREAM_PRESETS, type RestreamPlatform } from "@/lib/restream-rules";
+import { cn } from "@/lib/utils";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
 
@@ -79,22 +80,26 @@ export function RestreamDestinations({ roomId, compact }: { roomId?: string; com
 
   const loading = dest.isLoading;
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          {roomId ? "Where this studio sends its show, on top of streamTXC." : "Your saved destinations. Add them to any studio, and they're used when you stream from OBS or StreamYard."}
-        </p>
-        <Button onClick={() => setOpen(true)} disabled={rows.length + sites.length >= max * 2} className="font-mono gap-1.5">
+    <div className={compact ? "space-y-2.5" : "space-y-4"}>
+      <div className={cn("flex items-center gap-2", compact ? "justify-end" : "flex-wrap justify-between gap-3")}>
+        {!compact && (
+          <p className="text-sm text-muted-foreground">
+            {roomId ? "Where this studio sends its show, on top of streamTXC." : "Your saved destinations. Add them to any studio, and they're used when you stream from OBS or StreamYard."}
+          </p>
+        )}
+        <Button size={compact ? "sm" : "default"} onClick={() => setOpen(true)} disabled={rows.length + sites.length >= max * 2}
+          className={cn("font-mono gap-1.5", compact && "w-full")}>
           <Plus className="h-4 w-4" /> Add destination
         </Button>
       </div>
 
       {roomId && pickable.length > 0 && (
         <div className="space-y-2">
-          <div className="font-mono text-xs text-primary">[ FROM MY SAVED DESTINATIONS ]</div>
-          <div className="flex flex-wrap gap-2">
+          <div className="font-mono text-xs text-primary">{compact ? "[ FROM SAVED ]" : "[ FROM MY SAVED DESTINATIONS ]"}</div>
+          <div className={cn("flex flex-wrap", compact ? "gap-1.5" : "gap-2")}>
             {pickable.map((p) => (
-              <Button key={`${p.kind}${p.id}`} variant="outline" size="sm" disabled={busy} onClick={() => useSaved(p)} className="gap-1.5" title={p.sub}>
+              <Button key={`${p.kind}${p.id}`} variant="outline" size="sm" disabled={busy} onClick={() => useSaved(p)}
+                className={cn("gap-1.5", compact && "h-7 max-w-full px-2 text-[11px]")} title={p.sub}>
                 {p.kind === "w" ? <Globe className="h-3.5 w-3.5" /> : <Radio className="h-3.5 w-3.5" />} <Plus className="h-3 w-3" /> {p.name}
               </Button>
             ))}
@@ -105,17 +110,17 @@ export function RestreamDestinations({ roomId, compact }: { roomId?: string; com
       {loading ? (
         <div className="font-mono text-sm text-muted-foreground">Loading…</div>
       ) : rows.length + sites.length === 0 ? (
-        <p className="text-sm text-muted-foreground border border-dashed border-border rounded-sm p-4">
+        <p className={cn("text-muted-foreground border border-dashed border-border rounded-sm", compact ? "p-2 text-xs" : "p-4 text-sm")}>
           {roomId ? "No destinations in this studio yet — it goes to streamTXC only." : "No saved destinations yet."}
         </p>
       ) : (
         <ul className="divide-y divide-border border border-border rounded-sm">
           {sites.map((s: any) => (
-            <li key={s.id} className="flex items-center gap-3 p-3">
+            <li key={s.id} className={cn("flex items-center gap-2", compact ? "p-2" : "gap-3 p-3")}>
               <Globe className="h-4 w-4 text-primary shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="font-medium truncate">{s.name}</div>
-                <div className="font-mono text-xs text-muted-foreground truncate">
+                <div className={cn("truncate font-medium", compact && "text-[13px]")}>{s.name}</div>
+                <div className={cn("font-mono text-muted-foreground truncate", compact ? "text-[11px]" : "text-xs")}>
                   {new URL(s.endpoint).host} · key …{s.keyHint} · {s.showing ? "showing now" : s.enabled ? "on" : "off"}
                   {s.problem && s.enabled ? " · couldn't reach it" : ""}
                 </div>
@@ -129,11 +134,11 @@ export function RestreamDestinations({ roomId, compact }: { roomId?: string; com
             </li>
           ))}
           {rows.map((r: any) => (
-            <li key={r.id} className="flex items-center gap-3 p-3">
+            <li key={r.id} className={cn("flex items-center gap-2", compact ? "p-2" : "gap-3 p-3")}>
               <Radio className="h-4 w-4 text-primary shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="font-medium truncate">{r.name}</div>
-                <div className="font-mono text-xs text-muted-foreground truncate">{RESTREAM_PRESETS[r.platform as RestreamPlatform]?.label ?? r.platform} · key {r.key_hint}</div>
+                <div className={cn("truncate font-medium", compact && "text-[13px]")}>{r.name}</div>
+                <div className={cn("font-mono text-muted-foreground truncate", compact ? "text-[11px]" : "text-xs")}>{RESTREAM_PRESETS[r.platform as RestreamPlatform]?.label ?? r.platform} · key {r.key_hint}</div>
               </div>
               <Switch checked={r.enabled} aria-label={`Send to ${r.name}`} onCheckedChange={async (v) => {
                 try { await save({ data: { ...scoped, id: r.id, name: r.name, platform: r.platform, serverUrl: r.server_url, enabled: v } }); refresh(); }
@@ -147,14 +152,15 @@ export function RestreamDestinations({ roomId, compact }: { roomId?: string; com
         </ul>
       )}
 
-      {!compact && (
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="outline" onClick={applyNow} disabled={busy} className="font-mono gap-2">
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />} Update my live channel
-          </Button>
-          <span className="text-xs text-muted-foreground">Only works while your live channel is fully off. Changes take effect on your next Go Live.</span>
-        </div>
-      )}
+      <div className={cn("flex gap-3", compact ? "flex-col items-stretch gap-1.5" : "flex-wrap items-center")}>
+        <Button variant="outline" size={compact ? "sm" : "default"} onClick={applyNow} disabled={busy}
+          className={cn("font-mono gap-2", compact && "w-full")}>
+          {busy && <Loader2 className="h-4 w-4 animate-spin" />} Update my live channel
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          {compact ? "Channel off only · takes effect on next Go Live." : "Only works while your live channel is fully off. Changes take effect on your next Go Live."}
+        </span>
+      </div>
 
       <AddDestinationDialog
         open={open} onOpenChange={setOpen} roomId={roomId}
