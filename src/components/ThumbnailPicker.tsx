@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import Hls from "hls.js";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -45,6 +46,7 @@ export function ThumbnailPicker({ file, videoSrc, onChange, onPinningChange }: P
   // Build & tear down the video source when file/url changes.
   useEffect(() => {
     let url: string | null = null;
+    let hls: Hls | null = null;
     const v = videoRef.current;
     if (file) {
       url = URL.createObjectURL(file);
@@ -54,14 +56,23 @@ export function ThumbnailPicker({ file, videoSrc, onChange, onPinningChange }: P
         v.load();
       }
     } else if (videoSrc && v) {
-      v.src = videoSrc;
-      v.load();
+      // Transcoded videos are HLS playlists; browsers other than Safari need hls.js.
+      const isHls = videoSrc.split(/[?#]/, 1)[0]?.endsWith(".m3u8") ?? false;
+      if (isHls && Hls.isSupported()) {
+        hls = new Hls({ maxBufferLength: 10 });
+        hls.loadSource(videoSrc);
+        hls.attachMedia(v);
+      } else {
+        v.src = videoSrc;
+        v.load();
+      }
     }
     setThumbCid(null);
     onChange(null);
     setPreviewUrl(null);
     return () => {
       if (url) URL.revokeObjectURL(url);
+      hls?.destroy();
       objectUrlRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

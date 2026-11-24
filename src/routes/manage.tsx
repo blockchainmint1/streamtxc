@@ -1,3 +1,4 @@
+import { hlsUrlForVideo } from "@/lib/ipfs-gateway";
 import { publicOrigin } from "@/lib/site-origin";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -782,6 +783,7 @@ function ManagePageInner() {
                           />
                           <EditVideoDialog
                             cid={v.cid}
+                            playSrc={hlsUrlForVideo(v) ?? null}
                             initialTitle={v.title}
                             initialDescription={v.description ?? ""}
                             initialThumbCid={v.thumbnail_cid ?? null}
@@ -1169,8 +1171,10 @@ function EditVideoDialog({
   initialDescription,
   initialThumbCid,
   wallet,
+  playSrc,
 }: {
   cid: string;
+  playSrc?: string | null;
   initialTitle: string;
   initialDescription: string;
   initialThumbCid: string | null;
@@ -1304,7 +1308,7 @@ function EditVideoDialog({
           <div className="space-y-2">
             <Label className="font-mono text-xs">THUMBNAIL</Label>
             <ThumbnailPicker
-              videoSrc={`/api/stream/${cid}`}
+              videoSrc={playSrc ?? `/api/stream/${cid}`}
               onChange={(c) => {
                 if (c) {
                   setThumbCid(c);
