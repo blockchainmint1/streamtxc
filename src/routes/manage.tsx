@@ -61,6 +61,7 @@ import { toast } from "sonner";
 import { NotificationPrefs } from "@/components/NotificationPrefs";
 import { MeetingRoomsManager } from "@/components/meet/HostPanel";
 import { SignInSecuritySection } from "@/components/SignInSecurity";
+import { RestreamDestinations } from "@/components/RestreamDestinations";
 import { ADMIN_WALLET } from "@/lib/admin";
 import { BranchSharePanel } from "@/components/BranchSharePanel";
 import { listBugReports } from "@/lib/bug-reports.functions";
@@ -860,6 +861,7 @@ function ManagePageInner() {
         {address && <GoLiveAdminSection wallet={address} />}
         {address && <MyGoLiveSection wallet={address} />}
         {address && <ConferenceSection />}
+        {address && <RestreamSection />}
         {address && <SignInSecuritySection />}
       </main>
       <Footer />
@@ -867,6 +869,20 @@ function ManagePageInner() {
   );
 }
 
+
+// Restream — extra sites the host's live channel pushes to at the same time.
+function RestreamSection() {
+  return (
+    <section id="restream" className="mt-16 border-t border-border pt-8 scroll-mt-20">
+      <div className="font-mono text-xs text-primary mb-3">[ MULTISTREAM ]</div>
+      <h2 className="text-2xl font-bold mb-2">Also stream to…</h2>
+      <p className="text-sm text-muted-foreground mb-6 max-w-2xl">
+        Send every broadcast to YouTube, Facebook, Twitch and other sites at the same time as streamTXC — up to 5 places.
+      </p>
+      <RestreamDestinations />
+    </section>
+  );
+}
 
 // Conference — the same meeting rooms as /meet: make named rooms, edit them,
 // copy their team / view-only links and join.

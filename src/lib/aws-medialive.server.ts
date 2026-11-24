@@ -267,3 +267,25 @@ export async function createHlsOriginEndpoint(args: {
 export async function deleteHlsOriginEndpoint(id: string) {
   await mpCall("DELETE", `/origin_endpoints/${id}`).catch(() => null);
 }
+/**
+ * Rewrite a channel's destinations + encoder settings (used for restream
+ * outputs). AWS only allows this while the channel is fully off.
+ */
+export async function updateChannelRestream(
+  id: string,
+  transform: (destinations: any[], encoderSettings: any) => { destinations: any[]; encoderSettings: any },
+): Promise<void> {
+  const { state, raw } = await describeChannel(id);
+  if (state !== "IDLE") {
+    throw new Error("Turn your live channel fully off first — AWS only accepts new destinations while it's stopped.");
+  }
+  const next = transform(raw.destinations ?? [], raw.encoderSettings ?? {});
+  try {
+    await call("PUT", `/prod/channels/${id}`, { destinations: next.destinations, encoderSettings: next.encoderSettings });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/\[403\]/.test(msg)) throw new Error("Amazon hasn't allowed updating the live channel yet — a one-time AWS permission (UpdateChannel) is needed.");
+    if (/\[4\d\d\]/.test(msg)) throw new Error("Amazon rejected one of the destinations — check the server URL and stream key.");
+    throw err;
+  }
+}

@@ -962,6 +962,45 @@ export type Database = {
           },
         ]
       }
+      restream_destinations: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          key_hint: string
+          name: string
+          owner_wallet: string
+          platform: string
+          server_url: string
+          stream_key_enc: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          key_hint?: string
+          name: string
+          owner_wallet: string
+          platform?: string
+          server_url: string
+          stream_key_enc: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          key_hint?: string
+          name?: string
+          owner_wallet?: string
+          platform?: string
+          server_url?: string
+          stream_key_enc?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       video_drafts: {
         Row: {
           created_at: string

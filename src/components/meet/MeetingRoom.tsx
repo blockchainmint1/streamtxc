@@ -4,13 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  Mic, MicOff, Video, VideoOff, MonitorUp, MonitorX, PhoneOff, Users, Eye, Volume2, Bell, BellOff, FileText,
+  Mic, MicOff, Video, VideoOff, MonitorUp, MonitorX, PhoneOff, Users, Eye, Volume2, Bell, BellOff, FileText, Clapperboard,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { decodeExternalUserId, type MeetingRole } from "@/lib/meeting-rules";
 import { InMeetingHostBar } from "./HostPanel";
+import { StudioPanel } from "./StudioPanel";
 import { playMeetSound, setSoundsMutedLocally, soundsMutedLocally } from "@/lib/meet-sound";
 import { getMeetingRecordingState } from "@/lib/meetings.functions";
 import { SEAT_HEARTBEAT_MS } from "@/lib/meeting-rules";
@@ -85,6 +86,7 @@ export function MeetingRoom({
   const [sharing, setSharing] = useState(false);
   const [needsSoundTap, setNeedsSoundTap] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [studio, setStudio] = useState(false);
   const canShare = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia;
 
   const [soundsOff, setSoundsOff] = useState(false);
@@ -383,6 +385,11 @@ export function MeetingRoom({
               <FileText className="h-3 w-3" /> notes on
             </span>
           )}
+          {join.role === "host" && (
+            <Button size="sm" variant={studio ? "default" : "outline"} onClick={() => setStudio((v) => !v)} className="h-7 gap-1 font-mono text-xs">
+              <Clapperboard className="h-3.5 w-3.5" /> Studio
+            </Button>
+          )}
           {status === "connecting" && <span className="text-primary">connecting…</span>}
         </div>
       </div>
@@ -396,6 +403,15 @@ export function MeetingRoom({
         </button>
       )}
 
+      {studio && join.role === "host" ? (
+        <StudioPanel
+          av={avRef.current}
+          code={code}
+          localSharing={sharing}
+          othersSharing={!!contentTile && contentTile.attendeeId.split("#")[0] !== selfId}
+          people={speakers.map((p) => ({ attendeeId: p.attendeeId, name: p.name, tileId: cameraByAttendee.get(p.attendeeId)?.tileId, isSelf: p.attendeeId === selfId }))}
+        />
+      ) : (
       <div className={cn("flex-1 min-h-0 p-3 gap-3", contentTile ? "flex flex-col lg:flex-row" : "flex")}>
         {contentTile && (
           <div className="flex-1 min-h-0 rounded-sm border border-primary/60 bg-card overflow-hidden relative">
@@ -446,6 +462,7 @@ export function MeetingRoom({
           )}
         </div>
       </div>
+      )}
 
       {join.role === "host" && join.roomId && <InMeetingHostBar roomId={join.roomId} />}
 
