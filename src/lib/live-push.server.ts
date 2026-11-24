@@ -10,12 +10,17 @@ export async function runLivePushTick() {
   const { data: targets } = await db.from("live_push_sites").select("*");
   const out: Array<Record<string, unknown>> = [];
   const liveCache = new Map<string, any>();
+  // Which studio is on air per creator: studio sites only show that studio's stream.
+  const onAirRoom = new Map<string, string | null>();
   const owners = [...new Set((targets ?? []).map((t: any) => t.owner_wallet as string))];
   await Promise.all(owners.map(async (w) => {
     const { data } = await db.from("live_streams")
       .select("id, title, started_at").eq("owner_wallet", w).eq("status", "live")
       .order("started_at", { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
     liveCache.set(w as string, data ?? null);
+    const { data: room } = await db.from("meeting_rooms").select("id").eq("owner_wallet", w)
+      .eq("studio_on_air", true).is("archived_at", null).limit(1).maybeSingle();
+    onAirRoom.set(w as string, room?.id ?? null);
   }));
   // All sites at once, so a few slow or dead sites can't stretch the tick.
   await Promise.all((targets ?? []).map(async (t: any) => {
@@ -25,21 +30,22 @@ export async function runLivePushTick() {
         .order("started_at", { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
       liveCache.set(t.owner_wallet, data ?? null);
     }
-    const s = liveCache.get(t.owner_wallet);
+    const live = liveCache.get(t.owner_wallet);
+    const s = !t.room_id || onAirRoom.get(t.owner_wallet) === t.room_id ? live : null;
     const now = Date.now();
     const action = decidePush({
       enabled: t.enabled, lastState: t.last_state, lastStreamId: t.last_stream_id,
       lastPushedAt: t.last_pushed_at ? Date.parse(t.last_pushed_at) : null, lastError: t.last_error,
     }, s?.id ?? null, now);
     if (!action) return;
-    const streamId = action === "live" ? s.id : t.last_stream_id;
+    const streamId = action === "live" ? s!.id : t.last_stream_id;
     let err: string | null = null;
     try {
       const secret = await openPushKey(t.secret_sealed);
       const body = JSON.stringify({
         event: action, siteId: t.id, wallet: t.owner_wallet, streamId,
-        title: action === "live" ? s.title : null,
-        startedAt: action === "live" ? s.started_at : null,
+        title: action === "live" ? s!.title : null,
+        startedAt: action === "live" ? s!.started_at : null,
         embedUrl: streamId ? `${ORIGIN}/embed/live/${streamId}` : null,
         watchUrl: streamId ? `${ORIGIN}/live/${streamId}` : null,
         sentAt: new Date(now).toISOString(), nonce: crypto.randomUUID(),

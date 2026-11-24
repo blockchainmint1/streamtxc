@@ -95,7 +95,7 @@ export function CreatorStudioHub(_props: { wallet: string }) {
 
       <section className="space-y-3">
         <h2 className="text-2xl font-bold">Destinations</h2>
-        <p className="text-sm text-muted-foreground">Send your show to YouTube, Facebook, Twitch, any RTMP server, or partner websites like Honest.Money and TEXITcoin.org. Website switches start off so tests stay private.</p>
+        <p className="text-sm text-muted-foreground">Send your show to YouTube, Facebook, Twitch, any RTMP server, or partner websites like Honest.Money and TEXITcoin.org. Website switches start off so tests stay private. These go out from every stream; to send only one studio somewhere, add it inside that studio.</p>
         <RestreamDestinations />
       </section>
 

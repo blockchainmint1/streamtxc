@@ -16,18 +16,19 @@ import { RESTREAM_PRESETS, type RestreamPlatform } from "@/lib/restream-rules";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
 
-export function RestreamDestinations() {
+export function RestreamDestinations({ roomId }: { roomId?: string } = {}) {
+  const scoped = roomId ? { roomId } : {};
   const qc = useQueryClient();
   const list = useServerFn(listRestreamDestinations);
   const save = useServerFn(saveRestreamDestination);
   const del = useServerFn(deleteRestreamDestination);
   const apply = useServerFn(applyRestreamDestinations);
-  const { data, isLoading } = useQuery({ queryKey: ["restream"], queryFn: () => list() });
+  const { data, isLoading } = useQuery({ queryKey: ["restream", roomId ?? "all"], queryFn: () => list({ data: scoped }) });
   const listWeb = useServerFn(listLivePushSites);
   const saveWeb = useServerFn(saveLivePushSite);
   const toggleWeb = useServerFn(toggleLivePushSite);
   const delWeb = useServerFn(deleteLivePushSite);
-  const web = useQuery({ queryKey: ["live-push"], queryFn: () => listWeb(), refetchInterval: 30_000, retry: false });
+  const web = useQuery({ queryKey: ["live-push", roomId ?? "all"], queryFn: () => listWeb({ data: scoped }), refetchInterval: 30_000, retry: false });
   const refreshWeb = () => qc.invalidateQueries({ queryKey: ["live-push"] });
   const [platform, setPlatform] = useState<RestreamPlatform | "website">("youtube");
   const [name, setName] = useState("");
@@ -43,11 +44,11 @@ export function RestreamDestinations() {
     setBusy(true);
     try {
       if (platform === "website") {
-        await saveWeb({ data: { name: name || "Website", endpoint: serverUrl, key: streamKey } });
+        await saveWeb({ data: { ...scoped, name: name || "Website", endpoint: serverUrl, key: streamKey } });
         toast.success("Saved. Flip its switch on when you want your stream to show there.");
         refreshWeb();
       } else {
-        await save({ data: { name: name || preset.label, platform, serverUrl: serverUrl || undefined, streamKey } });
+        await save({ data: { ...scoped, name: name || preset.label, platform, serverUrl: serverUrl || undefined, streamKey } });
         toast.success("Saved. Press “Update my live channel” while it's off.");
         refresh();
       }
@@ -58,7 +59,7 @@ export function RestreamDestinations() {
   async function applyNow() {
     setBusy(true);
     try {
-      const r = await apply();
+      const r = await apply({ data: scoped });
       toast.success(r.count ? `Your live channel will now also go to ${r.count} other site${r.count > 1 ? "s" : ""}.` : "Extra destinations removed from your live channel.");
     } catch (err) { toast.error(msg(err)); } finally { setBusy(false); }
   }

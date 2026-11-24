@@ -569,6 +569,7 @@ export type Database = {
           last_stream_id: string | null
           name: string
           owner_wallet: string
+          room_id: string | null
           secret_sealed: string
           updated_at: string
         }
@@ -584,6 +585,7 @@ export type Database = {
           last_stream_id?: string | null
           name: string
           owner_wallet: string
+          room_id?: string | null
           secret_sealed: string
           updated_at?: string
         }
@@ -599,10 +601,19 @@ export type Database = {
           last_stream_id?: string | null
           name?: string
           owner_wallet?: string
+          room_id?: string | null
           secret_sealed?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "live_push_sites_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       live_push_targets: {
         Row: {
@@ -1058,6 +1069,7 @@ export type Database = {
           name: string
           owner_wallet: string
           platform: string
+          room_id: string | null
           server_url: string
           stream_key_enc: string
           updated_at: string
@@ -1070,6 +1082,7 @@ export type Database = {
           name: string
           owner_wallet: string
           platform?: string
+          room_id?: string | null
           server_url: string
           stream_key_enc: string
           updated_at?: string
@@ -1082,11 +1095,20 @@ export type Database = {
           name?: string
           owner_wallet?: string
           platform?: string
+          room_id?: string | null
           server_url?: string
           stream_key_enc?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "restream_destinations_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "meeting_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       video_drafts: {
         Row: {

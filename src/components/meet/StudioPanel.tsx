@@ -2,6 +2,7 @@
 // browser paints the finished picture on a canvas and shares it into the
 // meeting as "content". The live connector uses the presenter-only layout,
 // so whatever this canvas shows is exactly what the live stream shows.
+import { RestreamDestinations } from "@/components/RestreamDestinations";
 import { STUDIO_TOPIC, type StudioSignal } from "@/lib/green-room";
 import { useServerFn } from "@tanstack/react-start";
 import { setStudioStage } from "@/lib/meetings.functions";
@@ -245,6 +246,13 @@ export function StudioPanel({
         </div>
       </div>
 
+      {roomId && (
+        <section className="lg:col-span-2 lg:row-start-2 border border-border rounded-sm p-4 bg-card space-y-3 order-last">
+          <div className="font-mono text-xs text-primary">[ THIS STUDIO'S DESTINATIONS ]</div>
+          <p className="text-xs text-muted-foreground">Where this studio sends its show, on top of streamTXC. Destinations on the Manage → Stream tab go out from every studio.</p>
+          <RestreamDestinations roomId={roomId} />
+        </section>
+      )}
       <aside className="space-y-4 border border-border rounded-sm p-4 bg-card h-fit">
         <div>
           <Label className="mb-2 block">Layout</Label>

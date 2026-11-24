@@ -120,6 +120,13 @@
       "when": 1795549571999,
       "tag": "0016_meeting_rooms_studio_state",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795550923045,
+      "tag": "0017_per_studio_destinations",
+      "breakpoints": true
     }
   ]
 }

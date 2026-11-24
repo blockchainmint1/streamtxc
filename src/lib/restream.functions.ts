@@ -22,15 +22,26 @@ async function myChannelId(wallet: string): Promise<string> {
   return String(data.medialive_channel_id);
 }
 
+async function checkRoom(wallet: string, roomId?: string | null) {
+  if (!roomId) return null;
+  const { data } = await (await db()).from("meeting_rooms").select("id").eq("id", roomId).eq("owner_wallet", wallet).is("archived_at", null).maybeSingle();
+  if (!data) throw new Error("That studio isn't yours.");
+  return roomId;
+}
+const scope = (q: any, roomId: string | null) => (roomId ? q.eq("room_id", roomId) : q.is("room_id", null));
+const RoomIn = z.object({ roomId: z.string().uuid().optional() });
+
 const Platform = z.enum(["youtube", "facebook", "twitch", "custom"]);
 
 export const listRestreamDestinations = createServerFn({ method: "POST" })
   .middleware([requireWalletSession])
-  .handler(async ({ context }) => {
-    const { data, error } = await (await db())
+  .inputValidator((i: unknown) => RoomIn.parse(i ?? {}))
+  .handler(async ({ context, data: input }) => {
+    const roomId = await checkRoom(context.wallet, input.roomId);
+    const { data, error } = await scope((await db())
       .from("restream_destinations")
       .select("id, name, platform, server_url, key_hint, enabled, created_at")
-      .eq("owner_wallet", context.wallet)
+      .eq("owner_wallet", context.wallet), roomId)
       .order("created_at");
     if (error) throw new Error("Couldn't load your destinations.");
     return { destinations: data ?? [], max: MAX_RESTREAM_DESTINATIONS };
@@ -41,6 +52,7 @@ export const saveRestreamDestination = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z.object({
       id: z.string().uuid().optional(),
+      roomId: z.string().uuid().optional(),
       name: z.string().trim().min(1).max(60),
       platform: Platform,
       serverUrl: z.string().max(300).optional(),
@@ -50,6 +62,7 @@ export const saveRestreamDestination = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const sb = await db();
+    const roomId = await checkRoom(context.wallet, data.roomId);
     const preset = RESTREAM_PRESETS[data.platform as RestreamPlatform];
     const serverUrl = validateServerUrl(data.serverUrl?.trim() || preset.serverUrl);
     const patch: Record<string, unknown> = {
@@ -68,9 +81,9 @@ export const saveRestreamDestination = createServerFn({ method: "POST" })
       return { ok: true };
     }
     if (!patch.stream_key_enc) throw new Error("Paste the stream key for this destination.");
-    const { count } = await sb.from("restream_destinations").select("id", { count: "exact", head: true }).eq("owner_wallet", context.wallet);
+    const { count } = await scope(sb.from("restream_destinations").select("id", { count: "exact", head: true }).eq("owner_wallet", context.wallet), roomId);
     if ((count ?? 0) >= MAX_RESTREAM_DESTINATIONS) throw new Error(`You can have up to ${MAX_RESTREAM_DESTINATIONS} destinations.`);
-    const { error } = await sb.from("restream_destinations").insert({ ...patch, owner_wallet: context.wallet });
+    const { error } = await sb.from("restream_destinations").insert({ ...patch, owner_wallet: context.wallet, room_id: roomId });
     if (error) throw new Error("Couldn't save that destination.");
     return { ok: true };
   });
@@ -86,13 +99,18 @@ export const deleteRestreamDestination = createServerFn({ method: "POST" })
 /** Write the switched-on destinations into the host's AWS channel (channel must be off). */
 export const applyRestreamDestinations = createServerFn({ method: "POST" })
   .middleware([requireWalletSession])
-  .handler(async ({ context }) => {
+  .inputValidator((i: unknown) => RoomIn.parse(i ?? {}))
+  .handler(async ({ context, data: input }) => {
     const sb = await db();
-    const { data: rows } = await sb
+    const roomId = await checkRoom(context.wallet, input.roomId);
+    // A studio sends to its own destinations plus the "every stream" ones.
+    let q = sb
       .from("restream_destinations")
       .select("server_url, stream_key_enc")
       .eq("owner_wallet", context.wallet)
-      .eq("enabled", true)
+      .eq("enabled", true);
+    q = roomId ? q.or(`room_id.is.null,room_id.eq.${roomId}`) : q.is("room_id", null);
+    const { data: rows } = await q
       .order("created_at");
     const { openStreamKey } = await import("./restream-crypto.server");
     const targets: { serverUrl: string; streamKey: string }[] = [];
