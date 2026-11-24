@@ -61,13 +61,15 @@ export function StudioPanel({
   const [stage, setStage] = useState<string[]>([]);
   const [screen, setScreen] = useState<MediaStream | null>(null);
   const [onAir, setOnAir] = useState(false);
+  const [screenOn, setScreenOn] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const vids = useRef(new Map<string, HTMLVideoElement>());
   const screenVid = useRef<HTMLVideoElement | null>(null);
   const logoImg = useRef<HTMLImageElement | null>(null);
   const tickerX = useRef(W);
-  const state = useRef({ b, stage, people, screen });
-  state.current = { b, stage, people, screen };
+  const liveScreen = screen && screenOn ? screen : null;
+  const state = useRef({ b, stage, people, screen: liveScreen });
+  state.current = { b, stage, people, screen: liveScreen };
 
   // Drop people who left from the stage.
   useEffect(() => {
@@ -179,7 +181,7 @@ export function StudioPanel({
   }
   function offAir() { try { av?.stopContentShare(); } catch { /* noop */ } setOnAir(false); }
   async function addScreen() {
-    try { setScreen(await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false })); }
+    try { setScreenOn(true); setScreen(await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false })); }
     catch { /* cancelled */ }
   }
   function pickLogo(f: File | undefined) {
@@ -241,7 +243,12 @@ export function StudioPanel({
                 )}
               </button>
             ))}
-            <video ref={screenVid} autoPlay playsInline muted className={cn("shrink-0 w-40 aspect-video rounded-sm border border-border bg-card", !screen && "hidden")} />
+            <button type="button" onClick={() => setScreenOn((v) => !v)} aria-pressed={screenOn}
+              className={cn("relative shrink-0 w-40 aspect-video rounded-sm border overflow-hidden bg-card", !screen && "hidden",
+                screenOn ? "border-primary ring-2 ring-primary" : "border-border")}>
+              <video ref={screenVid} autoPlay playsInline muted className="absolute inset-0 h-full w-full object-contain" />
+              <span className="absolute bottom-1 left-1 rounded-sm bg-background/80 px-1.5 font-mono text-[11px]">{screenOn ? "● " : ""}Screen</span>
+            </button>
           </div>
         </div>
       </div>

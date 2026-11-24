@@ -12,7 +12,7 @@ export interface Rect { x: number; y: number; w: number; h: number }
 export function layoutRects(layout: StudioLayout, people: number, hasScreen: boolean, W: number, H: number, gap = 12) {
   const slots: Rect[] = [];
   let screenRect: Rect | null = null;
-  if (hasScreen && (layout === "screen" || people === 0)) {
+  if (hasScreen) {
     const side = people ? Math.round(W * 0.24) : 0;
     screenRect = { x: gap, y: gap, w: W - side - gap * (people ? 3 : 2), h: H - gap * 2 };
     const n = Math.min(people, 4);
