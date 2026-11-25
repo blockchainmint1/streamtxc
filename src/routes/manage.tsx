@@ -1,3 +1,5 @@
+import { StreamDestinationPicker } from "@/components/stream/StreamDestinationPicker";
+import { applyRestreamDestinations } from "@/lib/restream.functions";
 import { hlsUrlForVideo } from "@/lib/ipfs-gateway";
 import { publicOrigin } from "@/lib/site-origin";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -1555,6 +1557,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
   const isAdmin = wallet === ADMIN_WALLET;
   const list = useServerFn(listRecentLiveStreams);
   const create = useServerFn(createLiveStream);
+  const applyDest = useServerFn(applyRestreamDestinations);
   const start = useServerFn(startLiveStream);
   const warmUp = useServerFn(warmUpLiveStream);
   const stop = useServerFn(stopLiveStream);
@@ -1681,6 +1684,12 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
       setXUrl("");
       setFbUrl("");
       setShowtime("");
+      try {
+        const r = await applyDest({ data: {} });
+        if (r.count) toast.success(`Also sending to ${r.count} other platform${r.count > 1 ? "s" : ""}.`);
+      } catch {
+        toast.warning("Destinations saved, but the live channel is on — they'll apply after it's switched off.");
+      }
       toast.success(
         showtime
           ? "Stream created — AWS will warm up automatically 15 minutes before showtime"
@@ -2035,6 +2044,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
             className="font-mono text-xs mt-1"
           />
         </label>
+        <StreamDestinationPicker />
         <Button onClick={handleCreate} disabled={busy} className="font-mono">
           Create stream
         </Button>
