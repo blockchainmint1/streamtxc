@@ -65,6 +65,7 @@ import { NotificationPrefs } from "@/components/NotificationPrefs";
 import { MeetingRoomsManager } from "@/components/meet/HostPanel";
 import { SignInSecuritySection } from "@/components/SignInSecurity";
 import { RestreamDestinations } from "@/components/RestreamDestinations";
+import { StreamActiveDestinations } from "@/components/stream/StreamActiveDestinations";
 import { ADMIN_WALLET } from "@/lib/admin";
 import { BranchSharePanel } from "@/components/BranchSharePanel";
 import { listBugReports } from "@/lib/bug-reports.functions";
@@ -2092,6 +2093,7 @@ function GoLiveAdminSection({ wallet }: { wallet: string }) {
                       <> · warmed {new Date(s.warmup_started_at).toLocaleTimeString()}</>
                     )}
                   </div>
+                  {(s.status === "scheduled" || isActive) && <StreamActiveDestinations />}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {s.status === "scheduled" &&
@@ -3109,6 +3111,7 @@ function MyGoLiveSection({ wallet }: { wallet: string }) {
               <div className="font-mono text-xs text-muted-foreground">
                 Active broadcast: {activeStream.title}
               </div>
+              <StreamActiveDestinations />
               <div className="flex gap-2 flex-wrap">
                 {activeStream.status === "starting" && (
                   <Button
