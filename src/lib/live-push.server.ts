@@ -59,7 +59,11 @@ export async function runLivePushTick() {
         body, signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) err = `site answered ${res.status}`;
-    } catch { err = err ?? "site didn't answer"; }
+    } catch (e) {
+      const m = e instanceof Error ? e.message : "";
+      err = err ?? (/partner key|SEAL_KEY|SESSION_SECRET/.test(m) ? "saved key unreadable — re-enter it" : "site didn't answer");
+      console.error("live push failed", t.id, m);
+    }
     await db.from("live_push_sites").update({
       last_state: err ? t.last_state : action === "live" ? "live" : "off",
       last_stream_id: streamId, last_pushed_at: new Date(now).toISOString(), last_error: err, updated_at: new Date(now).toISOString(),

@@ -18,6 +18,11 @@ export async function sealPushKey(plain: string): Promise<string> {
   return `p1.${b64(iv)}.${b64(ct)}`;
 }
 export async function openPushKey(sealed: string): Promise<string> {
+  // Sites saved before the dedicated seal key existed use the stream-key format.
+  if (sealed.startsWith("v1.")) {
+    const { openStreamKey } = await import("./restream-crypto.server");
+    return openStreamKey(sealed);
+  }
   const [v, iv, ct] = sealed.split(".");
   if (v !== "p1" || !iv || !ct) throw new Error("Unreadable partner key");
   const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(iv) }, await key(), unb64(ct));
