@@ -254,7 +254,7 @@ export async function createHlsOriginEndpoint(args: {
     manifestName: "index",
     startoverWindowSeconds: 3600,
     hlsPackage: {
-      segmentDurationSeconds: 4,
+      segmentDurationSeconds: 2,
       playlistWindowSeconds: 60,
       playlistType: "EVENT",
       adMarkers: "NONE",

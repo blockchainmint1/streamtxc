@@ -112,13 +112,13 @@ export function VideoPlayerV2({
         isLive
           ? {
               enableWorker: true,
-              // Live: give the player a real buffer cushion. Segments are
-              // 6s, so 3 segments (~18s) behind the edge is the sweet spot
-              // between latency and resilience to jitter.
+              // Live: small buffer cushion. Live segments are
+              // 2s, so 3 segments (~6s) behind the edge balances delay
+              // against resilience to jitter; catch up past ~12s.
               maxBufferLength: 30,
               backBufferLength: 30,
               liveSyncDurationCount: 3,
-              liveMaxLatencyDurationCount: 12,
+              liveMaxLatencyDurationCount: 6,
               lowLatencyMode: false,
               // -1 = start at hls.js' computed live sync position (NOT the
               // absolute manifest edge, which has no buffer ahead of it).

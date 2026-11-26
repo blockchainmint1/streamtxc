@@ -177,7 +177,7 @@ function LivePreview({ src, poster }: { src: string; poster?: string }) {
         enableWorker: true,
         maxBufferLength: 20,
         liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 12,
+        liveMaxLatencyDurationCount: 6,
         lowLatencyMode: false,
         startPosition: -1,
         capLevelToPlayerSize: true,
